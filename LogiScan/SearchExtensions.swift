@@ -1,0 +1,58 @@
+//
+//  SearchExtensions.swift
+//  LogiScan
+//
+//  Created by Demeulemeester on 30/09/2025.
+//
+
+import Foundation
+
+extension Array where Element == StockItem {
+    func filteredBySearch(_ searchText: String) -> [StockItem] {
+        guard !searchText.isEmpty else { return self }
+        
+        let lowercaseQuery = searchText.lowercased()
+        return filter { item in
+            item.name.lowercased().contains(lowercaseQuery) ||
+            item.sku.lowercased().contains(lowercaseQuery)
+        }
+    }
+}
+
+extension Array where Element == Event {
+    func filteredBySearch(_ searchText: String) -> [Event] {
+        guard !searchText.isEmpty else { return self }
+        
+        let lowercaseQuery = searchText.lowercased()
+        return filter { event in
+            event.name.lowercased().contains(lowercaseQuery) ||
+            event.client.lowercased().contains(lowercaseQuery)
+        }
+    }
+}
+
+extension Array where Element == Truck {
+    func filteredBySearch(_ searchText: String) -> [Truck] {
+        guard !searchText.isEmpty else { return self }
+        
+        let lowercaseQuery = searchText.lowercased()
+        return filter { truck in
+            truck.licensePlate.lowercased().contains(lowercaseQuery) ||
+            truck.truckId.lowercased().contains(lowercaseQuery)
+        }
+    }
+}
+
+extension Array where Element == Asset {
+    func filteredBySearch(_ searchText: String) -> [Asset] {
+        guard !searchText.isEmpty else { return self }
+        
+        let lowercaseQuery = searchText.lowercased()
+        return filter { asset in
+            asset.name.lowercased().contains(lowercaseQuery) ||
+            asset.sku.lowercased().contains(lowercaseQuery) ||
+            asset.assetId.lowercased().contains(lowercaseQuery) ||
+            (asset.serialNumber?.lowercased().contains(lowercaseQuery) ?? false)
+        }
+    }
+}

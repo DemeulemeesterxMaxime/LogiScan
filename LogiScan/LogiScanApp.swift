@@ -10,22 +10,29 @@ import SwiftData
 
 @main
 struct LogiScanApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
+    let sharedModelContainer: ModelContainer
+    
+    init() {
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            sharedModelContainer = try ModelContainer(
+                for: Asset.self,
+                     StockItem.self,
+                     Location.self,
+                     Truck.self,
+                     Event.self,
+                     Order.self,
+                     OrderLine.self,
+                     OrderTimestamp.self,
+                     Movement.self
+            )
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
-    }()
+    }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainTabView()
         }
         .modelContainer(sharedModelContainer)
     }
