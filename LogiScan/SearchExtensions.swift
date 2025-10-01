@@ -14,8 +14,19 @@ extension Array where Element == StockItem {
         let lowercaseQuery = searchText.lowercased()
         return filter { item in
             item.name.lowercased().contains(lowercaseQuery) ||
-            item.sku.lowercased().contains(lowercaseQuery)
+            item.sku.lowercased().contains(lowercaseQuery) ||
+            item.tags.contains { $0.lowercased().contains(lowercaseQuery) }
         }
+    }
+    
+    func filteredByTag(_ tag: String) -> [StockItem] {
+        guard !tag.isEmpty else { return self }
+        return filter { $0.tags.contains(tag) }
+    }
+    
+    func filteredByCategory(_ category: String) -> [StockItem] {
+        guard category != "Tous" else { return self }
+        return filter { $0.category == category }
     }
 }
 

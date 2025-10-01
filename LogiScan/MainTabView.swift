@@ -10,34 +10,22 @@ import SwiftData
 
 struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
-    
-    // Repositories initialisés avec lazy loading
-    private var assetRepository: AssetRepository {
-        AssetRepository(modelContext: modelContext)
-    }
-    
-    private var movementRepository: MovementRepository {
-        MovementRepository(modelContext: modelContext)
-    }
+    @State private var isDataInitialized = false
     
     var body: some View {
         TabView {
             // Dashboard
             DashboardView()
                 .onAppear {
-                    // Configuration du dashboard avec les repositories
-                    // TODO: Passer les repositories au DashboardViewModel
+                    initializeSampleDataIfNeeded()
                 }
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
                     Text("Tableau de bord")
                 }
             
-            // Scanner QR
-            ScannerMainView(
-                assetRepository: assetRepository,
-                movementRepository: movementRepository
-            )
+            // Scanner QR - Version simplifiée sans repositories
+            SimpleScannerView()
             .tabItem {
                 Image(systemName: "qrcode.viewfinder")
                 Text("Scanner")
@@ -50,15 +38,15 @@ struct MainTabView: View {
                     Text("Stock")
                 }
             
-            // Événements
-            EventsListView()
+            // Événements - Version simplifiée
+            Text("Événements - En cours de développement")
                 .tabItem {
                     Image(systemName: "calendar.circle.fill")
                     Text("Événements")
                 }
             
-            // Camions
-            TrucksListView()
+            // Camions - Version simplifiée
+            Text("Camions - En cours de développement")
                 .tabItem {
                     Image(systemName: "truck.box.fill")
                     Text("Camions")
@@ -66,11 +54,62 @@ struct MainTabView: View {
         }
         .accentColor(.blue)
     }
+    
+    private func initializeSampleDataIfNeeded() {
+        guard !isDataInitialized else { return }
+        
+        print("🔄 Initialisation données d'exemple simplifiées...")
+        
+        Task {
+            // Données ultra-simplifiées pour éviter tout conflit
+            do {
+                // Vérifier si des données existent déjà
+                let existingItems = try modelContext.fetch(FetchDescriptor<StockItem>())
+                
+                if existingItems.isEmpty {
+                    // Créer quelques items de base
+                    let item1 = StockItem(
+                        sku: "SPK-001",
+                        name: "Enceinte Test",
+                        category: "Audio",
+                        totalQuantity: 5,
+                        unitWeight: 10.0,
+                        unitVolume: 0.1,
+                        unitValue: 500.0
+                    )
+                    
+                    let item2 = StockItem(
+                        sku: "LED-001", 
+                        name: "LED Test",
+                        category: "Éclairage",
+                        totalQuantity: 10,
+                        unitWeight: 2.0,
+                        unitVolume: 0.05,
+                        unitValue: 100.0
+                    )
+                    
+                    modelContext.insert(item1)
+                    modelContext.insert(item2)
+                    
+                    try modelContext.save()
+                    print("✅ Données d'exemple créées")
+                } else {
+                    print("✅ Données existantes trouvées (\(existingItems.count) items)")
+                }
+                
+                isDataInitialized = true
+                
+            } catch {
+                print("⚠️ Erreur création données d'exemple: \(error)")
+                isDataInitialized = true // Marquer comme initialisé même en cas d'erreur
+            }
+        }
+    }
 }
 
 #Preview {
     let container = try! ModelContainer(
-        for: Asset.self, Movement.self, StockItem.self, Event.self, Truck.self, Location.self, Order.self, OrderLine.self, OrderTimestamp.self,
+        for: StockItem.self, Asset.self, Movement.self, Event.self, Truck.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     

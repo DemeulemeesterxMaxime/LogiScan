@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class Asset {
-    @Attribute(.unique) var assetId: String
+    var assetId: String // Retiré @Attribute(.unique) temporairement
     var sku: String
     var name: String
     var category: String

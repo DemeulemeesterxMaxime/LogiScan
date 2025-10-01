@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class Movement {
-    @Attribute(.unique) var movementId: String
+    var movementId: String // Retiré @Attribute(.unique) temporairement
     var type: MovementType
     var assetId: String?
     var sku: String?

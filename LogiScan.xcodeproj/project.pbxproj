@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 90;
 	objects = {
 
 /* Begin PBXContainerItemProxy section */
@@ -63,24 +63,18 @@
 /* Begin PBXFrameworksBuildPhase section */
 		81E94FEB2E84495200413192 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E94FFC2E84495400413192 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E950062E84495400413192 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -118,14 +112,10 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			fileSystemSynchronizedGroups = (
 				81E94FF02E84495200413192 /* LogiScan */,
 			);
 			name = LogiScan;
-			packageProductDependencies = (
-			);
 			productName = LogiScan;
 			productReference = 81E94FEE2E84495200413192 /* LogiScan.app */;
 			productType = "com.apple.product-type.application";
@@ -147,8 +137,6 @@
 				81E950022E84495400413192 /* LogiScanTests */,
 			);
 			name = LogiScanTests;
-			packageProductDependencies = (
-			);
 			productName = LogiScanTests;
 			productReference = 81E94FFF2E84495400413192 /* LogiScanTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -170,8 +158,6 @@
 				81E9500C2E84495400413192 /* LogiScanUITests */,
 			);
 			name = LogiScanUITests;
-			packageProductDependencies = (
-			);
 			productName = LogiScanUITests;
 			productReference = 81E950092E84495400413192 /* LogiScanUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -208,7 +194,7 @@
 			);
 			mainGroup = 81E94FE52E84495200413192;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
+			preferredProjectObjectVersion = 90;
 			productRefGroup = 81E94FEF2E84495200413192 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -223,48 +209,36 @@
 /* Begin PBXResourcesBuildPhase section */
 		81E94FEC2E84495200413192 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E94FFD2E84495400413192 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E950072E84495400413192 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		81E94FEA2E84495200413192 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E94FFB2E84495400413192 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E950052E84495400413192 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
@@ -282,7 +256,7 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		81E950132E84495400413192 /* Debug */ = {
+		81E950132E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScan" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -321,7 +295,7 @@
 			};
 			name = Debug;
 		};
-		81E950142E84495400413192 /* Release */ = {
+		81E950142E84495400413192 /* Release configuration for PBXNativeTarget "LogiScan" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -361,7 +335,7 @@
 			};
 			name = Release;
 		};
-		81E950152E84495400413192 /* Debug */ = {
+		81E950152E84495400413192 /* Debug configuration for PBXProject "LogiScan" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -425,7 +399,7 @@
 			};
 			name = Debug;
 		};
-		81E950162E84495400413192 /* Release */ = {
+		81E950162E84495400413192 /* Release configuration for PBXProject "LogiScan" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -482,7 +456,7 @@
 			};
 			name = Release;
 		};
-		81E950182E84495400413192 /* Debug */ = {
+		81E950182E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScanTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -501,7 +475,7 @@
 			};
 			name = Debug;
 		};
-		81E950192E84495400413192 /* Release */ = {
+		81E950192E84495400413192 /* Release configuration for PBXNativeTarget "LogiScanTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -520,7 +494,7 @@
 			};
 			name = Release;
 		};
-		81E9501B2E84495400413192 /* Debug */ = {
+		81E9501B2E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScanUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -537,7 +511,7 @@
 			};
 			name = Debug;
 		};
-		81E9501C2E84495400413192 /* Release */ = {
+		81E9501C2E84495400413192 /* Release configuration for PBXNativeTarget "LogiScanUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -560,37 +534,33 @@
 		81E94FE92E84495200413192 /* Build configuration list for PBXProject "LogiScan" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				81E950152E84495400413192 /* Debug */,
-				81E950162E84495400413192 /* Release */,
+				81E950152E84495400413192 /* Debug configuration for PBXProject "LogiScan" */,
+				81E950162E84495400413192 /* Release configuration for PBXProject "LogiScan" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		81E950122E84495400413192 /* Build configuration list for PBXNativeTarget "LogiScan" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				81E950132E84495400413192 /* Debug */,
-				81E950142E84495400413192 /* Release */,
+				81E950132E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScan" */,
+				81E950142E84495400413192 /* Release configuration for PBXNativeTarget "LogiScan" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		81E950172E84495400413192 /* Build configuration list for PBXNativeTarget "LogiScanTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				81E950182E84495400413192 /* Debug */,
-				81E950192E84495400413192 /* Release */,
+				81E950182E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScanTests" */,
+				81E950192E84495400413192 /* Release configuration for PBXNativeTarget "LogiScanTests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		81E9501A2E84495400413192 /* Build configuration list for PBXNativeTarget "LogiScanUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				81E9501B2E84495400413192 /* Debug */,
-				81E9501C2E84495400413192 /* Release */,
+				81E9501B2E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScanUITests" */,
+				81E9501C2E84495400413192 /* Release configuration for PBXNativeTarget "LogiScanUITests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */

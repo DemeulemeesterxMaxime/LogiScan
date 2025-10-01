@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class StockItem {
-    @Attribute(.unique) var sku: String
+    var sku: String // Retiré @Attribute(.unique) temporairement
     var name: String
     var category: String
     var totalQuantity: Int
@@ -20,6 +20,7 @@ final class StockItem {
     var unitValue: Double
     var images: [String] // URLs ou noms de fichiers
     var substituables: [String] // SKUs équivalents
+    var tags: [String] // Étiquettes personnalisables
     var createdAt: Date
     var updatedAt: Date
     
@@ -33,7 +34,8 @@ final class StockItem {
         unitVolume: Double,
         unitValue: Double,
         images: [String] = [],
-        substituables: [String] = []
+        substituables: [String] = [],
+        tags: [String] = []
     ) {
         self.sku = sku
         self.name = name
@@ -45,6 +47,7 @@ final class StockItem {
         self.unitValue = unitValue
         self.images = images
         self.substituables = substituables
+        self.tags = tags
         self.createdAt = Date()
         self.updatedAt = Date()
     }

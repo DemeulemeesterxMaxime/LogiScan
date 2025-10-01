@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class Location {
-    @Attribute(.unique) var locationId: String
+    var locationId: String // Retiré @Attribute(.unique) pour éviter les conflits
     var type: LocationType
     var name: String
     var parentLocationId: String?

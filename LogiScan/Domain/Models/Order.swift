@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class Order {
-    @Attribute(.unique) var orderId: String
+    var orderId: String // Retiré @Attribute(.unique) pour éviter les conflits
     var eventId: String
     var status: OrderStatus
     var assignedTruckId: String?
@@ -20,9 +20,9 @@ final class Order {
     var createdAt: Date
     var updatedAt: Date
     
-    // Relations
-    @Relationship(deleteRule: .cascade) var orderLines: [OrderLine] = []
-    @Relationship(deleteRule: .cascade) var timestamps: [OrderTimestamp] = []
+    // Relations simplifiées pour éviter les problèmes SwiftData
+    // @Relationship(deleteRule: .cascade) var orderLines: [OrderLine] = []
+    // @Relationship(deleteRule: .cascade) var timestamps: [OrderTimestamp] = []
     
     init(
         orderId: String,
@@ -47,20 +47,22 @@ final class Order {
 
 @Model
 final class OrderLine {
+    var orderId: String // Référence explicite au lieu de @Relationship
     var sku: String?
     var assetId: String?
     var requestedQuantity: Int
     var confirmedQuantity: Int
     var unitPrice: Double
-    var order: Order?
     
     init(
+        orderId: String,
         sku: String? = nil,
         assetId: String? = nil,
         requestedQuantity: Int,
         confirmedQuantity: Int = 0,
         unitPrice: Double = 0.0
     ) {
+        self.orderId = orderId
         self.sku = sku
         self.assetId = assetId
         self.requestedQuantity = requestedQuantity
@@ -71,18 +73,20 @@ final class OrderLine {
 
 @Model
 final class OrderTimestamp {
+    var orderId: String // Référence explicite au lieu de @Relationship
     var status: OrderStatus
     var timestamp: Date
     var userId: String?
     var notes: String
-    var order: Order?
     
     init(
+        orderId: String,
         status: OrderStatus,
         timestamp: Date = Date(),
         userId: String? = nil,
         notes: String = ""
     ) {
+        self.orderId = orderId
         self.status = status
         self.timestamp = timestamp
         self.userId = userId

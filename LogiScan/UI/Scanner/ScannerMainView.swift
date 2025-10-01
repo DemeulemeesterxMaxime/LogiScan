@@ -248,10 +248,9 @@ struct ScannerMainView: View {
 }
 
 #Preview {
-    // Simplification du preview - les repositories seront créés automatiquement
-    // par l'environnement SwiftUI avec le modelContainer
+    // Preview simplifié avec modèles de base seulement
     let container = try! ModelContainer(
-        for: Asset.self, StockItem.self, Location.self, Truck.self, Event.self, Order.self, OrderLine.self, OrderTimestamp.self, Movement.self,
+        for: StockItem.self, Asset.self, Movement.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     

@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class Truck {
-    @Attribute(.unique) var truckId: String
+    var truckId: String // Retiré @Attribute(.unique) pour éviter les conflits
     var licensePlate: String
     var maxVolume: Double
     var maxWeight: Double

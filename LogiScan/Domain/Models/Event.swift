@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class Event {
-    @Attribute(.unique) var eventId: String
+    var eventId: String // Retiré @Attribute(.unique) pour éviter les conflits
     var name: String
     var client: String
     var address: String

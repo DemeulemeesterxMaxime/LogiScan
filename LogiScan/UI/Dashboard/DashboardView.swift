@@ -10,8 +10,28 @@ import SwiftData
 import Charts
 
 struct DashboardView: View {
-    @StateObject private var viewModel = DashboardViewModel()
+    @Environment(\.modelContext) private var modelContext
+    @Query private var stockItems: [StockItem]
+    @Query private var movements: [Movement]
+    @Query private var assets: [Asset]
+    
     @State private var selectedPeriod: DashboardPeriod = .today
+    
+    var activeAssetsCount: Int {
+        assets.filter { $0.status == .ok }.count
+    }
+    
+    var todayMovementsCount: Int {
+        let today = Calendar.current.startOfDay(for: Date())
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: today)!
+        return movements.filter { movement in
+            movement.timestamp >= today && movement.timestamp < tomorrow
+        }.count
+    }
+    
+    var recentMovements: [Movement] {
+        Array(movements.sorted { $0.timestamp > $1.timestamp }.prefix(5))
+    }
     
     var body: some View {
         NavigationView {
@@ -36,73 +56,69 @@ struct DashboardView: View {
             }
             .navigationTitle("Tableau de bord")
             .refreshable {
-                await viewModel.refreshData()
-            }
-        }
-        .onAppear {
-            Task {
-                await viewModel.loadData(for: selectedPeriod)
-            }
-        }
-        .onChange(of: selectedPeriod) { newPeriod in
-            Task {
-                await viewModel.loadData(for: newPeriod)
+                // Refresh des données SwiftData automatique
             }
         }
     }
     
     private var periodSelector: some View {
-        HStack {
-            ForEach(DashboardPeriod.allCases, id: \.self) { period in
-                Button(action: {
-                    selectedPeriod = period
-                }) {
-                    Text(period.displayName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(selectedPeriod == period ? Color.accentColor : Color(.systemGray5))
-                        )
-                        .foregroundColor(selectedPeriod == period ? .white : .primary)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                ForEach(DashboardPeriod.allCases, id: \.self) { period in
+                    periodButton(for: period)
                 }
             }
+            .padding(.horizontal)
         }
-        .padding(.horizontal)
+    }
+    
+    private func periodButton(for period: DashboardPeriod) -> some View {
+        Button(action: {
+            selectedPeriod = period
+        }) {
+            Text(period.displayName)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(selectedPeriod == period ? Color.accentColor : Color.gray.opacity(0.2))
+                )
+                .foregroundColor(selectedPeriod == period ? .white : .primary)
+        }
     }
     
     private var metricsGrid: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
             MetricCard(
                 title: "Assets actifs",
-                value: "\(viewModel.activeAssets)",
-                change: viewModel.activeAssetsChange,
+                value: "\(activeAssetsCount)",
+                change: nil,
                 icon: "cube.box.fill",
                 color: .blue
             )
             
             MetricCard(
-                title: "Événements",
-                value: "\(viewModel.activeEvents)",
-                change: viewModel.activeEventsChange,
-                icon: "calendar.circle.fill",
+                title: "Articles en stock",
+                value: "\(stockItems.count)",
+                change: nil,
+                icon: "cube.box",
                 color: .green
             )
             
             MetricCard(
-                title: "Camions",
-                value: "\(viewModel.activeTrucks)",
-                change: viewModel.activeTrucksChange,
-                icon: "truck.box.fill",
+                title: "Stock total",
+                value: "\(stockItems.map(\.totalQuantity).reduce(0, +))",
+                change: nil,
+                icon: "square.stack.3d.up.fill",
                 color: .orange
             )
             
             MetricCard(
-                title: "Mouvements",
-                value: "\(viewModel.todayMovements)",
-                change: viewModel.movementsChange,
+                title: "Mouvements aujourd'hui",
+                value: "\(todayMovementsCount)",
+                change: nil,
                 icon: "arrow.left.arrow.right.circle.fill",
                 color: .purple
             )
@@ -111,29 +127,27 @@ struct DashboardView: View {
     
     private var chartsSection: some View {
         VStack(spacing: 16) {
-            // Graphique des mouvements par jour
-            ChartCard(title: "Mouvements quotidiens") {
-                Chart(viewModel.dailyMovements) { data in
-                    BarMark(
-                        x: .value("Date", data.date, unit: .day),
-                        y: .value("Mouvements", data.count)
-                    )
-                    .foregroundStyle(Color.accentColor.gradient)
+            // Graphique simple des catégories
+            ChartCard(title: "Répartition du stock par catégorie") {
+                if stockItems.isEmpty {
+                    Text("Aucune donnée disponible")
+                        .foregroundColor(.secondary)
+                        .frame(height: 150)
+                } else {
+                    let categoryData = Dictionary(grouping: stockItems, by: \.category)
+                        .mapValues { $0.map(\.totalQuantity).reduce(0, +) }
+                        .map { DistributionCategoryData(category: $0.key, count: $0.value) }
+                    
+                    Chart(categoryData) { data in
+                        SectorMark(
+                            angle: .value("Count", data.count),
+                            innerRadius: .ratio(0.5),
+                            angularInset: 2
+                        )
+                        .foregroundStyle(by: .value("Category", data.category))
+                    }
+                    .frame(height: 150)
                 }
-                .frame(height: 150)
-            }
-            
-            // Graphique répartition par catégorie
-            ChartCard(title: "Répartition par catégorie") {
-                Chart(viewModel.categoryDistribution) { data in
-                    SectorMark(
-                        angle: .value("Count", data.count),
-                        innerRadius: .ratio(0.5),
-                        angularInset: 2
-                    )
-                    .foregroundStyle(by: .value("Category", data.category))
-                }
-                .frame(height: 150)
             }
         }
     }
@@ -219,14 +233,20 @@ struct DashboardView: View {
             }
             
             LazyVStack(spacing: 12) {
-                ForEach(viewModel.recentMovements.prefix(5), id: \.movementId) { movement in
+                ForEach(recentMovements, id: \.movementId) { movement in
                     RecentActivityRow(movement: movement)
+                }
+                
+                if recentMovements.isEmpty {
+                    Text("Aucun mouvement récent")
+                        .foregroundColor(.secondary)
+                        .padding()
                 }
             }
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemGray6))
+                    .fill(Color.gray.opacity(0.1))
             )
         }
     }
@@ -266,7 +286,7 @@ struct MetricCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
+                .fill(Color.gray.opacity(0.1))
         )
     }
     
@@ -303,7 +323,7 @@ struct ChartCard<Content: View>: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
+                .fill(Color.gray.opacity(0.1))
         )
     }
 }
@@ -331,7 +351,7 @@ struct QuickActionButton: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemGray6))
+                    .fill(Color.gray.opacity(0.1))
             )
         }
     }
@@ -388,6 +408,12 @@ enum DashboardPeriod: String, CaseIterable {
         case .quarter: return "Ce trimestre"
         }
     }
+}
+
+struct DistributionCategoryData: Identifiable {
+    let id = UUID()
+    let category: String
+    let count: Int
 }
 
 #Preview {
