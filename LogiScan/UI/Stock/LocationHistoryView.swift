@@ -346,11 +346,6 @@ enum HistoryPeriod: String, CaseIterable {
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: Movement.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    
-    return LocationHistoryView(sku: "LED-SPOT-50W")
-        .modelContainer(container)
+    LocationHistoryView(sku: "LED-SPOT-50W")
+        .modelContainer(for: [Movement.self], inMemory: true)
 }

@@ -287,12 +287,7 @@ struct TagChip: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: StockItem.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    
-    let sampleItem = StockItem(
+    @Previewable @State var sampleItem = StockItem(
         sku: "LED-SPOT-50W",
         name: "Projecteur LED 50W",
         category: "Éclairage",
@@ -303,6 +298,6 @@ struct TagChip: View {
         tags: ["LED", "50W", "Extérieur"]
     )
     
-    return TagEditorView(stockItem: sampleItem)
-        .modelContainer(container)
+    TagEditorView(stockItem: sampleItem)
+        .modelContainer(for: [StockItem.self], inMemory: true)
 }

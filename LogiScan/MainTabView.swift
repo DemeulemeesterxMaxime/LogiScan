@@ -108,11 +108,6 @@ struct MainTabView: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: StockItem.self, Asset.self, Movement.self, Event.self, Truck.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    
-    return MainTabView()
-        .modelContainer(container)
+    MainTabView()
+        .modelContainer(for: [StockItem.self, Asset.self, Movement.self, Event.self, Truck.self], inMemory: true)
 }

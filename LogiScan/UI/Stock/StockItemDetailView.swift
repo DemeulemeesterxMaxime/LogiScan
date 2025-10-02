@@ -17,6 +17,7 @@ struct StockItemDetailView: View {
     @State private var showingTagEditor = false
     @State private var showingQRShare = false
     @State private var showingLocationHistory = false
+    @State private var showingEditForm = false
     @State private var qrCodeImage: UIImage?
     
     @Query private var assets: [Asset]
@@ -36,27 +37,37 @@ struct StockItemDetailView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     // En-tête avec image et infos principales
-                    headerSection
+                    HeaderSectionView(stockItem: stockItem)
                     
                     // Code QR
-                    qrCodeSection
+                    QRCodeSectionView(
+                        qrCodeImage: qrCodeImage,
+                        sku: stockItem.sku,
+                        showingQRShare: $showingQRShare
+                    )
                     
                     // Étiquettes
-                    tagsSection
+                    TagsSectionView(
+                        stockItem: stockItem,
+                        showingTagEditor: $showingTagEditor
+                    )
                     
                     // Détails techniques
-                    detailsSection
+                    DetailsSectionView(stockItem: stockItem)
                     
                     // Localisation et disponibilité
-                    availabilitySection
+                    AvailabilitySectionView(stockItem: stockItem)
                     
                     // Assets individuels (si sérialisés)
                     if !filteredAssets.isEmpty {
-                        serializedAssetsSection
+                        SerializedAssetsSectionView(assets: Array(filteredAssets.prefix(5)))
                     }
                     
                     // Historique des mouvements récents
-                    movementHistorySection
+                    MovementHistorySectionView(
+                        movements: Array(relatedMovements.prefix(5)),
+                        showingLocationHistory: $showingLocationHistory
+                    )
                 }
                 .padding()
             }
@@ -71,6 +82,10 @@ struct StockItemDetailView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
+                        Button("Modifier l'article", systemImage: "pencil") {
+                            showingEditForm = true
+                        }
+                        
                         Button("Modifier les étiquettes", systemImage: "tag") {
                             showingTagEditor = true
                         }
@@ -97,6 +112,9 @@ struct StockItemDetailView: View {
         .onAppear {
             generateQRCode()
         }
+        .sheet(isPresented: $showingEditForm) {
+            StockItemFormView(editingItem: stockItem)
+        }
         .sheet(isPresented: $showingTagEditor) {
             TagEditorView(stockItem: stockItem)
         }
@@ -108,7 +126,38 @@ struct StockItemDetailView: View {
         }
     }
     
-    private var headerSection: some View {
+    func generateQRCode() {
+        let qrPayload = """
+        {
+            "v": 1,
+            "type": "stock",
+            "sku": "\(stockItem.sku)",
+            "name": "\(stockItem.name)",
+            "category": "\(stockItem.category)"
+        }
+        """
+        
+        let context = CIContext()
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(qrPayload.utf8)
+        
+        if let outputImage = filter.outputImage {
+            let transform = CGAffineTransform(scaleX: 10, y: 10)
+            let scaledImage = outputImage.transformed(by: transform)
+            
+            if let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) {
+                qrCodeImage = UIImage(cgImage: cgImage)
+            }
+        }
+    }
+}
+
+// MARK: - Header Section
+
+struct HeaderSectionView: View {
+    let stockItem: StockItem
+    
+    var body: some View {
         VStack(spacing: 16) {
             // Image de l'article (placeholder pour l'instant)
             RoundedRectangle(cornerRadius: 12)
@@ -136,25 +185,29 @@ struct StockItemDetailView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
-                categoryBadge
+                Text(stockItem.category)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.blue.opacity(0.2))
+                    )
+                    .foregroundColor(.blue)
             }
         }
     }
+}
+
+// MARK: - QR Code Section
+
+struct QRCodeSectionView: View {
+    let qrCodeImage: UIImage?
+    let sku: String
+    @Binding var showingQRShare: Bool
     
-    private var categoryBadge: some View {
-        Text(stockItem.category)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.blue.opacity(0.2))
-            )
-            .foregroundColor(.blue)
-    }
-    
-    private var qrCodeSection: some View {
+    var body: some View {
         VStack(spacing: 16) {
             HStack {
                 Text("Code QR")
@@ -174,20 +227,20 @@ struct StockItemDetailView: View {
                     .interpolation(.none)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 150, height: 150)
+                    .frame(width: 189, height: 189)  // 5cm à 72 DPI
                     .background(Color.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .shadow(radius: 2)
             } else {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color(.systemGray5))
-                    .frame(width: 150, height: 150)
+                    .frame(width: 189, height: 189)  // 5cm à 72 DPI
                     .overlay(
                         ProgressView()
                     )
             }
             
-            Text("SKU: \(stockItem.sku)")
+            Text("SKU: \(sku)")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -197,8 +250,15 @@ struct StockItemDetailView: View {
                 .fill(Color(.systemGray6))
         )
     }
+}
+
+// MARK: - Tags Section
+
+struct TagsSectionView: View {
+    let stockItem: StockItem
+    @Binding var showingTagEditor: Bool
     
-    private var tagsSection: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Étiquettes")
@@ -243,16 +303,22 @@ struct StockItemDetailView: View {
                 .fill(Color(.systemGray6))
         )
     }
+}
+
+// MARK: - Details Section
+
+struct DetailsSectionView: View {
+    let stockItem: StockItem
     
-    private var detailsSection: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Détails techniques")
                 .font(.headline)
             
             VStack(spacing: 12) {
-                detailRow("Poids unitaire", String(format: "%.2f kg", stockItem.unitWeight))
-                detailRow("Volume unitaire", String(format: "%.3f m³", stockItem.unitVolume))
-                detailRow("Valeur unitaire", String(format: "%.2f €", stockItem.unitValue))
+                DetailRow(title: "Poids unitaire", value: String(format: "%.2f kg", stockItem.unitWeight))
+                DetailRow(title: "Volume unitaire", value: String(format: "%.3f m³", stockItem.unitVolume))
+                DetailRow(title: "Valeur unitaire", value: String(format: "%.2f €", stockItem.unitValue))
                 
                 if !stockItem.substituables.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
@@ -277,27 +343,52 @@ struct StockItemDetailView: View {
                 .fill(Color(.systemGray6))
         )
     }
+}
+
+struct DetailRow: View {
+    let title: String
+    let value: String
     
-    private var availabilitySection: some View {
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            Spacer()
+            
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+        }
+    }
+}
+
+// MARK: - Availability Section
+
+struct AvailabilitySectionView: View {
+    let stockItem: StockItem
+    
+    var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Disponibilité")
                 .font(.headline)
             
             HStack(spacing: 24) {
-                availabilityCard(
+                AvailabilityCard(
                     title: "Total",
                     count: stockItem.totalQuantity,
                     color: .blue
                 )
                 
-                availabilityCard(
+                AvailabilityCard(
                     title: "Disponible",
                     count: stockItem.availableQuantity,
                     color: stockItem.availableQuantity > 0 ? .green : .red
                 )
                 
                 if stockItem.maintenanceQuantity > 0 {
-                    availabilityCard(
+                    AvailabilityCard(
                         title: "Maintenance",
                         count: stockItem.maintenanceQuantity,
                         color: .orange
@@ -311,84 +402,14 @@ struct StockItemDetailView: View {
                 .fill(Color(.systemGray6))
         )
     }
+}
+
+struct AvailabilityCard: View {
+    let title: String
+    let count: Int
+    let color: Color
     
-    private var serializedAssetsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Assets individuels (\(filteredAssets.count))")
-                    .font(.headline)
-                
-                Spacer()
-                
-                Button("Voir tout") {
-                    // TODO: Navigation vers liste complète
-                }
-                .font(.subheadline)
-                .foregroundColor(.blue)
-            }
-            
-            LazyVStack(spacing: 8) {
-                ForEach(Array(filteredAssets.prefix(5)), id: \.assetId) { asset in
-                    AssetRow(asset: asset)
-                }
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
-        )
-    }
-    
-    private var movementHistorySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Mouvements récents")
-                    .font(.headline)
-                
-                Spacer()
-                
-                Button("Historique complet") {
-                    showingLocationHistory = true
-                }
-                .font(.subheadline)
-                .foregroundColor(.blue)
-            }
-            
-            if relatedMovements.isEmpty {
-                Text("Aucun mouvement enregistré")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            } else {
-                LazyVStack(spacing: 8) {
-                    ForEach(Array(relatedMovements.prefix(5)), id: \.movementId) { movement in
-                        MovementRowCompact(movement: movement)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
-        )
-    }
-    
-    private func detailRow(_ title: String, _ value: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Spacer()
-            
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.medium)
-        }
-    }
-    
-    private func availabilityCard(title: String, count: Int, color: Color) -> some View {
+    var body: some View {
         VStack(spacing: 4) {
             Text("\(count)")
                 .font(.title2)
@@ -406,30 +427,39 @@ struct StockItemDetailView: View {
                 .fill(Color(.systemBackground))
         )
     }
+}
+
+// MARK: - Serialized Assets Section
+
+struct SerializedAssetsSectionView: View {
+    let assets: [Asset]
     
-    private func generateQRCode() {
-        let qrPayload = """
-        {
-            "v": 1,
-            "type": "stock",
-            "sku": "\(stockItem.sku)",
-            "name": "\(stockItem.name)",
-            "category": "\(stockItem.category)"
-        }
-        """
-        
-        let context = CIContext()
-        let filter = CIFilter.qrCodeGenerator()
-        filter.message = Data(qrPayload.utf8)
-        
-        if let outputImage = filter.outputImage {
-            let transform = CGAffineTransform(scaleX: 10, y: 10)
-            let scaledImage = outputImage.transformed(by: transform)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Assets individuels (\(assets.count))")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Button("Voir tout") {
+                    // TODO: Navigation vers liste complète
+                }
+                .font(.subheadline)
+                .foregroundColor(.blue)
+            }
             
-            if let cgImage = context.createCGImage(scaledImage, from: scaledImage.extent) {
-                qrCodeImage = UIImage(cgImage: cgImage)
+            LazyVStack(spacing: 8) {
+                ForEach(assets, id: \.assetId) { asset in
+                    AssetRow(asset: asset)
+                }
             }
         }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6))
+        )
     }
 }
 
@@ -471,6 +501,47 @@ struct AssetRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Movement History Section
+
+struct MovementHistorySectionView: View {
+    let movements: [Movement]
+    @Binding var showingLocationHistory: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Mouvements récents")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Button("Historique complet") {
+                    showingLocationHistory = true
+                }
+                .font(.subheadline)
+                .foregroundColor(.blue)
+            }
+            
+            if movements.isEmpty {
+                Text("Aucun mouvement enregistré")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            } else {
+                LazyVStack(spacing: 8) {
+                    ForEach(movements, id: \.movementId) { movement in
+                        MovementRowCompact(movement: movement)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6))
+        )
     }
 }
 
@@ -522,13 +593,10 @@ struct MovementRowCompact: View {
     }
 }
 
+// MARK: - Preview
+
 #Preview {
-    let container = try! ModelContainer(
-        for: StockItem.self, Asset.self, Movement.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    
-    let sampleItem = StockItem(
+    @Previewable @State var sampleItem = StockItem(
         sku: "LED-SPOT-50W",
         name: "Projecteur LED 50W",
         category: "Éclairage",
@@ -539,6 +607,6 @@ struct MovementRowCompact: View {
         tags: ["LED", "Éclairage", "50W", "Extérieur"]
     )
     
-    return StockItemDetailView(stockItem: sampleItem)
-        .modelContainer(container)
+    StockItemDetailView(stockItem: sampleItem)
+        .modelContainer(for: [StockItem.self, Asset.self, Movement.self], inMemory: true)
 }

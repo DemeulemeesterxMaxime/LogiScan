@@ -185,11 +185,6 @@ struct EventRow: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: Event.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    
-    return EventsListView()
-        .modelContainer(container)
+    EventsListView()
+        .modelContainer(for: [Event.self], inMemory: true)
 }

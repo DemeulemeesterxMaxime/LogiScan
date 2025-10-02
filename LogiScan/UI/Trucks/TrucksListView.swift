@@ -242,11 +242,6 @@ struct SummaryCard: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: Truck.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    
-    return TrucksListView()
-        .modelContainer(container)
+    TrucksListView()
+        .modelContainer(for: [Truck.self], inMemory: true)
 }
