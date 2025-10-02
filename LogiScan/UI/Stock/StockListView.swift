@@ -272,27 +272,6 @@ struct StockItemRow: View {
     }
 }
 
-struct FilterChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(isSelected ? Color.accentColor : Color(.systemGray5))
-                )
-                .foregroundColor(isSelected ? .white : .primary)
-        }
-    }
-}
-
 #Preview {
     let container = try! ModelContainer(
         for: StockItem.self, Asset.self, Movement.self, Event.self, Truck.self,

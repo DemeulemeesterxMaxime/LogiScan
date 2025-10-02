@@ -38,15 +38,15 @@ struct MainTabView: View {
                     Text("Stock")
                 }
             
-            // Événements - Version simplifiée
-            Text("Événements - En cours de développement")
+            // Événements
+            EventsListView()
                 .tabItem {
                     Image(systemName: "calendar.circle.fill")
                     Text("Événements")
                 }
             
-            // Camions - Version simplifiée
-            Text("Camions - En cours de développement")
+            // Camions
+            TrucksListView()
                 .tabItem {
                     Image(systemName: "truck.box.fill")
                     Text("Camions")
