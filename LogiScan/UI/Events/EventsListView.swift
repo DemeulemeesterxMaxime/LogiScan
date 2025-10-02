@@ -79,8 +79,11 @@ struct EventsListView: View {
             Event(
                 eventId: "EVT001",
                 name: "Concert Jazz Festival",
-                client: "Ville de Paris",
-                address: "Place de la République, 75003 Paris",
+                clientName: "Ville de Paris",
+                clientPhone: "01 42 76 40 40",
+                clientEmail: "contact@paris.fr",
+                clientAddress: "Hôtel de Ville, Place de l'Hôtel-de-Ville, 75004 Paris",
+                eventAddress: "Place de la République, 75003 Paris",
                 startDate: calendar.date(byAdding: .day, value: 5, to: today)!,
                 endDate: calendar.date(byAdding: .day, value: 7, to: today)!,
                 status: .confirmed,
@@ -89,8 +92,11 @@ struct EventsListView: View {
             Event(
                 eventId: "EVT002",
                 name: "Mariage Château de Versailles",
-                client: "Martin & Sophie",
-                address: "Château de Versailles, 78000 Versailles",
+                clientName: "Martin & Sophie",
+                clientPhone: "06 12 34 56 78",
+                clientEmail: "martin.sophie@email.fr",
+                clientAddress: "12 Rue des Lilas, 78000 Versailles",
+                eventAddress: "Château de Versailles, 78000 Versailles",
                 startDate: calendar.date(byAdding: .day, value: 12, to: today)!,
                 endDate: calendar.date(byAdding: .day, value: 13, to: today)!,
                 status: .preparation,
@@ -99,8 +105,11 @@ struct EventsListView: View {
             Event(
                 eventId: "EVT003",
                 name: "Salon Professionnel TechExpo",
-                client: "TechExpo SAS",
-                address: "Porte de Versailles, 75015 Paris",
+                clientName: "TechExpo SAS",
+                clientPhone: "01 56 78 90 12",
+                clientEmail: "contact@techexpo.fr",
+                clientAddress: "45 Avenue de la Grande Armée, 75016 Paris",
+                eventAddress: "Porte de Versailles, 75015 Paris",
                 startDate: calendar.date(byAdding: .day, value: -2, to: today)!,
                 endDate: calendar.date(byAdding: .day, value: 1, to: today)!,
                 status: .inProgress,
@@ -133,7 +142,7 @@ struct EventRow: View {
             }
             
             // Client
-            Label(event.client, systemImage: "person.circle")
+            Label(event.clientName, systemImage: "person.circle")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
@@ -153,7 +162,7 @@ struct EventRow: View {
             .foregroundColor(.secondary)
             
             // Lieu
-            Label(event.address, systemImage: "location")
+            Label(event.eventAddress, systemImage: "location")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .lineLimit(1)

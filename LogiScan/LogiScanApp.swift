@@ -33,11 +33,13 @@ struct LogiScanApp: App {
                      OrderLine.self,         // Lignes de commandes
                      OrderTimestamp.self,    // Historique des commandes
                      Location.self,          // Gestion des emplacements
+                     QuoteItem.self,         // Articles du devis (nouveau)
+                     AssetReservation.self,  // Réservations d'assets (nouveau)
                 configurations: configuration
             )
             
             print("✅ ModelContainer créé avec succès (mode mémoire)")
-            print("   - 9 modèles configurés")
+            print("   - 11 modèles configurés")
             print("   - Persistence désactivée (développement)")
             
         } catch {

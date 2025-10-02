@@ -17,8 +17,8 @@ struct DashboardView: View {
     
     @State private var selectedPeriod: DashboardPeriod = .today
     
-    var activeAssetsCount: Int {
-        assets.filter { $0.status == .ok }.count
+    private var assetsOK: Int {
+        assets.filter { $0.status == .available }.count
     }
     
     var todayMovementsCount: Int {
@@ -93,7 +93,7 @@ struct DashboardView: View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
             MetricCard(
                 title: "Assets actifs",
-                value: "\(activeAssetsCount)",
+                value: "\(assetsOK)",
                 change: nil,
                 icon: "cube.box.fill",
                 color: .blue

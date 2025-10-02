@@ -37,7 +37,8 @@ extension Array where Element == Event {
         let lowercaseQuery = searchText.lowercased()
         return filter { event in
             event.name.lowercased().contains(lowercaseQuery) ||
-            event.client.lowercased().contains(lowercaseQuery)
+            event.clientName.lowercased().contains(lowercaseQuery) ||
+            event.eventAddress.lowercased().contains(lowercaseQuery)
         }
     }
 }
