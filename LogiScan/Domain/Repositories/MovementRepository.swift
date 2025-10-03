@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 
+@MainActor
 protocol MovementRepositoryProtocol {
     func createMovement(_ movement: Movement) async throws
     func getMovementsByAsset(_ assetId: String) async throws -> [Movement]
@@ -20,21 +21,21 @@ protocol MovementRepositoryProtocol {
 @MainActor
 class MovementRepository: ObservableObject, MovementRepositoryProtocol {
     private let modelContext: ModelContext
-    
+
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
-    
+
     func createMovement(_ movement: Movement) async throws {
         modelContext.insert(movement)
         try modelContext.save()
-        
+
         // Déclencher la sync en arrière-plan si possible
         Task {
             await attemptSync()
         }
     }
-    
+
     func getMovementsByAsset(_ assetId: String) async throws -> [Movement] {
         let descriptor = FetchDescriptor<Movement>(
             predicate: #Predicate { $0.assetId == assetId },
@@ -42,7 +43,7 @@ class MovementRepository: ObservableObject, MovementRepositoryProtocol {
         )
         return try modelContext.fetch(descriptor)
     }
-    
+
     func getMovementsByEvent(_ eventId: String) async throws -> [Movement] {
         let descriptor = FetchDescriptor<Movement>(
             predicate: #Predicate { $0.eventId == eventId },
@@ -50,7 +51,7 @@ class MovementRepository: ObservableObject, MovementRepositoryProtocol {
         )
         return try modelContext.fetch(descriptor)
     }
-    
+
     func getUnsyncedMovements() async throws -> [Movement] {
         let descriptor = FetchDescriptor<Movement>(
             predicate: #Predicate { !$0.isSynced },
@@ -58,7 +59,7 @@ class MovementRepository: ObservableObject, MovementRepositoryProtocol {
         )
         return try modelContext.fetch(descriptor)
     }
-    
+
     func markMovementAsSynced(_ movementId: String) async throws {
         let descriptor = FetchDescriptor<Movement>(
             predicate: #Predicate { $0.movementId == movementId }
@@ -66,11 +67,11 @@ class MovementRepository: ObservableObject, MovementRepositoryProtocol {
         guard let movement = try modelContext.fetch(descriptor).first else {
             throw RepositoryError.assetNotFound
         }
-        
+
         movement.isSynced = true
         try modelContext.save()
     }
-    
+
     func getRecentMovements(limit: Int = 50) async throws -> [Movement] {
         var descriptor = FetchDescriptor<Movement>(
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
@@ -78,7 +79,7 @@ class MovementRepository: ObservableObject, MovementRepositoryProtocol {
         descriptor.fetchLimit = limit
         return try modelContext.fetch(descriptor)
     }
-    
+
     private func attemptSync() async {
         // TODO: Implémenter la synchronisation avec l'API
         do {

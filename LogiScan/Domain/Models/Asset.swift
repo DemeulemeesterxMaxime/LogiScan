@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class Asset {
-    var assetId: String // Retiré @Attribute(.unique) temporairement
+    var assetId: String  // Retiré @Attribute(.unique) temporairement
     var sku: String
     var name: String
     var category: String
@@ -21,16 +21,16 @@ final class Asset {
     var value: Double
     var qrPayload: String
     var currentLocationId: String?
-    
+
     // Nouveaux champs
-    var comments: String // Commentaires (état, dommages, etc.)
-    var tags: [String] // Étiquettes héritées + spécifiques
+    var comments: String  // Commentaires (état, dommages, etc.)
+    var tags: [String]  // Étiquettes héritées + spécifiques
     var lastMaintenanceDate: Date?
     var nextMaintenanceDate: Date?
-    
+
     var createdAt: Date
     var updatedAt: Date
-    
+
     init(
         assetId: String,
         sku: String,
@@ -66,12 +66,12 @@ final class Asset {
         self.createdAt = Date()
         self.updatedAt = Date()
     }
-    
+
     // Propriété calculée pour savoir si l'asset est disponible
     var isAvailable: Bool {
         status == .available
     }
-    
+
     // Vérifie si maintenance est nécessaire
     var needsMaintenance: Bool {
         guard let nextDate = nextMaintenanceDate else { return false }
@@ -86,7 +86,7 @@ enum AssetStatus: String, CaseIterable, Codable {
     case damaged = "ENDOMMAGE"
     case maintenance = "MAINTENANCE"
     case lost = "PERDU"
-    
+
     var displayName: String {
         switch self {
         case .available: return "Disponible"
@@ -97,7 +97,7 @@ enum AssetStatus: String, CaseIterable, Codable {
         case .lost: return "Perdu"
         }
     }
-    
+
     var color: String {
         switch self {
         case .available: return "green"
@@ -108,7 +108,7 @@ enum AssetStatus: String, CaseIterable, Codable {
         case .lost: return "gray"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .available: return "checkmark.circle.fill"

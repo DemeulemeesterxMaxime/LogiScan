@@ -16,13 +16,13 @@ final class QuoteItem {
     var name: String
     var category: String
     var quantity: Int
-    var unitPrice: Double // Prix configuré dans StockItem
-    var customPrice: Double // Prix modifié dans le devis
-    var totalPrice: Double // customPrice * quantity
-    var assignedAssets: [String] // Liste asset IDs spécifiques
+    var unitPrice: Double  // Prix configuré dans StockItem
+    var customPrice: Double  // Prix modifié dans le devis
+    var totalPrice: Double  // customPrice * quantity
+    var assignedAssets: [String]  // Liste asset IDs spécifiques
     var createdAt: Date
     var updatedAt: Date
-    
+
     init(
         quoteItemId: String,
         eventId: String,
@@ -47,20 +47,20 @@ final class QuoteItem {
         self.createdAt = Date()
         self.updatedAt = Date()
     }
-    
+
     // Calcul du pourcentage de remise/augmentation
     var discountPercent: Double {
         guard unitPrice > 0 else { return 0 }
         return ((customPrice - unitPrice) / unitPrice) * 100
     }
-    
+
     // Mise à jour du prix personnalisé
     func updateCustomPrice(_ newPrice: Double) {
         self.customPrice = newPrice
         self.totalPrice = newPrice * Double(quantity)
         self.updatedAt = Date()
     }
-    
+
     // Mise à jour de la quantité
     func updateQuantity(_ newQuantity: Int) {
         self.quantity = newQuantity

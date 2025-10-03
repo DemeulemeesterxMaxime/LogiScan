@@ -6,6 +6,13 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		81B085F92E9027AB00F2B627 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 81B085F82E9027AB00F2B627 /* FirebaseAnalytics */; };
+		81B085FB2E9027AB00F2B627 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 81B085FA2E9027AB00F2B627 /* FirebaseAuth */; };
+		81B085FD2E9027AB00F2B627 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 81B085FC2E9027AB00F2B627 /* FirebaseDatabase */; };
+		81B085FF2E9027AB00F2B627 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 81B085FE2E9027AB00F2B627 /* FirebaseFirestore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		81E950002E84495400413192 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -64,6 +71,10 @@
 		81E94FEB2E84495200413192 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				81B085FD2E9027AB00F2B627 /* FirebaseDatabase in Frameworks */,
+				81B085FF2E9027AB00F2B627 /* FirebaseFirestore in Frameworks */,
+				81B085F92E9027AB00F2B627 /* FirebaseAnalytics in Frameworks */,
+				81B085FB2E9027AB00F2B627 /* FirebaseAuth in Frameworks */,
 			);
 		};
 		81E94FFC2E84495400413192 /* Frameworks */ = {
@@ -116,6 +127,12 @@
 				81E94FF02E84495200413192 /* LogiScan */,
 			);
 			name = LogiScan;
+			packageProductDependencies = (
+				81B085F82E9027AB00F2B627 /* FirebaseAnalytics */,
+				81B085FA2E9027AB00F2B627 /* FirebaseAuth */,
+				81B085FC2E9027AB00F2B627 /* FirebaseDatabase */,
+				81B085FE2E9027AB00F2B627 /* FirebaseFirestore */,
+			);
 			productName = LogiScan;
 			productReference = 81E94FEE2E84495200413192 /* LogiScan.app */;
 			productType = "com.apple.product-type.application";
@@ -194,6 +211,9 @@
 			);
 			mainGroup = 81E94FE52E84495200413192;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				81B085F72E9027AB00F2B627 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 81E94FEF2E84495200413192 /* Products */;
 			projectDirPath = "";
@@ -261,13 +281,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = LogiScan/LogiScan.entitlements;
+				CODE_SIGN_ENTITLEMENTS = LogiScan/LogiScanDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
-				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = BB3PGNJBJ2;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10;
+				DEVELOPMENT_TEAM = BB3PGNJBJ2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LogiScan/Info.plist;
@@ -285,7 +303,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = maxime.LogiScan;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Distribution LogiScan";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
@@ -304,7 +321,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = BB3PGNJBJ2;
 				ENABLE_PREVIEWS = YES;
@@ -388,7 +405,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -446,7 +463,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -564,6 +581,40 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		81B085F72E9027AB00F2B627 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		81B085F82E9027AB00F2B627 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 81B085F72E9027AB00F2B627 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		81B085FA2E9027AB00F2B627 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 81B085F72E9027AB00F2B627 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		81B085FC2E9027AB00F2B627 /* FirebaseDatabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 81B085F72E9027AB00F2B627 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
+		};
+		81B085FE2E9027AB00F2B627 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 81B085F72E9027AB00F2B627 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 81E94FE62E84495200413192 /* Project object */;
 }

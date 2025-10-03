@@ -12,14 +12,14 @@ import SwiftData
 enum OwnershipType: String, Codable, CaseIterable {
     case owned = "PROPRIETE"
     case rented = "LOCATION"
-    
+
     var displayName: String {
         switch self {
         case .owned: return "Notre matériel"
         case .rented: return "Location"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .owned: return "house.fill"
@@ -31,14 +31,14 @@ enum OwnershipType: String, Codable, CaseIterable {
 // MARK: - Dimensions
 struct Dimensions: Codable, Equatable {
     var length: Double  // cm
-    var width: Double   // cm
+    var width: Double  // cm
     var height: Double  // cm
-    
+
     var volumeInM3: Double {
         // Conversion de cm³ en m³
         (length * width * height) / 1_000_000
     }
-    
+
     var displayString: String {
         String(format: "%.0f × %.0f × %.0f cm", length, width, height)
     }
@@ -47,32 +47,32 @@ struct Dimensions: Codable, Equatable {
 // MARK: - StockItem Model
 @Model
 final class StockItem {
-    var sku: String // Retiré @Attribute(.unique) temporairement
+    var sku: String  // Retiré @Attribute(.unique) temporairement
     var name: String
     var category: String
-    var itemDescription: String // Description technique détaillée
+    var itemDescription: String  // Description technique détaillée
     var totalQuantity: Int
     var maintenanceQuantity: Int
     var unitWeight: Double
     var unitVolume: Double
     var unitValue: Double
-    var images: [String] // URLs ou noms de fichiers
-    var substituables: [String] // SKUs équivalents
-    var tags: [String] // Étiquettes personnalisables
-    
+    var images: [String]  // URLs ou noms de fichiers
+    var substituables: [String]  // SKUs équivalents
+    var tags: [String]  // Étiquettes personnalisables
+
     // Nouveaux champs - Propriété et tarification
     var ownershipType: OwnershipType
-    var rentalPrice: Double? // Prix de location par jour (si applicable)
-    var purchasePrice: Double? // Prix d'achat initial
-    
+    var rentalPrice: Double?  // Prix de location par jour (si applicable)
+    var purchasePrice: Double?  // Prix d'achat initial
+
     // Nouveaux champs - Caractéristiques techniques
     var dimensions: Dimensions?
-    var powerConsumption: Double? // Consommation électrique en W
-    var technicalSpecs: [String: String] // Specs techniques flexibles (ex: {"Voltage": "220V", "Poids net": "2.5kg"})
-    
+    var powerConsumption: Double?  // Consommation électrique en W
+    var technicalSpecs: [String: String]  // Specs techniques flexibles (ex: {"Voltage": "220V", "Poids net": "2.5kg"})
+
     var createdAt: Date
     var updatedAt: Date
-    
+
     init(
         sku: String,
         name: String,
@@ -114,11 +114,11 @@ final class StockItem {
         self.createdAt = Date()
         self.updatedAt = Date()
     }
-    
+
     var availableQuantity: Int {
         totalQuantity - maintenanceQuantity
     }
-    
+
     // Prix effectif selon le type de propriété
     var effectivePrice: Double {
         switch ownershipType {

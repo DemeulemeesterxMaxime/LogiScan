@@ -15,7 +15,7 @@ enum ReservationStatus: String, Codable, CaseIterable {
     case delivered = "LIVRE"
     case returned = "RETOURNE"
     case cancelled = "ANNULE"
-    
+
     var displayName: String {
         switch self {
         case .pending: return "En attente"
@@ -26,7 +26,7 @@ enum ReservationStatus: String, Codable, CaseIterable {
         case .cancelled: return "Annulé"
         }
     }
-    
+
     var color: String {
         switch self {
         case .pending: return "orange"
@@ -37,7 +37,7 @@ enum ReservationStatus: String, Codable, CaseIterable {
         case .cancelled: return "red"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .pending: return "clock"
@@ -61,7 +61,7 @@ final class AssetReservation {
     var notes: String
     var createdAt: Date
     var updatedAt: Date
-    
+
     init(
         reservationId: String,
         assetId: String,
@@ -81,18 +81,18 @@ final class AssetReservation {
         self.createdAt = Date()
         self.updatedAt = Date()
     }
-    
+
     // Vérifie si la réservation est active
     var isActive: Bool {
         let now = Date()
         return now >= startDate && now <= endDate && status != .cancelled
     }
-    
+
     // Vérifie si la réservation chevauche une période
     func overlaps(startDate: Date, endDate: Date) -> Bool {
         return self.startDate < endDate && self.endDate > startDate
     }
-    
+
     // Met à jour le statut
     func updateStatus(_ newStatus: ReservationStatus) {
         self.status = newStatus

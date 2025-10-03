@@ -12,12 +12,12 @@ class SampleData {
     static func createSampleData(modelContext: ModelContext) {
         // Vérifie si des données existent déjà
         let stockItemsCount = try? modelContext.fetchCount(FetchDescriptor<StockItem>())
-        
+
         // Si des données existent déjà, ne pas les recréer
         if let count = stockItemsCount, count > 0 {
             return
         }
-        
+
         // Création des emplacements de base pour distribution événementielle
         let hangar = Location(
             locationId: "LOC-HANGAR-001",
@@ -26,49 +26,49 @@ class SampleData {
             parentLocationId: nil,
             capacity: LocationCapacity(maxWeight: 15000.0, maxVolume: 800.0)
         )
-        
+
         let zoneAudio = Location(
             locationId: "LOC-ZONE-AUDIO",
             type: .zone,
             name: "Zone Audio (Rayonnage A1-A5)",
             parentLocationId: "LOC-HANGAR-001"
         )
-        
+
         let zoneEclairage = Location(
             locationId: "LOC-ZONE-LIGHT",
             type: .zone,
             name: "Zone Éclairage (Rayonnage B1-B8)",
             parentLocationId: "LOC-HANGAR-001"
         )
-        
+
         let zoneTransport = Location(
             locationId: "LOC-ZONE-TRANSPORT",
             type: .zone,
             name: "Zone Flight Cases (Rayonnage C1-C3)",
             parentLocationId: "LOC-HANGAR-001"
         )
-        
+
         let zonePreparation = Location(
             locationId: "LOC-ZONE-PREPARATION",
             type: .zone,
             name: "Zone Préparation Commandes",
             parentLocationId: "LOC-HANGAR-001"
         )
-        
+
         let camion1 = Location(
             locationId: "LOC-CAMION-001",
             type: .truck,
             name: "PL-123-AB (Mercedes Sprinter)",
             capacity: LocationCapacity(maxWeight: 3500.0, maxVolume: 50.0)
         )
-        
+
         let camion2 = Location(
             locationId: "LOC-CAMION-002",
             type: .truck,
             name: "PL-456-CD (Iveco Daily)",
             capacity: LocationCapacity(maxWeight: 5000.0, maxVolume: 75.0)
         )
-        
+
         modelContext.insert(hangar)
         modelContext.insert(zoneAudio)
         modelContext.insert(zoneEclairage)
@@ -76,7 +76,7 @@ class SampleData {
         modelContext.insert(zonePreparation)
         modelContext.insert(camion1)
         modelContext.insert(camion2)
-        
+
         // Création de la flotte de camions
         let truck1 = Truck(
             truckId: "TRUCK-001",
@@ -85,18 +85,18 @@ class SampleData {
             maxWeight: 3500.0,
             status: .available
         )
-        
+
         let truck2 = Truck(
-            truckId: "TRUCK-002", 
+            truckId: "TRUCK-002",
             licensePlate: "PL-456-CD",
             maxVolume: 75.0,
             maxWeight: 5000.0,
             status: .available
         )
-        
+
         modelContext.insert(truck1)
         modelContext.insert(truck2)
-        
+
         // Création des SKUs de base pour logistique événementielle
         let stockItems = [
             StockItem(
@@ -158,13 +158,13 @@ class SampleData {
                 unitVolume: 0.096,
                 unitValue: 320.0,
                 tags: ["Transport", "Flight Case", "Medium", "Protection"]
-            )
+            ),
         ]
-        
+
         for item in stockItems {
             modelContext.insert(item)
         }
-        
+
         // Création d'assets sérialisés pour distribution
         let assets = [
             Asset(
@@ -177,7 +177,8 @@ class SampleData {
                 weight: 15.0,
                 volume: 0.05,
                 value: 800.0,
-                qrPayload: #"{"v":1,"type":"asset","id":"A-SPK-001","sku":"SPK-12","sn":"SPK12-001"}"#,
+                qrPayload:
+                    #"{"v":1,"type":"asset","id":"A-SPK-001","sku":"SPK-12","sn":"SPK12-001"}"#,
                 currentLocationId: "LOC-ZONE-AUDIO"
             ),
             Asset(
@@ -190,7 +191,8 @@ class SampleData {
                 weight: 15.0,
                 volume: 0.05,
                 value: 800.0,
-                qrPayload: #"{"v":1,"type":"asset","id":"A-SPK-002","sku":"SPK-12","sn":"SPK12-002"}"#,
+                qrPayload:
+                    #"{"v":1,"type":"asset","id":"A-SPK-002","sku":"SPK-12","sn":"SPK12-002"}"#,
                 currentLocationId: "LOC-ZONE-AUDIO"
             ),
             Asset(
@@ -203,7 +205,8 @@ class SampleData {
                 weight: 6.0,
                 volume: 0.035,
                 value: 1400.0,
-                qrPayload: #"{"v":1,"type":"asset","id":"A-LASER-001","sku":"LASER-RGB-5W","sn":"LASER001"}"#,
+                qrPayload:
+                    #"{"v":1,"type":"asset","id":"A-LASER-001","sku":"LASER-RGB-5W","sn":"LASER001"}"#,
                 currentLocationId: "LOC-ZONE-LIGHT"
             ),
             Asset(
@@ -216,15 +219,16 @@ class SampleData {
                 weight: 8.0,
                 volume: 0.096,
                 value: 320.0,
-                qrPayload: #"{"v":1,"type":"asset","id":"A-FLIGHT-001","sku":"FLIGHT-CASE-MEDIUM","sn":"FC-M001"}"#,
+                qrPayload:
+                    #"{"v":1,"type":"asset","id":"A-FLIGHT-001","sku":"FLIGHT-CASE-MEDIUM","sn":"FC-M001"}"#,
                 currentLocationId: "LOC-ZONE-TRANSPORT"
-            )
+            ),
         ]
-        
+
         for asset in assets {
             modelContext.insert(asset)
         }
-        
+
         // Création d'événements de test pour distribution
         let event1 = Event(
             eventId: "EVT-001",
@@ -237,9 +241,10 @@ class SampleData {
             startDate: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date(),
             endDate: Calendar.current.date(byAdding: .day, value: 8, to: Date()) ?? Date(),
             status: .confirmed,
-            notes: "Soirée de gala pour 500 personnes. Configuration: système son complet + éclairage scène + lasers."
+            notes:
+                "Soirée de gala pour 500 personnes. Configuration: système son complet + éclairage scène + lasers."
         )
-        
+
         let event2 = Event(
             eventId: "EVT-002",
             name: "Festival Jazz'Var - Scène Plein Air",
@@ -253,10 +258,10 @@ class SampleData {
             status: .planning,
             notes: "Festival 3 jours. Prestation complète outdoor. Matériel renforcé requis."
         )
-        
+
         modelContext.insert(event1)
         modelContext.insert(event2)
-        
+
         // Création de mouvements d'exemple pour traçabilité
         let movements = [
             Movement(
@@ -268,7 +273,8 @@ class SampleData {
                 toLocationId: "LOC-ZONE-PREPARATION",
                 timestamp: Calendar.current.date(byAdding: .hour, value: -2, to: Date()) ?? Date(),
                 eventId: "EVT-001",
-                scanPayload: #"{"v":1,"type":"asset","id":"A-SPK-001","sku":"SPK-12","sn":"SPK12-001"}"#,
+                scanPayload:
+                    #"{"v":1,"type":"asset","id":"A-SPK-001","sku":"SPK-12","sn":"SPK12-001"}"#,
                 notes: "Préparation pour ISEN Gala"
             ),
             Movement(
@@ -288,13 +294,13 @@ class SampleData {
                 toLocationId: "LOC-ZONE-AUDIO",
                 timestamp: Calendar.current.date(byAdding: .hour, value: -4, to: Date()) ?? Date(),
                 notes: "Réorganisation stock câbles"
-            )
+            ),
         ]
-        
+
         for movement in movements {
             modelContext.insert(movement)
         }
-        
+
         // Sauvegarde
         do {
             try modelContext.save()

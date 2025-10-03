@@ -10,34 +10,34 @@ import SwiftData
 
 @Model
 final class Event {
-    var eventId: String // Retiré @Attribute(.unique) pour éviter les conflits
+    var eventId: String  // Retiré @Attribute(.unique) pour éviter les conflits
     var name: String
-    
+
     // Informations client
     var clientName: String
     var clientPhone: String
     var clientEmail: String
-    var clientAddress: String // Adresse de facturation
-    
+    var clientAddress: String  // Adresse de facturation
+
     // Informations événement
-    var eventAddress: String // Adresse de l'événement
+    var eventAddress: String  // Adresse de l'événement
     var startDate: Date
     var endDate: Date
     var status: EventStatus
     var notes: String
     var contactInfo: ContactInfo?
-    
+
     // Devis et facturation
     var assignedTruckId: String?
-    var totalAmount: Double // Calculé depuis les QuoteItems
-    var discountPercent: Double // Remise globale en pourcentage
-    var finalAmount: Double // Montant final après remise
+    var totalAmount: Double  // Calculé depuis les QuoteItems
+    var discountPercent: Double  // Remise globale en pourcentage
+    var finalAmount: Double  // Montant final après remise
     var quoteStatus: QuoteStatus
     var paymentStatus: PaymentStatus
-    
+
     var createdAt: Date
     var updatedAt: Date
-    
+
     init(
         eventId: String,
         name: String,
@@ -78,13 +78,13 @@ final class Event {
         self.createdAt = Date()
         self.updatedAt = Date()
     }
-    
+
     // Calcule le montant final avec remise
     func calculateFinalAmount() {
         self.finalAmount = totalAmount * (1 - discountPercent / 100)
         self.updatedAt = Date()
     }
-    
+
     // Met à jour le total depuis les QuoteItems
     func updateTotalAmount(_ newTotal: Double) {
         self.totalAmount = newTotal
@@ -99,7 +99,7 @@ enum EventStatus: String, CaseIterable, Codable {
     case inProgress = "EN_COURS"
     case completed = "TERMINE"
     case cancelled = "ANNULE"
-    
+
     var displayName: String {
         switch self {
         case .planning: return "Planification"
@@ -110,7 +110,7 @@ enum EventStatus: String, CaseIterable, Codable {
         case .cancelled: return "Annulé"
         }
     }
-    
+
     var color: String {
         switch self {
         case .planning: return "gray"
@@ -128,7 +128,7 @@ enum QuoteStatus: String, Codable, CaseIterable {
     case sent = "ENVOYE"
     case accepted = "ACCEPTE"
     case refused = "REFUSE"
-    
+
     var displayName: String {
         switch self {
         case .draft: return "Brouillon"
@@ -144,7 +144,7 @@ enum PaymentStatus: String, Codable, CaseIterable {
     case deposit = "ACOMPTE"
     case paid = "PAYE"
     case refunded = "REMBOURSE"
-    
+
     var displayName: String {
         switch self {
         case .pending: return "En attente"
@@ -159,7 +159,7 @@ struct ContactInfo: Codable {
     var name: String
     var phone: String?
     var email: String?
-    
+
     init(name: String, phone: String? = nil, email: String? = nil) {
         self.name = name
         self.phone = phone
