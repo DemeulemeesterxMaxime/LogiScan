@@ -23,8 +23,8 @@ struct LogiScanApp: App {
 
         // Configuration Firestore pour mode hors ligne
         let settings = Firestore.firestore().settings
-        settings.isPersistenceEnabled = true  // ✅ Cache local activé
-        settings.cacheSizeBytes = FirestoreCacheSizeUnlimited  // Cache illimité
+        // ✅ Cache local activé (illimité) - NSNumber(value: -1) = cache illimité
+        settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: -1))
         Firestore.firestore().settings = settings
         print("💾 Firestore : Cache local activé (mode hors ligne supporté)")
         // Logs de diagnostic détaillés pour debugging

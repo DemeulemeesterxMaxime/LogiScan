@@ -13,6 +13,9 @@ struct StockItemFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var existingItems: [StockItem]
+    
+    // ✅ AJOUT : SyncManager pour synchronisation Firebase
+    @StateObject private var syncManager = SyncManager()
 
     let editingItem: StockItem?
 
@@ -510,6 +513,12 @@ struct StockItemFormView: View {
 
             do {
                 try modelContext.save()
+                
+                // ✅ AJOUT : Synchroniser avec Firebase
+                Task {
+                    await syncManager.updateStockItemInFirebase(existing)
+                }
+                
                 createdItem = existing
                 showingQRCode = true
             } catch {
@@ -623,6 +632,18 @@ struct StockItemFormView: View {
 
         do {
             try modelContext.save()
+            
+            // ✅ AJOUT : Synchroniser avec Firebase
+            Task {
+                if let existingItem = editingItem {
+                    // Mise à jour d'un article existant
+                    await syncManager.updateStockItemInFirebase(existingItem)
+                } else if let newItem = createdItem {
+                    // Création d'un nouvel article
+                    await syncManager.syncStockItemToFirebase(newItem)
+                }
+            }
+            
             if editingItem == nil {
                 showingQRCode = true
             } else {

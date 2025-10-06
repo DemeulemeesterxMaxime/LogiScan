@@ -14,8 +14,10 @@ struct DashboardView: View {
     @Query private var stockItems: [StockItem]
     @Query private var movements: [Movement]
     @Query private var assets: [Asset]
+    @StateObject private var syncManager = SyncManager()
 
     @State private var selectedPeriod: DashboardPeriod = .today
+    @State private var isRefreshing = false
 
     private var assetsOK: Int {
         assets.filter { $0.status == .available }.count
@@ -56,9 +58,53 @@ struct DashboardView: View {
             }
             .navigationTitle("Tableau de bord")
             .refreshable {
-                // Refresh des données SwiftData automatique
+                await refreshData()
+            }
+            .overlay {
+                if syncManager.isSyncing {
+                    VStack {
+                        ProgressView("Synchronisation...")
+                            .padding()
+                            .background(Color(.systemBackground).opacity(0.9))
+                            .cornerRadius(10)
+                            .shadow(radius: 5)
+                    }
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 4) {
+                        if let lastSync = syncManager.lastSyncDate {
+                            Text(lastSync.formatted(date: .omitted, time: .shortened))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Image(systemName: "arrow.clockwise.circle.fill")
+                            .foregroundColor(.blue)
+                            .font(.title3)
+                            .onTapGesture {
+                                Task {
+                                    await refreshData()
+                                }
+                            }
+                    }
+                }
+            }
+            .task {
+                // Sync automatique au chargement (uniquement si nécessaire)
+                await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext)
             }
         }
+    }
+    
+    // MARK: - Refresh Function
+    
+    private func refreshData() async {
+        print("🔄 [DashboardView] Pull-to-refresh déclenché")
+        isRefreshing = true
+        await syncManager.syncFromFirebase(modelContext: modelContext)
+        isRefreshing = false
     }
 
     private var periodSelector: some View {

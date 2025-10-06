@@ -158,12 +158,18 @@ class FirebaseService: ObservableObject {
     func updateAssetStatus(assetId: String, stockSku: String, newStatus: String, location: String?)
         async throws
     {
-        try await assetsRef(stockSku: stockSku).document(assetId).updateData([
+        var updateData: [String: Any] = [
             "status": newStatus,
-            "currentLocationId": location ?? "",
             "lastScannedAt": Timestamp(date: Date()),
             "updatedAt": Timestamp(date: Date()),
-        ])
+        ]
+        
+        // Ajouter currentLocationId seulement si location n'est pas nil
+        if let location = location {
+            updateData["currentLocationId"] = location
+        }
+        
+        try await assetsRef(stockSku: stockSku).document(assetId).updateData(updateData)
         print("✅ Asset statut mis à jour : \(assetId) -> \(newStatus)")
     }
 

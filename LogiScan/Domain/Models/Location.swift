@@ -57,8 +57,8 @@ enum LocationType: String, CaseIterable, Codable {
         switch self {
         case .hangar: return "building.2"
         case .zone: return "square.grid.3x3"
-        case .truck: return "truck"
-        case .site: return "location"
+        case .truck: return "truck.box.fill"  // ✅ Icône SF Symbols valide
+        case .site: return "mappin.and.ellipse"  // ✅ Icône plus précise pour un site
         }
     }
 }

@@ -11,11 +11,13 @@ import SwiftUI
 struct StockListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var stockItems: [StockItem]
+    @StateObject private var syncManager = SyncManager()
     @State private var searchText = ""
     @State private var selectedCategory = "Tous"
     @State private var selectedTag: String? = nil
     @State private var selectedOwnership: OwnershipType? = nil
     @State private var showingAddItem = false
+    @State private var isRefreshing = false
 
     private let categories = ["Tous", "Éclairage", "Son", "Structures", "Mobilier", "Divers"]
 
@@ -61,16 +63,41 @@ struct StockListView: View {
                 }
 
                 // Liste des items
-                List(filteredItems) { item in
-                    NavigationLink(destination: StockItemDetailView(stockItem: item)) {
-                        StockItemRow(item: item)
+                List {
+                    ForEach(filteredItems) { item in
+                        NavigationLink(destination: StockItemDetailView(stockItem: item)) {
+                            StockItemRow(item: item)
+                        }
                     }
+                    .onDelete(perform: deleteItems)
                 }
                 .searchable(text: $searchText, prompt: "Rechercher un article ou tag...")
                 .listStyle(.plain)
+                .refreshable {
+                    await refreshData()
+                }
+                .overlay {
+                    if syncManager.isSyncing {
+                        VStack {
+                            ProgressView("Synchronisation...")
+                                .padding()
+                                .background(Color(.systemBackground).opacity(0.9))
+                                .cornerRadius(10)
+                                .shadow(radius: 5)
+                        }
+                    }
+                }
             }
             .navigationTitle("Stock")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if let lastSync = syncManager.lastSyncDate {
+                        Text("Sync: \(lastSync.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddItem = true }) {
                         Image(systemName: "plus.circle.fill")
@@ -78,9 +105,50 @@ struct StockListView: View {
                     }
                 }
             }
+            .task {
+                // Sync automatique au chargement de la vue (uniquement si nécessaire)
+                await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext)
+            }
         }
         .sheet(isPresented: $showingAddItem) {
             StockItemFormView()
+        }
+    }
+    
+    // MARK: - Refresh Function
+    
+    private func refreshData() async {
+        print("🔄 [StockListView] Pull-to-refresh déclenché")
+        isRefreshing = true
+        await syncManager.syncFromFirebase(modelContext: modelContext)
+        isRefreshing = false
+    }
+    
+    // MARK: - Delete Function
+    
+    private func deleteItems(at offsets: IndexSet) {
+        for index in offsets {
+            let itemToDelete = filteredItems[index]
+            print("🗑️ [StockListView] Suppression de l'article : \(itemToDelete.sku)")
+            
+            // Sauvegarder le SKU avant suppression (pour Firebase)
+            let skuToDelete = itemToDelete.sku
+            
+            // Supprimer de SwiftData (local)
+            modelContext.delete(itemToDelete)
+            
+            // Supprimer de Firebase (cloud) de manière asynchrone
+            Task {
+                await syncManager.deleteStockItemFromFirebase(sku: skuToDelete)
+            }
+        }
+        
+        // Sauvegarder le contexte SwiftData
+        do {
+            try modelContext.save()
+            print("✅ [StockListView] Article(s) supprimé(s) localement")
+        } catch {
+            print("❌ [StockListView] Erreur sauvegarde après suppression : \(error)")
         }
     }
 
