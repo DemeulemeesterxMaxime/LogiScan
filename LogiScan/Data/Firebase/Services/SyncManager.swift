@@ -105,6 +105,10 @@ class SyncManager: ObservableObject {
             
             var itemsCreated = 0
             var itemsUpdated = 0
+            var itemsDeleted = 0
+            
+            // Créer un Set des SKU Firebase pour comparaison rapide
+            let firebaseSKUs = Set(firestoreItems.map { $0.sku })
             
             // Synchroniser chaque item Firebase
             for firestoreItem in firestoreItems {
@@ -121,10 +125,19 @@ class SyncManager: ObservableObject {
                 }
             }
             
+            // 🔥 NOUVEAU : Supprimer les items locaux qui n'existent plus dans Firebase
+            for localItem in localItems {
+                if !firebaseSKUs.contains(localItem.sku) {
+                    print("🗑️ [SyncManager] Suppression de l'article local orphelin : \(localItem.sku)")
+                    modelContext.delete(localItem)
+                    itemsDeleted += 1
+                }
+            }
+            
             try modelContext.save()
             lastSyncDate = Date()
             
-            print("✅ [SyncManager] Synchronisation terminée : \(itemsCreated) créés, \(itemsUpdated) mis à jour")
+            print("✅ [SyncManager] Synchronisation terminée : \(itemsCreated) créés, \(itemsUpdated) mis à jour, \(itemsDeleted) supprimés")
             
         } catch {
             let errorMsg = "❌ Erreur synchronisation depuis Firebase: \(error.localizedDescription)"
