@@ -15,6 +15,7 @@ struct AssetsListView: View {
 
     @State private var searchText = ""
     @State private var selectedStatus: AssetStatus?
+    @State private var localSelectedAsset: Asset? = nil
 
     var filteredAssets: [Asset] {
         var result = assets
@@ -101,12 +102,13 @@ struct AssetsListView: View {
                     List {
                         ForEach(filteredAssets, id: \.assetId) { asset in
                             Button {
-                                selectedAsset = asset
-                                dismiss()
+                                localSelectedAsset = asset
                             } label: {
                                 AssetListRow(asset: asset)
                             }
                             .buttonStyle(.plain)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                            .listRowSeparator(.visible)
                         }
                     }
                     .listStyle(.plain)
@@ -122,6 +124,9 @@ struct AssetsListView: View {
                 }
             }
             .searchable(text: $searchText, prompt: "Rechercher une référence...")
+            .sheet(item: $localSelectedAsset) { asset in
+                AssetDetailView(asset: asset)
+            }
         }
     }
 }
@@ -133,21 +138,34 @@ struct StatusBadge: View {
     let count: Int
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
+            // Nombre
             Text("\(count)")
-                .font(.title3)
-                .fontWeight(.bold)
-                .foregroundColor(Color(status.color))
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(status.swiftUIColor)
 
-            Image(systemName: status.icon)
-                .font(.caption)
-                .foregroundColor(Color(status.color))
+            // Icône + Nom
+            HStack(spacing: 4) {
+                Image(systemName: status.icon)
+                    .font(.caption2)
+                    .foregroundColor(status.swiftUIColor)
+                
+                Text(status.shortDisplayName)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, 12)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(status.color).opacity(0.15))
+            RoundedRectangle(cornerRadius: 12)
+                .fill(status.swiftUIColor.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(status.swiftUIColor.opacity(0.3), lineWidth: 1)
         )
     }
 }
@@ -158,90 +176,56 @@ struct AssetListRow: View {
     let asset: Asset
 
     var body: some View {
-        HStack(spacing: 14) {
-            // Icône statut
-            ZStack {
-                Circle()
-                    .fill(Color(asset.status.color).opacity(0.2))
-                    .frame(width: 50, height: 50)
-
-                Image(systemName: "cube.box.fill")
-                    .font(.title3)
-                    .foregroundColor(Color(asset.status.color))
+        HStack(spacing: 12) {
+            // ID de la référence
+            Text(asset.assetId)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .frame(width: 100, alignment: .leading)
+            
+            // STATUT - Badge compact
+            HStack(spacing: 4) {
+                Image(systemName: asset.status.icon)
+                    .font(.caption2)
+                    .foregroundColor(.white)
+                
+                Text(asset.status.displayName)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
             }
-
-            VStack(alignment: .leading, spacing: 6) {
-                // Asset ID + Badge statut
-                HStack(spacing: 8) {
-                    Text(asset.assetId)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-
-                    Text(asset.status.displayName)
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule()
-                                .fill(Color(asset.status.color).opacity(0.2))
-                        )
-                        .foregroundColor(Color(asset.status.color))
-                }
-
-                // Numéro de série
-                if let serialNumber = asset.serialNumber {
-                    HStack(spacing: 4) {
-                        Image(systemName: "barcode")
-                            .font(.caption2)
-                        Text("S/N: \(serialNumber)")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.secondary)
-                }
-
-                // Localisation
-                if let location = asset.currentLocationId {
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.circle.fill")
-                            .font(.caption2)
-                        Text(location)
-                            .font(.caption)
-                            .lineLimit(1)
-                    }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(asset.status.swiftUIColor)
+            )
+            
+            // LOCALISATION
+            HStack(spacing: 4) {
+                Image(systemName: "mappin.circle.fill")
+                    .font(.caption2)
                     .foregroundColor(.blue)
-                }
-
-                // Tags (max 3)
-                if !asset.tags.isEmpty {
-                    HStack(spacing: 4) {
-                        ForEach(asset.tags.prefix(3), id: \.self) { tag in
-                            Text(tag)
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.orange.opacity(0.2))
-                                )
-                                .foregroundColor(.orange)
-                        }
-
-                        if asset.tags.count > 3 {
-                            Text("+\(asset.tags.count - 3)")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
+                
+                Text(asset.currentLocationId ?? "—")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
-
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
             Spacer()
 
+            // Chevron
             Image(systemName: "chevron.right")
-                .font(.caption)
+                .font(.caption2)
                 .foregroundColor(.secondary)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .background(Color(.systemBackground))
     }
 }
 

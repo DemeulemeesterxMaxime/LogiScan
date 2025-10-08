@@ -10,7 +10,9 @@ import SwiftData
 import AVFoundation
 
 struct ScannerMainView: View {
+    @Environment(\.modelContext) private var modelContext
     @StateObject private var viewModel: ScannerViewModel
+    @StateObject private var syncManager = SyncManager()
     @State private var showingPermissionAlert = false
     @State private var cameraPermission: AVAuthorizationStatus = .notDetermined
     
@@ -40,23 +42,47 @@ struct ScannerMainView: View {
             .navigationTitle("Scanner")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        if viewModel.isScanning {
-                            viewModel.stopScanning()
-                        } else {
-                            viewModel.startScanning()
-                        }
-                    }) {
-                        Image(systemName: viewModel.isScanning ? "pause.circle" : "play.circle")
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if let lastSync = syncManager.lastSyncDate {
+                        Text(lastSync.formatted(date: .omitted, time: .shortened))
+                            .font(.caption)
                             .foregroundColor(.white)
-                            .font(.title2)
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            Task {
+                                await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
+                            }
+                        }) {
+                            Image(systemName: "arrow.clockwise.circle.fill")
+                                .foregroundColor(.white)
+                                .font(.title3)
+                        }
+                        
+                        Button(action: {
+                            if viewModel.isScanning {
+                                viewModel.stopScanning()
+                            } else {
+                                viewModel.startScanning()
+                            }
+                        }) {
+                            Image(systemName: viewModel.isScanning ? "pause.circle" : "play.circle")
+                                .foregroundColor(.white)
+                                .font(.title2)
+                        }
                     }
                 }
             }
         }
         .onAppear {
             checkCameraPermission()
+            // Rafraîchissement automatique à l'arrivée sur la page
+            Task {
+                await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
+            }
         }
         .sheet(isPresented: $viewModel.showResult) {
             ScanResultView(

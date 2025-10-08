@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import SwiftUI
 
 @Model
 final class Asset {
@@ -97,6 +98,18 @@ enum AssetStatus: String, CaseIterable, Codable {
         case .lost: return "Perdu"
         }
     }
+    
+    // Version courte pour les badges statistiques
+    var shortDisplayName: String {
+        switch self {
+        case .available: return "Disponible"
+        case .reserved: return "Réservé"
+        case .inUse: return "En utilisation"
+        case .damaged: return "Endommagé"
+        case .maintenance: return "Maintenance"  // Plus court
+        case .lost: return "Perdu"
+        }
+    }
 
     var color: String {
         switch self {
@@ -106,6 +119,18 @@ enum AssetStatus: String, CaseIterable, Codable {
         case .damaged: return "red"
         case .maintenance: return "orange"
         case .lost: return "gray"
+        }
+    }
+    
+    // Nouvelle propriété pour SwiftUI Color
+    var swiftUIColor: Color {
+        switch self {
+        case .available: return .green
+        case .reserved: return .blue
+        case .inUse: return .purple
+        case .damaged: return .red
+        case .maintenance: return .orange
+        case .lost: return .gray
         }
     }
 

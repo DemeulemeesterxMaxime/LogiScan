@@ -8,7 +8,6 @@
 import CoreImage.CIFilterBuiltins
 import SwiftData
 import SwiftUI
-import UIKit
 
 struct AssetDetailView: View {
     @Bindable var asset: Asset
@@ -17,12 +16,43 @@ struct AssetDetailView: View {
 
     @State private var qrCodeImage: UIImage?
     @State private var showingShareSheet = false
-    @State private var showingDeleteAlert = false
     @State private var editingComments = false
     @State private var editingTags = false
-    @State private var newTag = ""
+    @State private var showingTagPicker = false
+    @State private var showingStatusPicker = false
+    @State private var showingMaintenancePicker = false
+    @State private var selectedStatus: AssetStatus
+    @State private var selectedMaintenanceDate: Date = Date()
+    
+    // Variables pour tracker l'état initial et détecter les modifications
+    @State private var initialStatus: AssetStatus
+    @State private var initialComments: String
+    @State private var initialTags: [String]
+    @State private var initialLocation: String?
+    @State private var initialMaintenanceDate: Date?
 
     @Query private var stockItems: [StockItem]
+    @Query private var allAssets: [Asset]
+    @StateObject private var syncManager = SyncManager()
+    
+    init(asset: Asset) {
+        self._asset = Bindable(wrappedValue: asset)
+        self._selectedStatus = State(initialValue: asset.status)
+        self._initialStatus = State(initialValue: asset.status)
+        self._initialComments = State(initialValue: asset.comments)
+        self._initialTags = State(initialValue: asset.tags)
+        self._initialLocation = State(initialValue: asset.currentLocationId)
+        self._initialMaintenanceDate = State(initialValue: asset.nextMaintenanceDate)
+    }
+    
+    // Computed property pour vérifier si des modifications ont été faites
+    var hasChanges: Bool {
+        selectedStatus != initialStatus ||
+        asset.comments != initialComments ||
+        asset.tags != initialTags ||
+        asset.currentLocationId != initialLocation ||
+        asset.nextMaintenanceDate != initialMaintenanceDate
+    }
 
     var relatedStockItem: StockItem? {
         stockItems.first { $0.sku == asset.sku }
@@ -32,8 +62,8 @@ struct AssetDetailView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header avec QR Code
-                    VStack(spacing: 16) {
+                // Header avec QR Code
+                VStack(spacing: 16) {
                         // QR Code
                         if let qrImage = qrCodeImage {
                             Image(uiImage: qrImage)
@@ -48,7 +78,7 @@ struct AssetDetailView: View {
 
                         Image(systemName: "cube.box.fill")
                             .font(.system(size: 40))
-                            .foregroundColor(Color(asset.status.color))
+                            .foregroundColor(selectedStatus.swiftUIColor)
 
                         Text(asset.name)
                             .font(.title2)
@@ -96,18 +126,18 @@ struct AssetDetailView: View {
 
                     // Status badge
                     HStack(spacing: 8) {
-                        Text(asset.status.icon)
+                        Image(systemName: selectedStatus.icon)
                             .font(.title3)
-                        Text(asset.status.displayName)
+                        Text(selectedStatus.displayName)
                             .font(.headline)
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
                     .background(
                         RoundedRectangle(cornerRadius: 20)
-                            .fill(Color(asset.status.color).opacity(0.2))
+                            .fill(selectedStatus.swiftUIColor.opacity(0.2))
                     )
-                    .foregroundColor(Color(asset.status.color))
+                    .foregroundColor(selectedStatus.swiftUIColor)
 
                     // Commentaires - ÉDITABLE DIRECTEMENT
                     VStack(alignment: .leading, spacing: 12) {
@@ -168,26 +198,24 @@ struct AssetDetailView: View {
                             Spacer()
 
                             Button(editingTags ? "Terminer" : "Modifier") {
-                                editingTags.toggle()
+                                if editingTags {
+                                    // Sauvegarder les changements
+                                    editingTags = false
+                                } else {
+                                    editingTags = true
+                                }
                             }
                             .font(.subheadline)
                             .foregroundColor(.blue)
                         }
 
                         if editingTags {
-                            // Champ d'ajout
-                            HStack {
-                                TextField("Nouvelle étiquette", text: $newTag)
-                                    .textFieldStyle(.roundedBorder)
-
-                                Button {
-                                    addTag()
-                                } label: {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.title2)
-                                        .foregroundColor(.blue)
-                                }
-                                .disabled(newTag.trimmingCharacters(in: .whitespaces).isEmpty)
+                            Button {
+                                showingTagPicker = true
+                            } label: {
+                                Label("Ajouter des étiquettes", systemImage: "plus.circle.fill")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
                             }
                         }
 
@@ -217,9 +245,9 @@ struct AssetDetailView: View {
                                     .padding(.vertical, 6)
                                     .background(
                                         RoundedRectangle(cornerRadius: 16)
-                                            .fill(Color.blue.opacity(0.2))
+                                            .fill(Color.green.opacity(0.15))
                                     )
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.green)
                                 }
                             }
                         }
@@ -237,6 +265,19 @@ struct AssetDetailView: View {
                         Text("Informations")
                             .font(.headline)
 
+                        // Status
+                        HStack {
+                            Image(systemName: selectedStatus.icon)
+                                .foregroundColor(selectedStatus.swiftUIColor)
+                            Text("Statut:")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(selectedStatus.displayName)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+                        }
+
+                        // Localisation actuelle
                         if let location = asset.currentLocationId {
                             HStack {
                                 Image(systemName: "mappin.circle.fill")
@@ -247,7 +288,20 @@ struct AssetDetailView: View {
                                 Text(location)
                                     .fontWeight(.medium)
                             }
+                        } else {
+                            HStack {
+                                Image(systemName: "mappin.slash.circle")
+                                    .foregroundColor(.gray)
+                                Text("Localisation:")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("Non définie")
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                            }
                         }
+
+                        Divider()
 
                         HStack {
                             Image(systemName: "tag.fill")
@@ -267,6 +321,43 @@ struct AssetDetailView: View {
                             Spacer()
                             Text(asset.category)
                                 .fontWeight(.medium)
+                        }
+
+                        Divider()
+
+                        // Date de dernière maintenance
+                        HStack {
+                            Image(systemName: "wrench.and.screwdriver.fill")
+                                .foregroundColor(.orange)
+                            Text("Dernière maintenance:")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            if let lastMaintenance = asset.lastMaintenanceDate {
+                                Text(lastMaintenance.formatted(date: .abbreviated, time: .omitted))
+                                    .fontWeight(.medium)
+                            } else {
+                                Text("Jamais")
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        // Date de prochaine maintenance
+                        HStack {
+                            Image(systemName: "calendar.badge.clock")
+                                .foregroundColor(asset.needsMaintenance ? .red : .blue)
+                            Text("Prochaine maintenance:")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            if let nextMaintenance = asset.nextMaintenanceDate {
+                                Text(nextMaintenance.formatted(date: .abbreviated, time: .omitted))
+                                    .fontWeight(.medium)
+                                    .foregroundColor(asset.needsMaintenance ? .red : .primary)
+                            } else {
+                                Text("Non planifiée")
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                            }
                         }
 
                         Divider()
@@ -307,6 +398,60 @@ struct AssetDetailView: View {
                             .fill(Color(.systemGray6))
                     )
                     .padding(.horizontal)
+
+                    // Section 5 : Actions
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Actions")
+                            .font(.headline)
+
+                        // Modifier le statut
+                        Button {
+                            showingStatusPicker = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .foregroundColor(.blue)
+                                Text("Modifier le statut")
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color(.systemBackground))
+                            )
+                        }
+
+                        // Planifier une maintenance
+                        Button {
+                            showingMaintenancePicker = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "calendar.badge.plus")
+                                    .foregroundColor(.orange)
+                                Text("Planifier une maintenance")
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color(.systemBackground))
+                            )
+                        }
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemGray6))
+                    )
+                    .padding(.horizontal)
                 }
                 .padding(.vertical)
             }
@@ -314,50 +459,88 @@ struct AssetDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Fermer") {
+                    Button("Annuler") {
+                        // Annuler les modifications en rechargeant depuis le contexte
+                        modelContext.rollback()
                         dismiss()
                     }
                 }
 
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button("Modifier statut", systemImage: "arrow.triangle.2.circlepath") {
-                            // TODO: Changer le statut
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Sauvegarder") {
+                        // Appliquer le statut sélectionné
+                        asset.status = selectedStatus
+                        
+                        // Sauvegarder les modifications
+                        asset.updatedAt = Date()
+                        try? modelContext.save()
+                        
+                        // Synchroniser avec Firebase
+                        Task {
+                            await syncManager.updateAssetInFirebase(asset)
+                            
+                            // Recalculer les quantités du StockItem parent
+                            if let stockItem = relatedStockItem {
+                                await syncManager.recalculateStockItemQuantities(
+                                    stockItem: stockItem,
+                                    assets: allAssets,
+                                    modelContext: modelContext
+                                )
+                            }
                         }
-
-                        Divider()
-
-                        Button("Supprimer la référence", systemImage: "trash", role: .destructive) {
-                            showingDeleteAlert = true
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                        
+                        dismiss()
                     }
+                    .disabled(!hasChanges)
                 }
-            }
-            .alert("Supprimer cette référence ?", isPresented: $showingDeleteAlert) {
-                Button("Annuler", role: .cancel) {}
-                Button("Supprimer", role: .destructive) {
-                    deleteAsset()
-                }
-            } message: {
-                Text(
-                    "Cette action est irréversible. La référence \(asset.assetId) sera définitivement supprimée."
-                )
             }
             .sheet(isPresented: $showingShareSheet) {
                 if let qrImage = qrCodeImage {
                     ShareSheet(items: [qrImage])
                 }
             }
+            .sheet(isPresented: $showingTagPicker) {
+                UnifiedTagPickerView(
+                    category: asset.category,
+                    selectedTags: $asset.tags
+                )
+            }
+            .sheet(isPresented: $showingStatusPicker) {
+                NavigationView {
+                    StatusPickerView(
+                        selectedStatus: $selectedStatus,
+                        onSave: { newStatus in
+                            selectedStatus = newStatus
+                            // Ne PAS sauvegarder ici, juste mettre à jour la sélection
+                            // La sauvegarde se fera avec le bouton "Sauvegarder"
+                        }
+                    )
+                }
+                .presentationDetents([.medium])
+            }
+            .sheet(isPresented: $showingMaintenancePicker) {
+                NavigationView {
+                    MaintenanceSchedulerView(
+                        selectedDate: $selectedMaintenanceDate,
+                        onSave: {
+                            asset.nextMaintenanceDate = selectedMaintenanceDate
+                            asset.updatedAt = Date()
+                            try? modelContext.save()
+                        }
+                    )
+                }
+                .presentationDetents([.medium])
+            }
             .onAppear {
                 generateQRCode()
             }
+            .navigationTitle("Détail référence")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 
     // MARK: - Fonctions
-
+    
     func generateQRCode() {
         let context = CIContext()
         let filter = CIFilter.qrCodeGenerator()
@@ -434,28 +617,165 @@ struct AssetDetailView: View {
         printController.present(animated: true)
     }
 
-    func addTag() {
-        let trimmedTag = newTag.trimmingCharacters(in: .whitespaces)
-        guard !trimmedTag.isEmpty, !asset.tags.contains(trimmedTag) else { return }
-
-        asset.tags.append(trimmedTag)
-        newTag = ""
-    }
-
     func removeTag(_ tag: String) {
         asset.tags.removeAll { $0 == tag }
     }
+}
 
-    func deleteAsset() {
-        // Si l'asset fait partie d'un groupe (StockItem), décrémenter la quantité
-        if let stockItem = relatedStockItem {
-            stockItem.totalQuantity -= 1
-            stockItem.updatedAt = Date()
+// MARK: - Status Picker View
+
+struct StatusPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedStatus: AssetStatus
+    let onSave: (AssetStatus) -> Void
+    
+    @State private var temporaryStatus: AssetStatus
+    
+    init(selectedStatus: Binding<AssetStatus>, onSave: @escaping (AssetStatus) -> Void) {
+        self._selectedStatus = selectedStatus
+        self.onSave = onSave
+        self._temporaryStatus = State(initialValue: selectedStatus.wrappedValue)
+    }
+    
+    var body: some View {
+        List {
+            Section {
+                ForEach(AssetStatus.allCases, id: \.self) { status in
+                    Button {
+                        temporaryStatus = status
+                    } label: {
+                        HStack {
+                            Image(systemName: status.icon)
+                                .foregroundColor(Color(status.color))
+                                .frame(width: 30)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(status.displayName)
+                                    .foregroundColor(.primary)
+                                    .fontWeight(temporaryStatus == status ? .semibold : .regular)
+                                
+                                Text(statusDescription(for: status))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            if temporaryStatus == status {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Sélectionnez un statut")
+            } footer: {
+                Text("Le statut sera mis à jour immédiatement après validation")
+                    .font(.caption)
+            }
         }
+        .navigationTitle("Modifier le statut")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Annuler") {
+                    dismiss()
+                }
+            }
+            
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Valider") {
+                    onSave(temporaryStatus)
+                    dismiss()
+                }
+                .fontWeight(.semibold)
+            }
+        }
+    }
+    
+    private func statusDescription(for status: AssetStatus) -> String {
+        switch status {
+        case .available:
+            return "Prêt à être utilisé ou expédié"
+        case .reserved:
+            return "Réservé pour une commande ou un événement"
+        case .inUse:
+            return "Actuellement en utilisation"
+        case .damaged:
+            return "Endommagé, nécessite une réparation"
+        case .maintenance:
+            return "En cours de maintenance"
+        case .lost:
+            return "Perdu ou manquant à l'inventaire"
+        }
+    }
+}
 
-        modelContext.delete(asset)
-        try? modelContext.save()
-        dismiss()
+// MARK: - Maintenance Scheduler View
+
+struct MaintenanceSchedulerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedDate: Date
+    let onSave: () -> Void
+    
+    @State private var includeTime = false
+    
+    var body: some View {
+        Form {
+            Section {
+                DatePicker(
+                    "Date de maintenance",
+                    selection: $selectedDate,
+                    in: Date()...,
+                    displayedComponents: includeTime ? [.date, .hourAndMinute] : [.date]
+                )
+                .datePickerStyle(.graphical)
+                
+                Toggle("Inclure l'heure", isOn: $includeTime)
+            } header: {
+                Text("Planification")
+            } footer: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("La maintenance sera planifiée pour le:")
+                        .font(.caption)
+                    Text(selectedDate.formatted(date: .long, time: includeTime ? .shortened : .omitted))
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            Section {
+                HStack {
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundColor(.orange)
+                    Text("Conseil")
+                        .fontWeight(.semibold)
+                }
+                
+                Text("Planifiez les maintenances régulières pour prolonger la durée de vie de vos équipements et éviter les pannes.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .navigationTitle("Planifier maintenance")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Annuler") {
+                    dismiss()
+                }
+            }
+            
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Planifier") {
+                    onSave()
+                    dismiss()
+                }
+                .fontWeight(.semibold)
+            }
+        }
     }
 }
 

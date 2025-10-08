@@ -63,9 +63,9 @@ struct Dimensions: Codable {
 
 **✅ Critères de validation :**
 
-- [x] Champs ajoutés sans erreur de compilation
-- [x] Migration des données existantes fonctionne
-- [x] Preview fonctionne avec les nouveaux champs
+- [X] Champs ajoutés sans erreur de compilation
+- [X] Migration des données existantes fonctionne
+- [X] Preview fonctionne avec les nouveaux champs
 
 ---
 
@@ -100,9 +100,9 @@ enum AssetStatus: String, CaseIterable, Codable {
 
 **✅ Critères de validation :**
 
-- [x] Statuts enrichis fonctionnels
-- [x] Système de commentaires opérationnel
-- [x] Tags hérités + spécifiques fonctionnent
+- [X] Statuts enrichis fonctionnels
+- [X] Système de commentaires opérationnel
+- [X] Tags hérités + spécifiques fonctionnent
 
 ---
 
@@ -133,9 +133,9 @@ enum AssetStatus: String, CaseIterable, Codable {
 
 **✅ Critères de validation :**
 
-- [ ] Filtres ownership fonctionnels
-- [ ] Badges visibles et clairs
-- [ ] Ajout intelligent opérationnel
+- [X] Filtres ownership fonctionnels
+- [X] Badges visibles et clairs
+- [X] Ajout intelligent opérationnel
 
 ---
 
@@ -251,10 +251,10 @@ enum AssetStatus: String, CaseIterable, Codable {
 
 **✅ Critères de validation :**
 
-- [ ] Vue détail complète et lisible
-- [ ] Actions rapides fonctionnelles
-- [ ] Liste assets paginée
-- [ ] Bouton "Imprimer tous les QR" génère PDF
+- [X] Vue détail complète et lisible
+- [X] Actions rapides fonctionnelles
+- [X] Liste assets paginée
+- [X] Bouton "Imprimer tous les QR" génère PDF
 
 ---
 
@@ -319,10 +319,10 @@ enum AssetStatus: String, CaseIterable, Codable {
 
 **✅ Critères de validation :**
 
-- [ ] QR code unique généré
-- [ ] Partage/impression QR fonctionnel
-- [ ] Système de commentaires avec horodatage
-- [ ] Gestion des statuts opérationnelle
+- [X] QR code unique généré
+- [X] Partage/impression QR fonctionnel
+- [X] Système de commentaires avec horodatage
+- [X] Gestion des statuts opérationnelle
 
 ---
 
@@ -355,9 +355,9 @@ enum AssetStatus: String, CaseIterable, Codable {
 
 **✅ Critères de validation :**
 
-- [ ] Sélection multiple fonctionnelle
-- [ ] PDF généré correctement
-- [ ] Format adapté à l'impression réelle
+- [X] Sélection multiple fonctionnelle
+- [X] PDF généré correctement
+- [X] Format adapté à l'impression réelle
 
 ---
 
@@ -426,9 +426,9 @@ final class QuoteItem {
 
 **✅ Critères de validation :**
 
-- [x] Modèles créés sans erreur
-- [x] Relations Event ↔ QuoteItem fonctionnelles
-- [x] Calculs prix/remise corrects
+- [X] Modèles créés sans erreur
+- [X] Relations Event ↔ QuoteItem fonctionnelles
+- [X] Calculs prix/remise corrects
 
 ---
 
@@ -454,7 +454,6 @@ final class QuoteItem {
 - Liste camions disponibles sur la période
 - Affichage capacité/poids max
 - Réservation automatique
-
 
 **Bouton** : "Créer événement et commencer le devis"
 
@@ -656,9 +655,9 @@ final class AssetReservation {
 
 **✅ Critères de validation :**
 
-- [x] Réservations créées automatiquement
-- [x] Détection conflits fonctionnelle
-- [x] Gestion statuts de réservation
+- [X] Réservations créées automatiquement
+- [X] Détection conflits fonctionnelle
+- [X] Gestion statuts de réservation
 
 ---
 
@@ -863,9 +862,15 @@ LogiScan/
 ### Sprint 2 (Stocks)
 
 6. ✅ Phase 2.1 - StockListView
-7. ✅ Phase 2.2 - StockItemFormView
-8. ✅ Phase 3.1 - StockItemDetailView
-9. ✅ Phase 4.1 - AssetDetailView
+7. ✅ Phase 2.2 - StockItemFormView (Corrections appliquées le 6 oct. 2025)
+   - ✅ SKU non modifiable en édition
+   - ✅ Fonctionnalité de régénération QR codes
+   - ✅ Correction validation matériel en location
+   - ✅ Suppression du champ "En maintenance"
+8. ✅ Phase 3.1 - StockItemDetailView (Corrections appliquées le 6 oct. 2025)
+   - ✅ Suppression du bouton "Fermer"
+9. ✅ Phase 4.1 - AssetDetailView (Corrections appliquées le 6 oct. 2025)
+   - ✅ Système de tags enrichi (UnifiedTagPickerView)
 
 ### Sprint 3 (QR Codes)
 

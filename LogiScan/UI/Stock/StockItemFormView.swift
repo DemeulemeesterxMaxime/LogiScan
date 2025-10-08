@@ -13,7 +13,7 @@ struct StockItemFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var existingItems: [StockItem]
-    
+
     // ✅ AJOUT : SyncManager pour synchronisation Firebase
     @StateObject private var syncManager = SyncManager()
 
@@ -70,6 +70,8 @@ struct StockItemFormView: View {
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var isSubmitting = false
+    @State private var showingQRRegenerationAlert = false
+    @State private var qrRegenerationConfirmed = false
 
     private let categories = ["Éclairage", "Son", "Structures", "Mobilier", "Divers"]
 
@@ -163,9 +165,19 @@ struct StockItemFormView: View {
                         .disabled(isExistingArticle && selectedExistingItem != nil)
 
                     if !isExistingArticle || selectedExistingItem == nil {
-                        TextField("SKU (code unique)", text: $sku)
-                            .autocapitalization(.allCharacters)
-                            .disabled(editingItem != nil)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                TextField("SKU (code unique)", text: $sku)
+                                    .autocapitalization(.allCharacters)
+                                    .disabled(editingItem != nil)
+
+                                if editingItem != nil {
+                                    Text("Le SKU ne peut pas être modifié")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
                     } else {
                         HStack {
                             Text("SKU")
@@ -186,6 +198,32 @@ struct StockItemFormView: View {
                     TextField("Description", text: $itemDescription, axis: .vertical)
                         .lineLimit(2...4)
                         .disabled(isExistingArticle && selectedExistingItem != nil)
+
+                    // Bouton de régénération des QR codes (uniquement en édition)
+                    if editingItem != nil {
+                        Button {
+                            showingQRRegenerationAlert = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "qrcode.viewfinder")
+                                    .foregroundColor(.orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Régénérer les QR codes")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.primary)
+                                    Text("Utilisez cette fonction après modification du nom")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 8)
+                        }
+                    }
                 }
 
                 // Section quantités
@@ -194,10 +232,6 @@ struct StockItemFormView: View {
                         "Quantité à ajouter: \(totalQuantity)", value: $totalQuantity, in: 1...9999)
 
                     if !isExistingArticle {
-                        Stepper(
-                            "En maintenance: \(maintenanceQuantity)", value: $maintenanceQuantity,
-                            in: 0...totalQuantity)
-
                         // Option pour créer les références individuelles
                         Toggle(isOn: $createIndividualReferences) {
                             VStack(alignment: .leading, spacing: 4) {
@@ -404,6 +438,16 @@ struct StockItemFormView: View {
             } message: {
                 Text(errorMessage)
             }
+            .alert("Régénérer les QR codes", isPresented: $showingQRRegenerationAlert) {
+                Button("Annuler", role: .cancel) {}
+                Button("Confirmer") {
+                    qrRegenerationConfirmed = true
+                }
+            } message: {
+                Text(
+                    "Cette action va régénérer tous les QR codes pour cet article. Assurez-vous d'avoir mis à jour les QR codes physiques avant de confirmer la mise à jour dans l'application."
+                )
+            }
         }
     }
 
@@ -414,10 +458,22 @@ struct StockItemFormView: View {
             return selectedExistingItem != nil && totalQuantity > 0
         }
 
-        return !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !sku.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !unitValue.isEmpty
-            && (ownershipType == .owned || !rentalPrice.isEmpty) && !unitWeight.isEmpty
-            && !unitVolume.isEmpty
+        // Validation de base
+        guard
+            !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !sku.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !unitWeight.isEmpty
+                && !unitVolume.isEmpty
+        else {
+            return false
+        }
+
+        // Validation selon le type de propriété
+        if ownershipType == .owned {
+            return !unitValue.isEmpty
+        } else {
+            return !rentalPrice.isEmpty
+        }
     }
 
     private var calculatedVolume: Double? {
@@ -492,7 +548,43 @@ struct StockItemFormView: View {
     }
 
     private func saveItem() {
-        guard isFormValid else { return }
+        guard isFormValid else {
+            // Message d'erreur si le formulaire de base n'est pas valide
+            if isExistingArticle {
+                errorMessage =
+                    "❌ Informations manquantes\n\nVeuillez sélectionner un article existant et spécifier une quantité."
+                showingError = true
+                return
+            }
+
+            // Vérifier les champs obligatoires manquants
+            var missingFields: [String] = []
+
+            if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                missingFields.append("Nom")
+            }
+            if sku.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                missingFields.append("SKU")
+            }
+            if unitWeight.isEmpty {
+                missingFields.append("Poids")
+            }
+            if unitVolume.isEmpty {
+                missingFields.append("Volume")
+            }
+            if ownershipType == .owned && unitValue.isEmpty {
+                missingFields.append("Valeur unitaire")
+            }
+            if ownershipType == .rented && rentalPrice.isEmpty {
+                missingFields.append("Prix de location")
+            }
+
+            let fieldsList = missingFields.joined(separator: ", ")
+            errorMessage = "❌ Champs obligatoires manquants\n\nVeuillez remplir : \(fieldsList)"
+            showingError = true
+            return
+        }
+
         isSubmitting = true
 
         // Cas 1: Ajout d'unités à un article existant
@@ -513,12 +605,12 @@ struct StockItemFormView: View {
 
             do {
                 try modelContext.save()
-                
+
                 // ✅ AJOUT : Synchroniser avec Firebase
                 Task {
                     await syncManager.updateStockItemInFirebase(existing)
                 }
-                
+
                 createdItem = existing
                 showingQRCode = true
             } catch {
@@ -533,43 +625,109 @@ struct StockItemFormView: View {
         if editingItem == nil {
             let skuExists = existingItems.contains { $0.sku.uppercased() == sku.uppercased() }
             if skuExists {
-                errorMessage = "Ce SKU existe déjà. Veuillez en choisir un autre."
+                errorMessage =
+                    "❌ SKU déjà existant\n\nCe SKU existe déjà dans votre stock. Veuillez en choisir un autre ou ajouter des unités à l'article existant."
                 showingError = true
                 isSubmitting = false
                 return
             }
         }
 
-        // Conversion des valeurs numériques
-        guard let unitValueDouble = Double(unitValue),
-            let unitWeightDouble = Double(unitWeight),
-            let unitVolumeDouble = Double(unitVolume)
-        else {
-            errorMessage = "Valeurs numériques invalides."
+        // Conversion des valeurs numériques avec messages détaillés
+        guard let unitWeightDouble = Double(unitWeight) else {
+            errorMessage = "❌ Poids invalide\n\nLe poids doit être un nombre valide (ex: 2.5)."
             showingError = true
             isSubmitting = false
             return
         }
 
-        if ownershipType == .rented && rentalPrice.isEmpty {
-            errorMessage = "Le prix de location est obligatoire pour le matériel loué."
+        guard let unitVolumeDouble = Double(unitVolume) else {
+            errorMessage = "❌ Volume invalide\n\nLe volume doit être un nombre valide (ex: 0.01)."
             showingError = true
             isSubmitting = false
             return
         }
 
-        let rentalPriceDouble = ownershipType == .rented ? Double(rentalPrice) : nil
-        let purchasePriceDouble = !purchasePrice.isEmpty ? Double(purchasePrice) : nil
-        let powerConsumptionDouble = !powerConsumption.isEmpty ? Double(powerConsumption) : nil
+        // Validation selon le type de propriété
+        var unitValueDouble: Double = 0.0
+
+        if ownershipType == .owned {
+            guard let value = Double(unitValue), value > 0 else {
+                errorMessage =
+                    "❌ Valeur unitaire invalide\n\nPour du matériel en propriété, la valeur unitaire doit être un nombre positif (ex: 150.00)."
+                showingError = true
+                isSubmitting = false
+                return
+            }
+            unitValueDouble = value
+        }
+
+        // Validation prix de location
+        var rentalPriceDouble: Double? = nil
+        if ownershipType == .rented {
+            guard let rental = Double(rentalPrice), rental > 0 else {
+                errorMessage =
+                    "❌ Prix de location invalide\n\nPour du matériel en location, le prix de location par jour doit être un nombre positif (ex: 50.00)."
+                showingError = true
+                isSubmitting = false
+                return
+            }
+            rentalPriceDouble = rental
+        }
+
+        // Validation prix d'achat (optionnel mais doit être valide si rempli)
+        var purchasePriceDouble: Double? = nil
+        if !purchasePrice.isEmpty {
+            guard let purchase = Double(purchasePrice), purchase > 0 else {
+                errorMessage =
+                    "❌ Prix d'achat invalide\n\nLe prix d'achat doit être un nombre positif (ex: 120.00)."
+                showingError = true
+                isSubmitting = false
+                return
+            }
+            purchasePriceDouble = purchase
+        }
+
+        // Validation consommation électrique (optionnel mais doit être valide si rempli)
+        var powerConsumptionDouble: Double? = nil
+        if !powerConsumption.isEmpty {
+            guard let power = Double(powerConsumption), power > 0 else {
+                errorMessage =
+                    "❌ Consommation électrique invalide\n\nLa consommation doit être un nombre positif en watts (ex: 500)."
+                showingError = true
+                isSubmitting = false
+                return
+            }
+            powerConsumptionDouble = power
+        }
 
         // Dimensions
         var dimensions: Dimensions? = nil
-        if hasDimensions,
-            let length = Double(dimensionLength),
-            let width = Double(dimensionWidth),
-            let height = Double(dimensionHeight),
-            length > 0, width > 0, height > 0
-        {
+        if hasDimensions {
+            guard let length = Double(dimensionLength), length > 0 else {
+                errorMessage =
+                    "❌ Longueur invalide\n\nLa longueur doit être un nombre positif en mm (ex: 1200)."
+                showingError = true
+                isSubmitting = false
+                return
+            }
+
+            guard let width = Double(dimensionWidth), width > 0 else {
+                errorMessage =
+                    "❌ Largeur invalide\n\nLa largeur doit être un nombre positif en mm (ex: 800)."
+                showingError = true
+                isSubmitting = false
+                return
+            }
+
+            guard let height = Double(dimensionHeight), height > 0 else {
+                errorMessage =
+                    "❌ Hauteur invalide\n\nLa hauteur doit être un nombre positif en mm (ex: 600)."
+                showingError = true
+                isSubmitting = false
+                return
+            }
+
             dimensions = Dimensions(length: length, width: width, height: height)
         }
 
@@ -598,6 +756,11 @@ struct StockItemFormView: View {
             existingItem.tags = tags
             existingItem.technicalSpecs = specs
             existingItem.updatedAt = Date()
+
+            // Régénération des QR codes si confirmé
+            if qrRegenerationConfirmed {
+                regenerateQRCodesForAssets(stockItem: existingItem)
+            }
         } else {
             // Création
             let newItem = StockItem(
@@ -632,7 +795,7 @@ struct StockItemFormView: View {
 
         do {
             try modelContext.save()
-            
+
             // ✅ AJOUT : Synchroniser avec Firebase
             Task {
                 if let existingItem = editingItem {
@@ -643,7 +806,7 @@ struct StockItemFormView: View {
                     await syncManager.syncStockItemToFirebase(newItem)
                 }
             }
-            
+
             if editingItem == nil {
                 showingQRCode = true
             } else {
@@ -657,6 +820,33 @@ struct StockItemFormView: View {
     }
 
     // MARK: - Création des références individuelles
+
+    private func regenerateQRCodesForAssets(stockItem: StockItem) {
+        // Récupérer tous les assets liés à ce StockItem
+        let itemSku = stockItem.sku
+        let descriptor = FetchDescriptor<Asset>(
+            predicate: #Predicate<Asset> { asset in
+                asset.sku == itemSku
+            }
+        )
+
+        guard let assets = try? modelContext.fetch(descriptor) else {
+            return
+        }
+
+        // Régénérer le QR payload pour chaque asset
+        for asset in assets {
+            let qrPayload = """
+                {"v":1,"type":"asset","id":"\(asset.assetId)","sku":"\(stockItem.sku)","sn":"\(asset.serialNumber ?? "")"}
+                """
+            asset.qrPayload = qrPayload
+
+            // Mettre à jour le nom de l'asset avec le nouveau nom du StockItem
+            if let assetNumber = asset.assetId.split(separator: "-").last {
+                asset.name = "\(stockItem.name) #\(assetNumber)"
+            }
+        }
+    }
 
     private func createIndividualAssets(
         for stockItem: StockItem, quantity: Int, weight: Double, volume: Double, value: Double
@@ -691,6 +881,11 @@ struct StockItemFormView: View {
             )
 
             modelContext.insert(asset)
+
+            // ✅ AJOUT : Synchroniser l'asset vers Firebase
+            Task {
+                await syncManager.syncAssetToFirebase(asset)
+            }
         }
     }
 }

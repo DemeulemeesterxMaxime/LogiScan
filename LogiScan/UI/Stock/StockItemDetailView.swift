@@ -14,6 +14,8 @@ struct StockItemDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    @StateObject private var syncManager = SyncManager()
+
     @State private var showingTagEditor = false
     @State private var showingLocationHistory = false
     @State private var showingEditForm = false
@@ -22,12 +24,19 @@ struct StockItemDetailView: View {
     @State private var selectedAsset: Asset?
     @State private var showingDeleteAlert = false
     @State private var showingAssetsList = false
+    @State private var showingAddAsset = false
+    @State private var showingMaintenanceMenu = false
+    @State private var showingExportMenu = false
 
     @Query private var assets: [Asset]
     @Query private var movements: [Movement]
 
     var filteredAssets: [Asset] {
         assets.filter { $0.sku == stockItem.sku }
+    }
+    
+    var availableAssetsCount: Int {
+        filteredAssets.filter { $0.status == .available }.count
     }
 
     var relatedMovements: [Movement] {
@@ -47,36 +56,37 @@ struct StockItemDetailView: View {
                         stockItem: stockItem,
                         assets: Array(filteredAssets.prefix(5)),
                         totalAssetsCount: filteredAssets.count,
+                        availableAssetsCount: availableAssetsCount,
                         showingQRBatchPDF: $showingQRBatchPDF,
                         selectedAsset: $selectedAsset,
-                        showingAssetsList: $showingAssetsList
+                        showingAssetsList: $showingAssetsList,
+                        showingAddAsset: $showingAddAsset
                     )
 
-                    // 3. Disponibilité
-                    AvailabilitySectionView(stockItem: stockItem)
-
-                    // 4. Mouvements récents
+                    // 3. Mouvements récents
                     MovementHistorySectionView(
                         movements: Array(relatedMovements.prefix(5)),
                         showingLocationHistory: $showingLocationHistory
                     )
 
-                    // 5. Étiquettes
+                    // 4. Étiquettes
                     TagsSectionView(
                         stockItem: stockItem,
                         showingTagEditor: $showingTagEditor
                     )
 
-                    // 6. Actions rapides
+                    // 5. Actions rapides
                     QuickActionsView(
                         showingQuantityAdjustment: $showingQuantityAdjustment,
-                        showingEditForm: $showingEditForm
+                        showingEditForm: $showingEditForm,
+                        showingMaintenanceMenu: $showingMaintenanceMenu,
+                        showingLocationHistory: $showingLocationHistory
                     )
 
-                    // 7. Détails techniques
+                    // 6. Détails techniques
                     DetailsSectionView(stockItem: stockItem)
 
-                    // 8. Description / Commentaires
+                    // 7. Description / Commentaires
                     if !stockItem.itemDescription.isEmpty {
                         CommentsSectionView(description: stockItem.itemDescription)
                     }
@@ -86,12 +96,6 @@ struct StockItemDetailView: View {
             .navigationTitle(stockItem.name)
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Fermer") {
-                        dismiss()
-                    }
-                }
-
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button("Modifier l'article", systemImage: "pencil") {
@@ -141,11 +145,11 @@ struct StockItemDetailView: View {
         .sheet(isPresented: $showingQRBatchPDF) {
             QRBatchPDFView(assets: filteredAssets, stockItem: stockItem)
         }
-        .sheet(item: $selectedAsset) { asset in
-            AssetDetailView(asset: asset)
-        }
         .sheet(isPresented: $showingAssetsList) {
             AssetsListView(assets: filteredAssets, selectedAsset: $selectedAsset)
+        }
+        .sheet(isPresented: $showingAddAsset) {
+            AddAssetSheet(stockItem: stockItem)
         }
         .alert("Supprimer cet article ?", isPresented: $showingDeleteAlert) {
             Button("Annuler", role: .cancel) {}
@@ -168,14 +172,31 @@ struct StockItemDetailView: View {
     // MARK: - Fonctions
 
     func deleteStockItem() {
-        // Supprimer toutes les références associées
+        print("🗑️ [StockItemDetailView] Suppression de l'article : \(stockItem.sku)")
+
+        // Sauvegarder le SKU avant suppression (pour Firebase)
+        let skuToDelete = stockItem.sku
+
+        // Supprimer toutes les références associées (local)
         for asset in filteredAssets {
             modelContext.delete(asset)
         }
 
-        // Supprimer le StockItem
+        // Supprimer le StockItem (local)
         modelContext.delete(stockItem)
-        try? modelContext.save()
+
+        do {
+            try modelContext.save()
+            print("✅ [StockItemDetailView] Article supprimé localement")
+        } catch {
+            print("❌ [StockItemDetailView] Erreur sauvegarde après suppression : \(error)")
+        }
+
+        // Supprimer de Firebase (cloud) de manière asynchrone
+        Task {
+            await syncManager.deleteStockItemFromFirebase(sku: skuToDelete)
+        }
+
         dismiss()
     }
 }
@@ -514,117 +535,94 @@ struct DetailRow: View {
     }
 }
 
-// MARK: - Availability Section
-
-struct AvailabilitySectionView: View {
-    let stockItem: StockItem
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Disponibilité")
-                .font(.headline)
-
-            HStack(spacing: 24) {
-                AvailabilityCard(
-                    title: "Total",
-                    count: stockItem.totalQuantity,
-                    color: .blue
-                )
-
-                AvailabilityCard(
-                    title: "Disponible",
-                    count: stockItem.availableQuantity,
-                    color: stockItem.availableQuantity > 0 ? .green : .red
-                )
-
-                if stockItem.maintenanceQuantity > 0 {
-                    AvailabilityCard(
-                        title: "Maintenance",
-                        count: stockItem.maintenanceQuantity,
-                        color: .orange
-                    )
-                }
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
-        )
-    }
-}
-
-struct AvailabilityCard: View {
-    let title: String
-    let count: Int
-    let color: Color
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text("\(count)")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(color)
-
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(.systemBackground))
-        )
-    }
-}
-
 // MARK: - Serialized Assets Section
 
 struct SerializedAssetsSectionView: View {
     let stockItem: StockItem
     let assets: [Asset]
     let totalAssetsCount: Int
+    let availableAssetsCount: Int
     @Binding var showingQRBatchPDF: Bool
     @Binding var selectedAsset: Asset?
     @Binding var showingAssetsList: Bool
+    @Binding var showingAddAsset: Bool
+    
+    @Query private var allAssets: [Asset]
+    
+    // Calculer les vraies quantités depuis les Assets
+    private var quantities: (available: Int, reserved: Int, inUse: Int, damaged: Int, maintenance: Int, lost: Int) {
+        stockItem.calculateQuantities(from: allAssets)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "cube.box")
-                    .font(.headline)
-                    .foregroundColor(.blue)
-                Text("Références individuelles (\(totalAssetsCount))")
-                    .font(.headline)
-
-                Spacer()
-
-                // Bouton "Voir le détail des unités"
-                Button {
-                    showingAssetsList = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("Voir détail")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                        Image(systemName: "list.bullet")
-                            .font(.caption)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.blue.opacity(0.15))
-                    .foregroundColor(.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            // En-tête avec compteur dispo/total
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "cube.box")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                    Text("Références individuelles")
+                        .font(.headline)
+                    
+                    Spacer()
+                }
+                
+                Text("\(quantities.available) / \(totalAssetsCount) disponible")
+                    .font(.subheadline)
+                    .foregroundColor(quantities.available > 0 ? .green : .secondary)
+            }
+            
+            // Statistiques détaillées par statut
+            VStack(spacing: 8) {
+                if quantities.reserved > 0 {
+                    StatusRow(
+                        status: .reserved,
+                        count: quantities.reserved,
+                        total: totalAssetsCount
+                    )
+                }
+                
+                if quantities.inUse > 0 {
+                    StatusRow(
+                        status: .inUse,
+                        count: quantities.inUse,
+                        total: totalAssetsCount
+                    )
+                }
+                
+                if quantities.maintenance > 0 {
+                    StatusRow(
+                        status: .maintenance,
+                        count: quantities.maintenance,
+                        total: totalAssetsCount
+                    )
+                }
+                
+                if quantities.damaged > 0 {
+                    StatusRow(
+                        status: .damaged,
+                        count: quantities.damaged,
+                        total: totalAssetsCount
+                    )
+                }
+                
+                if quantities.lost > 0 {
+                    StatusRow(
+                        status: .lost,
+                        count: quantities.lost,
+                        total: totalAssetsCount
+                    )
                 }
             }
+            .padding(.vertical, 8)
 
-            // Boutons d'action
+            // Boutons d'action en une seule ligne
             HStack(spacing: 10) {
                 Button {
                     showingQRBatchPDF = true
                 } label: {
-                    Label("Voir les QR Codes", systemImage: "qrcode.viewfinder")
+                    Label("QR Codes", systemImage: "qrcode.viewfinder")
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -634,9 +632,9 @@ struct SerializedAssetsSectionView: View {
                 }
 
                 Button {
-                    // TODO: Ajouter une référence
+                    showingAddAsset = true
                 } label: {
-                    Label("Ajouter", systemImage: "plus")
+                    Label("Ajuster", systemImage: "arrow.up.arrow.down")
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
@@ -645,64 +643,19 @@ struct SerializedAssetsSectionView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
 
-                Spacer()
-            }
-
-            Divider()
-
-            // Message si aucun asset
-            if assets.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "cube.box")
-                        .font(.largeTitle)
-                        .foregroundColor(.secondary)
-
-                    Text("Aucune référence individuelle")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-
-                    Text(
-                        "Créez des références pour suivre chaque unité individuellement avec son propre QR code"
-                    )
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 24)
-            } else {
-                // Liste des assets (5 premiers) - Cliquables
-                LazyVStack(spacing: 12) {
-                    ForEach(assets, id: \.assetId) { asset in
-                        Button {
-                            selectedAsset = asset
-                        } label: {
-                            AssetRow(stockItem: stockItem, asset: asset)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            // Bouton "Afficher les X autres" si plus de 5
-            if totalAssetsCount > 5 {
                 Button {
-                    // TODO: Navigation vers liste complète
+                    showingAssetsList = true
                 } label: {
-                    HStack {
-                        Text("Afficher les \(assets.count - 5) autres")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.blue)
-                    .padding(.vertical, 8)
+                    Label("Voir détail", systemImage: "list.bullet")
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.purple.opacity(0.1))
+                        .foregroundColor(.purple)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+
+                Spacer()
             }
         }
         .padding()
@@ -713,119 +666,45 @@ struct SerializedAssetsSectionView: View {
     }
 }
 
-struct AssetRow: View {
-    let stockItem: StockItem
-    let asset: Asset
-    @State private var showingQRCode = false
+// MARK: - Status Row Component
 
-    // Computed property pour obtenir la couleur du statut
-    private var statusColor: Color {
-        switch asset.status {
-        case .available: return .green
-        case .reserved: return .blue
-        case .inUse: return .purple
-        case .damaged: return .red
-        case .maintenance: return .orange
-        case .lost: return .gray
-        }
+struct StatusRow: View {
+    let status: AssetStatus
+    let count: Int
+    let total: Int
+    
+    private var percentage: Double {
+        total > 0 ? Double(count) / Double(total) * 100 : 0
     }
-
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // Première ligne : Nom complet + Badge de statut
-            HStack(alignment: .center, spacing: 8) {
-                Text(stockItem.name)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Spacer()
-
-                // Badge de statut
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 8, height: 8)
-                    Text(asset.status.displayName)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(statusColor.opacity(0.15))
-                .clipShape(Capsule())
-                .foregroundColor(statusColor)
-            }
-
-            // Deuxième ligne : SKU + Réf + S/N
-            HStack(spacing: 8) {
-                Text(stockItem.sku)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fontWeight(.medium)
-
-                Text("•")
-                    .foregroundColor(.secondary)
-                    .font(.caption2)
-
-                Text("Réf: \(asset.assetId)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                if let serialNumber = asset.serialNumber {
-                    Text("•")
-                        .foregroundColor(.secondary)
-                        .font(.caption2)
-                    Text("S/N: \(serialNumber)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-            }
-            .padding(.top, 4)
-
-            // Troisième ligne : Localisation + Bouton QR
-            HStack {
-                if let location = asset.currentLocationId {
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.circle.fill")
-                            .font(.caption2)
-                        Text(location)
-                            .font(.caption)
-                            .lineLimit(1)
-                    }
-                    .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                // Bouton QR
-                Button {
-                    showingQRCode = true
-                } label: {
-                    Image(systemName: "qrcode")
-                        .font(.body)
-                        .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Color.blue)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.top, 6)
+        HStack(spacing: 8) {
+            Image(systemName: status.icon)
+                .font(.caption)
+                .foregroundColor(status.swiftUIColor)
+                .frame(width: 20)
+            
+            Text(status.displayName)
+                .font(.caption)
+                .foregroundColor(.primary)
+            
+            Spacer()
+            
+            Text("\(count)")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(status.swiftUIColor)
+            
+            Text("(\(String(format: "%.0f", percentage))%)")
+                .font(.caption2)
+                .foregroundColor(.secondary)
         }
-        .padding(.vertical, 12)
         .padding(.horizontal, 12)
+        .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6))
+            RoundedRectangle(cornerRadius: 8)
+                .fill(status.swiftUIColor.opacity(0.1))
         )
-        .sheet(isPresented: $showingQRCode) {
-            AssetQRCodeView(stockItem: stockItem, asset: asset)
-        }
     }
 }
 
@@ -836,6 +715,9 @@ struct AssetQRCodeView: View {
     let stockItem: StockItem
     let asset: Asset
     @State private var qrCodeImage: UIImage?
+    @State private var showingShareSheet = false
+    @State private var showingSaveAlert = false
+    @State private var saveAlertMessage = ""
 
     var body: some View {
         NavigationView {
@@ -885,7 +767,7 @@ struct AssetQRCodeView: View {
 
                 // Boutons d'action
                 VStack(spacing: 12) {
-                    Button(action: shareQRCode) {
+                    Button(action: { showingShareSheet = true }) {
                         Label("Partager le QR Code", systemImage: "square.and.arrow.up")
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -894,7 +776,7 @@ struct AssetQRCodeView: View {
                     .controlSize(.large)
                     .disabled(qrCodeImage == nil)
 
-                    Button(action: saveQRCodeToFiles) {
+                    Button(action: saveQRCodeToPhotos) {
                         Label("Enregistrer dans Photos", systemImage: "arrow.down.doc")
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -914,6 +796,16 @@ struct AssetQRCodeView: View {
                         dismiss()
                     }
                 }
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                if let image = qrCodeImage {
+                    ShareSheet(items: [image, "QR Code: \(stockItem.name) - \(asset.assetId)"])
+                }
+            }
+            .alert("Enregistrement", isPresented: $showingSaveAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveAlertMessage)
             }
         }
         .onAppear {
@@ -947,25 +839,41 @@ struct AssetQRCodeView: View {
         }
     }
 
-    private func shareQRCode() {
+    private func saveQRCodeToPhotos() {
         guard let image = qrCodeImage else { return }
 
-        let activityVC = UIActivityViewController(
-            activityItems: [image, "QR Code: \(stockItem.name) - \(asset.assetId)"],
-            applicationActivities: nil
-        )
-
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-            let window = windowScene.windows.first,
-            let rootVC = window.rootViewController
-        {
-            rootVC.present(activityVC, animated: true)
+        // Utiliser un wrapper pour gérer le callback
+        let imageSaver = ImageSaver()
+        imageSaver.successHandler = {
+            saveAlertMessage = "QR Code enregistré dans Photos avec succès !"
+            showingSaveAlert = true
         }
+        imageSaver.errorHandler = { error in
+            saveAlertMessage = "Erreur lors de l'enregistrement : \(error.localizedDescription)"
+            showingSaveAlert = true
+        }
+        imageSaver.writeToPhotoAlbum(image: image)
+    }
+}
+
+// MARK: - Image Saver (Gestion callback UIImageWriteToSavedPhotosAlbum)
+
+class ImageSaver: NSObject {
+    var successHandler: (() -> Void)?
+    var errorHandler: ((Error) -> Void)?
+
+    func writeToPhotoAlbum(image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(saveCompleted), nil)
     }
 
-    private func saveQRCodeToFiles() {
-        guard let image = qrCodeImage else { return }
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+    @objc func saveCompleted(
+        _ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer
+    ) {
+        if let error = error {
+            errorHandler?(error)
+        } else {
+            successHandler?()
+        }
     }
 }
 
@@ -1063,6 +971,8 @@ struct MovementRowCompact: View {
 struct QuickActionsView: View {
     @Binding var showingQuantityAdjustment: Bool
     @Binding var showingEditForm: Bool
+    @Binding var showingMaintenanceMenu: Bool
+    @Binding var showingLocationHistory: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1070,16 +980,16 @@ struct QuickActionsView: View {
                 .font(.headline)
 
             HStack(spacing: 12) {
-                // Ajouter unités
+                // Ajuster le stock
                 Button {
                     showingQuantityAdjustment = true
                 } label: {
                     VStack(spacing: 8) {
-                        Image(systemName: "plus.circle.fill")
+                        Image(systemName: "arrow.up.arrow.down.circle.fill")
                             .font(.title2)
-                            .foregroundColor(.green)
+                            .foregroundColor(.blue)
 
-                        Text("Ajouter\nunités")
+                        Text("Ajuster\nstock")
                             .font(.caption)
                             .fontWeight(.medium)
                             .multilineTextAlignment(.center)
@@ -1093,16 +1003,16 @@ struct QuickActionsView: View {
                 }
                 .buttonStyle(.plain)
 
-                // Supprimer unités
+                // Gérer la maintenance
                 Button {
-                    // TODO: Ouvrir sheet pour supprimer
+                    showingMaintenanceMenu = true
                 } label: {
                     VStack(spacing: 8) {
-                        Image(systemName: "minus.circle.fill")
+                        Image(systemName: "wrench.and.screwdriver.fill")
                             .font(.title2)
-                            .foregroundColor(.red)
+                            .foregroundColor(.orange)
 
-                        Text("Supprimer\nunités")
+                        Text("Gérer la\nmaintenance")
                             .font(.caption)
                             .fontWeight(.medium)
                             .multilineTextAlignment(.center)
@@ -1123,7 +1033,7 @@ struct QuickActionsView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "pencil.circle.fill")
                             .font(.title2)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.green)
 
                         Text("Modifier\ninfos")
                             .font(.caption)
@@ -1139,34 +1049,19 @@ struct QuickActionsView: View {
                 }
                 .buttonStyle(.plain)
 
-                // Menu
-                Menu {
-                    Button("Gérer la maintenance", systemImage: "wrench.and.screwdriver") {
-                        // TODO: Action maintenance
-                    }
-
-                    Button("Voir historique complet", systemImage: "clock") {
-                        // TODO: Navigation historique
-                    }
-
-                    Button("Exporter les données", systemImage: "square.and.arrow.up") {
-                        // TODO: Export
-                    }
-
-                    Divider()
-
-                    Button("Supprimer l'article", systemImage: "trash", role: .destructive) {
-                        // TODO: Confirmation suppression
-                    }
+                // Historique
+                Button {
+                    showingLocationHistory = true
                 } label: {
                     VStack(spacing: 8) {
-                        Image(systemName: "ellipsis.circle.fill")
+                        Image(systemName: "clock.fill")
                             .font(.title2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.purple)
 
-                        Text("Menu")
+                        Text("Voir\nhistorique")
                             .font(.caption)
                             .fontWeight(.medium)
+                            .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
@@ -1175,6 +1070,7 @@ struct QuickActionsView: View {
                             .fill(Color(.systemBackground))
                     )
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding()
@@ -1432,6 +1328,178 @@ struct QuantityAdjustmentSheet: View {
         // TODO: Créer un Movement pour tracer cette opération
 
         dismiss()
+    }
+}
+
+// MARK: - Add Asset Sheet
+
+struct AddAssetSheet: View {
+    @Bindable var stockItem: StockItem
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var quantity: Int = 1
+    @State private var serialNumber: String = ""
+    @State private var comments: String = ""
+    @State private var isSubmitting = false
+    @State private var errorMessage = ""
+    @State private var showingError = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(stockItem.name)
+                                .font(.headline)
+                            Text("SKU: \(stockItem.sku)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "cube.box.fill")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                    }
+                } header: {
+                    Text("Article")
+                }
+
+                Section {
+                    Stepper("Nombre de références: \(quantity)", value: $quantity, in: 1...100)
+
+                    TextField("Numéro de série (optionnel)", text: $serialNumber)
+                        .autocapitalization(.allCharacters)
+
+                    if quantity == 1 {
+                        Text("Une référence individuelle sera créée")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(
+                            "\(quantity) références individuelles seront créées avec des IDs séquentiels"
+                        )
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                } header: {
+                    Text("Quantité")
+                }
+
+                Section {
+                    TextField("Commentaires (optionnel)", text: $comments, axis: .vertical)
+                        .lineLimit(3...6)
+                } header: {
+                    Text("Informations complémentaires")
+                }
+
+                Section {
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("Stock actuel:")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(stockItem.totalQuantity)")
+                                .fontWeight(.semibold)
+                        }
+
+                        HStack {
+                            Text("Nouveau stock:")
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text("\(stockItem.totalQuantity + quantity)")
+                                .fontWeight(.bold)
+                                .foregroundColor(.green)
+                        }
+                    }
+                } header: {
+                    Text("Aperçu")
+                }
+            }
+            .navigationTitle("Ajouter des références")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Créer") {
+                        createAssets()
+                    }
+                    .disabled(isSubmitting)
+                }
+            }
+            .alert("Erreur", isPresented: $showingError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorMessage)
+            }
+        }
+    }
+
+    private func createAssets() {
+        isSubmitting = true
+
+        // Créer les assets
+        let existingAssetsCount = stockItem.totalQuantity
+
+        for i in 0..<quantity {
+            let assetNumber = existingAssetsCount + i + 1
+            let assetId = "\(stockItem.sku)-\(String(format: "%03d", assetNumber))"
+
+            let asset = Asset(
+                assetId: assetId,
+                sku: stockItem.sku,
+                name: stockItem.name,
+                category: stockItem.category,
+                serialNumber: serialNumber.isEmpty ? nil : "\(serialNumber)-\(i + 1)",
+                status: .available,
+                weight: stockItem.unitWeight,
+                volume: stockItem.unitVolume,
+                value: stockItem.unitValue,
+                qrPayload: generateQRPayload(assetId: assetId),
+                comments: comments,
+                tags: stockItem.tags
+            )
+
+            modelContext.insert(asset)
+        }
+
+        // Mettre à jour la quantité du stock
+        stockItem.totalQuantity += quantity
+        stockItem.updatedAt = Date()
+
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            errorMessage = "Erreur lors de la création: \(error.localizedDescription)"
+            showingError = true
+            isSubmitting = false
+        }
+    }
+
+    private func generateQRPayload(assetId: String) -> String {
+        let payload: [String: Any] = [
+            "type": "asset",
+            "assetId": assetId,
+            "sku": stockItem.sku,
+            "name": stockItem.name,
+        ]
+
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload),
+            let jsonString = String(data: jsonData, encoding: .utf8)
+        else {
+            return "{\"type\":\"asset\",\"assetId\":\"\(assetId)\"}"
+        }
+
+        return jsonString
     }
 }
 

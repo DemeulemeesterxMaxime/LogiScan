@@ -16,6 +16,8 @@
 	<string>LaunchScreen</string>
 	<key>NSCameraUsageDescription</key>
 	<string>LogiScan utilise la caméra pour scanner les codes QR des assets et équipements.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>LogiScan a besoin d'accéder à vos photos pour enregistrer les QR codes générés.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UISupportedInterfaceOrientations</key>

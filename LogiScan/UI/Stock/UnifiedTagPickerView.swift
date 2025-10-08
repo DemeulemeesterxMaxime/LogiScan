@@ -20,6 +20,7 @@ struct UnifiedTagPickerView: View {
     @State private var newTagText = ""
     @State private var showingDeleteConfirmation = false
     @State private var tagToDelete: String?
+    @State private var originalTags: [String] = []  // ✅ Sauvegarde des tags originaux
 
     var existingTags: [String] {
         let allTags = allStockItems.flatMap { $0.tags }
@@ -28,9 +29,11 @@ struct UnifiedTagPickerView: View {
 
     var suggestedTags: [String] {
         let currentTags = Set(selectedTags)
+        // ✅ Ne pas suggérer le tag qu'on vient d'ajouter
         return existingTags.filter {
             !currentTags.contains($0) && !newTagText.isEmpty
                 && $0.localizedCaseInsensitiveContains(newTagText)
+                && !selectedTags.contains($0)  // Évite les tags déjà sélectionnés
         }
     }
 
@@ -57,6 +60,8 @@ struct UnifiedTagPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Annuler") {
+                        // ✅ Restaurer les tags originaux
+                        selectedTags = originalTags
                         dismiss()
                     }
                 }
@@ -67,6 +72,10 @@ struct UnifiedTagPickerView: View {
                     }
                     .fontWeight(.semibold)
                 }
+            }
+            .onAppear {
+                // ✅ Sauvegarder les tags originaux au chargement
+                originalTags = selectedTags
             }
         }
         .alert("Supprimer l'étiquette", isPresented: $showingDeleteConfirmation) {

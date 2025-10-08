@@ -11,8 +11,10 @@ import SwiftUI
 struct TrucksListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var trucks: [Truck]
+    @StateObject private var syncManager = SyncManager()
     @State private var selectedStatus: TruckStatus? = nil
     @State private var searchText = ""
+    @State private var isRefreshing = false
 
     var filteredTrucks: [Truck] {
         var items = trucks
@@ -57,16 +59,65 @@ struct TrucksListView: View {
                 }
                 .searchable(text: $searchText, prompt: "Rechercher un camion...")
                 .listStyle(.plain)
-            }
-            .navigationTitle("Flotte")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { /* TODO: Ajouter camion */  }) {
-                        Image(systemName: "plus")
+                .refreshable {
+                    await refreshData()
+                }
+                .overlay {
+                    if syncManager.isSyncing {
+                        VStack {
+                            ProgressView("Synchronisation...")
+                                .padding()
+                                .background(Color(.systemBackground).opacity(0.9))
+                                .cornerRadius(10)
+                                .shadow(radius: 5)
+                        }
                     }
                 }
             }
+            .navigationTitle("Flotte")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if let lastSync = syncManager.lastSyncDate {
+                        Text(lastSync.formatted(date: .omitted, time: .shortened))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            Task {
+                                await refreshData()
+                            }
+                        }) {
+                            Image(systemName: "arrow.clockwise.circle.fill")
+                                .foregroundColor(.blue)
+                                .font(.title3)
+                        }
+                        
+                        Button(action: { /* TODO: Ajouter camion */  }) {
+                            Image(systemName: "plus")
+                        }
+                    }
+                }
+            }
+            .onAppear {
+                // Rafraîchissement automatique à l'arrivée sur la page
+                Task {
+                    await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
+                }
+            }
         }
+    }
+    
+    // MARK: - Refresh Function
+    
+    private func refreshData() async {
+        print("🔄 [TrucksListView] Pull-to-refresh déclenché")
+        isRefreshing = true
+        await syncManager.syncFromFirebase(modelContext: modelContext)
+        isRefreshing = false
     }
 
     private var trucksSummary: some View {

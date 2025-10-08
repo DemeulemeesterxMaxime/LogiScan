@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 final class Location {
-    var locationId: String // Retiré @Attribute(.unique) pour éviter les conflits
+    var locationId: String  // Retiré @Attribute(.unique) pour éviter les conflits
     var type: LocationType
     var name: String
     var parentLocationId: String?
@@ -18,7 +18,7 @@ final class Location {
     var capacity: LocationCapacity?
     var createdAt: Date
     var updatedAt: Date
-    
+
     init(
         locationId: String,
         type: LocationType,
@@ -43,7 +43,7 @@ enum LocationType: String, CaseIterable, Codable {
     case zone = "ZONE"
     case truck = "CAMION"
     case site = "SITE"
-    
+
     var displayName: String {
         switch self {
         case .hangar: return "Hangar"
@@ -52,7 +52,7 @@ enum LocationType: String, CaseIterable, Codable {
         case .site: return "Site"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .hangar: return "building.2"
@@ -67,7 +67,7 @@ struct LocationCapacity: Codable {
     var maxWeight: Double?
     var maxVolume: Double?
     var maxItems: Int?
-    
+
     init(maxWeight: Double? = nil, maxVolume: Double? = nil, maxItems: Int? = nil) {
         self.maxWeight = maxWeight
         self.maxVolume = maxVolume

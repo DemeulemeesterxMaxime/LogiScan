@@ -79,7 +79,7 @@ struct DashboardView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         Image(systemName: "arrow.clockwise.circle.fill")
                             .foregroundColor(.blue)
                             .font(.title3)
@@ -91,15 +91,17 @@ struct DashboardView: View {
                     }
                 }
             }
-            .task {
-                // Sync automatique au chargement (uniquement si nécessaire)
-                await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext)
+            .onAppear {
+                // Rafraîchissement automatique à l'arrivée sur la page
+                Task {
+                    await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
+                }
             }
         }
     }
-    
+
     // MARK: - Refresh Function
-    
+
     private func refreshData() async {
         print("🔄 [DashboardView] Pull-to-refresh déclenché")
         isRefreshing = true

@@ -115,6 +115,8 @@ final class StockItem {
         self.updatedAt = Date()
     }
 
+    // DEPRECATED: Ne pas utiliser cette propriété calculée simple
+    // Utiliser calculateQuantities(from:) à la place pour avoir les vraies données
     var availableQuantity: Int {
         totalQuantity - maintenanceQuantity
     }
@@ -127,5 +129,40 @@ final class StockItem {
         case .rented:
             return rentalPrice ?? unitValue
         }
+    }
+    
+    // MARK: - Calculated Quantities from Assets
+    
+    /// Calcule les quantités réelles basées sur les Assets
+    /// - Parameter assets: Tous les assets de la base de données
+    /// - Returns: Un tuple avec (disponible, réservé, enUtilisation, endommagé, enMaintenance, perdu)
+    func calculateQuantities(from assets: [Asset]) -> (available: Int, reserved: Int, inUse: Int, damaged: Int, maintenance: Int, lost: Int) {
+        let filteredAssets = assets.filter { $0.sku == self.sku }
+        
+        var available = 0
+        var reserved = 0
+        var inUse = 0
+        var damaged = 0
+        var maintenance = 0
+        var lost = 0
+        
+        for asset in filteredAssets {
+            switch asset.status {
+            case .available:
+                available += 1
+            case .reserved:
+                reserved += 1
+            case .inUse:
+                inUse += 1
+            case .damaged:
+                damaged += 1
+            case .maintenance:
+                maintenance += 1
+            case .lost:
+                lost += 1
+            }
+        }
+        
+        return (available, reserved, inUse, damaged, maintenance, lost)
     }
 }
