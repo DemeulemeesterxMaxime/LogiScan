@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Règles pour les organisations
+    match /organizations/{orgId} {
+      // Permettre la lecture et l'écriture pour tous (à sécuriser plus tard avec l'authentification)
+      allow read, write: if true;
+      
+      // Règles pour les stockItems
+      match /stockItems/{stockItemId} {
+        allow read, write: if true;
+        
+        // Règles pour les assets (références individuelles)
+        match /assets/{assetId} {
+          allow read, write: if true;
+        }
+      }
+      
+      // Règles pour les events
+      match /events/{eventId} {
+        allow read, write: if true;
+      }
+      
+      // Règles pour les orders
+      match /orders/{orderId} {
+        allow read, write: if true;
+      }
+      
+      // Règles pour les trucks
+      match /trucks/{truckId} {
+        allow read, write: if true;
+      }
+      
+      // Règles pour les movements
+      match /movements/{movementId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

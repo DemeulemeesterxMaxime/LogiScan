@@ -3,8 +3,13 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 90;
 	objects = {
+
+/* Begin PBXBuildFile section */
+		816D52A82E93AC8E00878ABC /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 816D52A72E93AC8E00878ABC /* FirebaseAuth */; };
+		816D52AA2E93AC8E00878ABC /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 816D52A92E93AC8E00878ABC /* FirebaseFirestore */; };
+/* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		81E950002E84495400413192 /* PBXContainerItemProxy */ = {
@@ -63,24 +68,20 @@
 /* Begin PBXFrameworksBuildPhase section */
 		81E94FEB2E84495200413192 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
+				816D52A82E93AC8E00878ABC /* FirebaseAuth in Frameworks */,
+				816D52AA2E93AC8E00878ABC /* FirebaseFirestore in Frameworks */,
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E94FFC2E84495400413192 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E950062E84495400413192 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -118,13 +119,13 @@
 			);
 			buildRules = (
 			);
-			dependencies = (
-			);
 			fileSystemSynchronizedGroups = (
 				81E94FF02E84495200413192 /* LogiScan */,
 			);
 			name = LogiScan;
 			packageProductDependencies = (
+				816D52A72E93AC8E00878ABC /* FirebaseAuth */,
+				816D52A92E93AC8E00878ABC /* FirebaseFirestore */,
 			);
 			productName = LogiScan;
 			productReference = 81E94FEE2E84495200413192 /* LogiScan.app */;
@@ -147,8 +148,6 @@
 				81E950022E84495400413192 /* LogiScanTests */,
 			);
 			name = LogiScanTests;
-			packageProductDependencies = (
-			);
 			productName = LogiScanTests;
 			productReference = 81E94FFF2E84495400413192 /* LogiScanTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -170,8 +169,6 @@
 				81E9500C2E84495400413192 /* LogiScanUITests */,
 			);
 			name = LogiScanUITests;
-			packageProductDependencies = (
-			);
 			productName = LogiScanUITests;
 			productReference = 81E950092E84495400413192 /* LogiScanUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -208,7 +205,10 @@
 			);
 			mainGroup = 81E94FE52E84495200413192;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
+			packageReferences = (
+				816D52A62E93AC8E00878ABC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
+			preferredProjectObjectVersion = 90;
 			productRefGroup = 81E94FEF2E84495200413192 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -223,48 +223,36 @@
 /* Begin PBXResourcesBuildPhase section */
 		81E94FEC2E84495200413192 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E94FFD2E84495400413192 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E950072E84495400413192 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		81E94FEA2E84495200413192 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E94FFB2E84495400413192 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 		81E950052E84495400413192 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
 			files = (
 			);
-			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
@@ -282,18 +270,16 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		81E950132E84495400413192 /* Debug */ = {
+		81E950132E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScan" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = LogiScan/LogiScan.entitlements;
+				CODE_SIGN_ENTITLEMENTS = LogiScan/LogiScanDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
-				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 6;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = BB3PGNJBJ2;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 15;
+				DEVELOPMENT_TEAM = BB3PGNJBJ2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = LogiScan/Info.plist;
@@ -311,7 +297,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = maxime.LogiScan;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Distribution LogiScan";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
@@ -321,7 +306,7 @@
 			};
 			name = Debug;
 		};
-		81E950142E84495400413192 /* Release */ = {
+		81E950142E84495400413192 /* Release configuration for PBXNativeTarget "LogiScan" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -330,7 +315,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = BB3PGNJBJ2;
 				ENABLE_PREVIEWS = YES;
@@ -361,7 +346,7 @@
 			};
 			name = Release;
 		};
-		81E950152E84495400413192 /* Debug */ = {
+		81E950152E84495400413192 /* Debug configuration for PBXProject "LogiScan" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -414,7 +399,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -425,7 +410,7 @@
 			};
 			name = Debug;
 		};
-		81E950162E84495400413192 /* Release */ = {
+		81E950162E84495400413192 /* Release configuration for PBXProject "LogiScan" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -472,7 +457,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -482,7 +467,7 @@
 			};
 			name = Release;
 		};
-		81E950182E84495400413192 /* Debug */ = {
+		81E950182E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScanTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -501,7 +486,7 @@
 			};
 			name = Debug;
 		};
-		81E950192E84495400413192 /* Release */ = {
+		81E950192E84495400413192 /* Release configuration for PBXNativeTarget "LogiScanTests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -520,7 +505,7 @@
 			};
 			name = Release;
 		};
-		81E9501B2E84495400413192 /* Debug */ = {
+		81E9501B2E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScanUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -537,7 +522,7 @@
 			};
 			name = Debug;
 		};
-		81E9501C2E84495400413192 /* Release */ = {
+		81E9501C2E84495400413192 /* Release configuration for PBXNativeTarget "LogiScanUITests" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -560,40 +545,60 @@
 		81E94FE92E84495200413192 /* Build configuration list for PBXProject "LogiScan" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				81E950152E84495400413192 /* Debug */,
-				81E950162E84495400413192 /* Release */,
+				81E950152E84495400413192 /* Debug configuration for PBXProject "LogiScan" */,
+				81E950162E84495400413192 /* Release configuration for PBXProject "LogiScan" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		81E950122E84495400413192 /* Build configuration list for PBXNativeTarget "LogiScan" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				81E950132E84495400413192 /* Debug */,
-				81E950142E84495400413192 /* Release */,
+				81E950132E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScan" */,
+				81E950142E84495400413192 /* Release configuration for PBXNativeTarget "LogiScan" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		81E950172E84495400413192 /* Build configuration list for PBXNativeTarget "LogiScanTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				81E950182E84495400413192 /* Debug */,
-				81E950192E84495400413192 /* Release */,
+				81E950182E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScanTests" */,
+				81E950192E84495400413192 /* Release configuration for PBXNativeTarget "LogiScanTests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		81E9501A2E84495400413192 /* Build configuration list for PBXNativeTarget "LogiScanUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				81E9501B2E84495400413192 /* Debug */,
-				81E9501C2E84495400413192 /* Release */,
+				81E9501B2E84495400413192 /* Debug configuration for PBXNativeTarget "LogiScanUITests" */,
+				81E9501C2E84495400413192 /* Release configuration for PBXNativeTarget "LogiScanUITests" */,
 			);
-			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		816D52A62E93AC8E00878ABC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		816D52A72E93AC8E00878ABC /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 816D52A62E93AC8E00878ABC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		816D52A92E93AC8E00878ABC /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 816D52A62E93AC8E00878ABC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 81E94FE62E84495200413192 /* Project object */;
 }

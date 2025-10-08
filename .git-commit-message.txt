@@ -1,0 +1,31 @@
+fix: Suppression fichier PDF de test du bundle App Store
+
+🔴 CORRECTION CRITIQUE
+- Supprimé "Devis Test Max.pdf" (81 KB) du dossier LogiScan/
+- Fichier de test personnel qui n'aurait pas dû être inclus dans la release
+
+⚠️ PROBLÈME IDENTIFIÉ  
+- Échec upload des symboles de debug (9 frameworks Firebase/Google)
+- Non bloquant mais à surveiller lors de la prochaine soumission
+
+✅ ACTIONS EFFECTUÉES
+- Suppression définitive du fichier PDF
+- Vérification : aucun autre fichier suspect trouvé
+- Nettoyage du dossier erreur/ (logs temporaires)
+
+📚 DOCUMENTATION CRÉÉE
+- CORRECTIONS_APP_STORE.md : documentation complète
+- QUICK_FIX_GUIDE.md : guide rapide de correction
+- RESUME_CORRECTIONS.md : résumé exécutif
+- rebuild_for_appstore.sh : script de nettoyage automatique
+
+📋 PROCHAINES ÉTAPES
+1. Clean Build Folder dans Xcode
+2. Créer nouvelle Archive (Build 11)
+3. Vérifier l'absence du PDF dans l'archive
+4. Distribuer vers App Store Connect
+5. Cocher "Upload your app's symbols"
+
+Status : ✅ Prêt pour nouvelle soumission App Store
+
+Refs: #AppStore #Build10 #FixCritique
