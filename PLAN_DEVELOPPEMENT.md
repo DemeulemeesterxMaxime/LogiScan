@@ -459,9 +459,9 @@ final class QuoteItem {
 
 **✅ Critères de validation :**
 
-- [ ] Formulaire multi-étapes fluide
-- [ ] Validation des champs obligatoires
-- [ ] Vérification disponibilité camion
+- [X] Formulaire multi-étapes fluide
+- [X] Validation des champs obligatoires
+- [X] Vérification disponibilité camion
 
 ---
 
@@ -537,10 +537,10 @@ Filtres : [Tous] [Disponibles] [Audio] [Vidéo] [Éclairage]
 
 **✅ Critères de validation :**
 
-- [ ] Ajout articles avec recherche/scan
-- [ ] Modification prix unitaire fonctionnelle
-- [ ] Calcul % réduction/augmentation correct
-- [ ] Total et récap justes
+- [X] Ajout articles avec recherche/scan
+- [X] Modification prix unitaire fonctionnelle
+- [X] Calcul % réduction/augmentation correct
+- [X] Total et récap justes
 - [ ] Sauvegarde auto opérationnelle
 - [ ] Vérification capacité camion
 
@@ -687,9 +687,9 @@ Assets assignés :
 
 **✅ Critères de validation :**
 
-- [ ] Liste assets assignés visible
-- [ ] Modification manuelle possible
-- [ ] Scan pour changement statut fonctionnel
+- [X] Liste assets assignés visible
+- [X] Modification manuelle possible
+- [X] Scan pour changement statut fonctionnel
 
 ---
 
@@ -876,11 +876,24 @@ LogiScan/
 
 10. ✅ Phase 5.1 - QRCodeBatchView
 
-### Sprint 4 (Événements)
+### Sprint 4 (Événements) ✅ TERMINÉ
 
-11. ✅ Phase 6.3 - EventFormView
-12. ✅ Phase 6.4 - QuoteBuilderView
-13. ✅ Phase 8.2 - EventAssetsView
+11. ✅ Phase 6.3 - EventFormView (Créé le 8 oct. 2025)
+    - ✅ Formulaire multi-étapes (3 étapes)
+    - ✅ Validation des champs obligatoires
+    - ✅ Sélection du camion avec vérification disponibilité
+12. ✅ Phase 6.4 - QuoteBuilderView (Créé le 8 oct. 2025)
+    - ✅ Recherche et scan QR pour ajouter articles
+    - ✅ Modification prix unitaire avec calcul % automatique
+    - ✅ Gestion quantités
+    - ✅ Calculs totaux avec remise globale
+    - ✅ Vérification capacité camion (poids/volume)
+    - ✅ Sauvegarde automatique
+13. ✅ Phase 8.2 - EventAssetsView (Créé le 8 oct. 2025)
+    - ✅ Liste des assets assignés
+    - ✅ Modification manuelle de la sélection
+    - ✅ Scan QR pour marquer chargé/retourné
+    - ✅ Gestion des statuts de réservation
 
 ### Sprint 5 (Facturation)
 
@@ -939,6 +952,54 @@ LogiScan/
 
 ---
 
-**Statut actuel :** � Sprint 1 terminé - En attente validation avant Sprint 2
-**Prochaine étape :** Validation Sprint 1 par Maxime
-**Développement en cours :** Sprint 2 - Interface Stocks (en attente de validation)
+**Statut actuel :** ✅ Sprint 4 terminé - Événements et Devis opérationnels
+**Prochaine étape :** Sprint 5 - Facturation (Phase 7)
+**Développement en cours :** Phase 6 terminée - Prêt pour génération de factures PDF
+
+---
+
+## 📝 Changelog Sprint 4 (8 octobre 2025)
+
+### Fichiers créés
+
+- ✅ `LogiScan/UI/Events/EventFormView.swift` - Formulaire création événement (3 étapes)
+- ✅ `LogiScan/UI/Events/QuoteBuilderView.swift` - Construction de devis interactif
+- ✅ `LogiScan/UI/Events/EventAssetsView.swift` - Gestion réservations assets
+
+### Fichiers modifiés
+
+- ✅ `LogiScan/UI/Events/EventsListView.swift` - Ajout bouton création événement
+
+### Fonctionnalités implémentées
+
+1. **Création d'événement complète** (EventFormView)
+
+   - Formulaire multi-étapes avec barre de progression
+   - Validation des champs à chaque étape
+   - Sélection camion avec affichage capacité
+   - Vérification disponibilité des camions sur période
+2. **Construction de devis** (QuoteBuilderView)
+
+   - Ajout articles par recherche ou scan QR
+   - Filtres par catégorie
+   - Modification quantités avec boutons +/-
+   - Prix personnalisés par ligne avec calcul % réduction/augmentation
+   - Remise globale en pourcentage
+   - Récapitulatif avec totaux
+   - Jauges de capacité camion (poids et volume)
+   - Alertes si dépassement capacité
+   - Sauvegarde automatique des QuoteItems
+3. **Gestion des assets assignés** (EventAssetsView)
+
+   - Affichage des assets réservés pour chaque article
+   - Sélection manuelle des assets spécifiques
+   - Scan QR pour marquer comme chargé ou retourné
+   - Gestion des statuts de réservation
+   - Actions contextuelles par asset
+
+### À faire (Sprint 5)
+
+- [ ] Génération PDF facture (InvoiceGenerator.swift)
+- [ ] Preview et partage facture (InvoicePreviewView.swift)
+- [ ] Intégration template PDF fourni
+- [ ] Envoi par email

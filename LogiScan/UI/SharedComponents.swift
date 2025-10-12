@@ -5,6 +5,7 @@
 //  Created by Demeulemeester on 02/10/2025.
 //
 
+import PDFKit
 import SwiftUI
 import UIKit
 
@@ -19,6 +20,25 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - PDFKit View
+
+/// Wrapper pour PDFView permettant d'afficher des PDFs
+struct PDFKitView: UIViewRepresentable {
+    let document: PDFDocument
+    
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.document = document
+        pdfView.autoScales = true
+        pdfView.displayMode = .singlePageContinuous
+        return pdfView
+    }
+    
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        uiView.document = document
+    }
 }
 
 // MARK: - Filter Chip

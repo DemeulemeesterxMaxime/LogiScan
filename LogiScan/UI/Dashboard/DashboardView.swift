@@ -94,7 +94,8 @@ struct DashboardView: View {
             .onAppear {
                 // Rafraîchissement automatique à l'arrivée sur la page
                 Task {
-                    await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
+                    await syncManager.syncFromFirebaseIfNeeded(
+                        modelContext: modelContext, forceRefresh: true)
                 }
             }
         }
@@ -212,6 +213,16 @@ struct DashboardView: View {
             LazyVGrid(
                 columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12
             ) {
+                // Bouton de test pour charger les données d'exemple
+                QuickActionButton(
+                    icon: "arrow.clockwise.circle.fill",
+                    title: "Charger données test",
+                    color: .gray,
+                    action: {
+                        SampleData.createSampleData(modelContext: modelContext)
+                    }
+                )
+
                 QuickActionButton(
                     icon: "qrcode.viewfinder",
                     title: "Scanner",

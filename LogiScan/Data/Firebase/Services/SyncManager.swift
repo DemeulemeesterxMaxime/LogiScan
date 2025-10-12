@@ -156,6 +156,21 @@ class SyncManager: ObservableObject {
         isSyncing = true
         defer { isSyncing = false }
 
+        // Synchroniser en parallèle les différentes collections
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.syncStockItemsFromFirebase(modelContext: modelContext) }
+            group.addTask { await self.syncEventsFromFirebase(modelContext: modelContext) }
+            group.addTask { await self.syncTrucksFromFirebase(modelContext: modelContext) }
+        }
+        
+        lastSyncDate = Date()
+        print("✅ [SyncManager] Synchronisation complète terminée")
+    }
+    
+    // MARK: - Sync StockItems
+    
+    private func syncStockItemsFromFirebase(modelContext: ModelContext) async {
+
         do {
             let firestoreItems = try await firebaseService.fetchStockItems()
             print("📥 [SyncManager] \(firestoreItems.count) articles récupérés depuis Firebase")
@@ -402,6 +417,224 @@ class SyncManager: ObservableObject {
         item.updatedAt = firestoreUpdatedAt
 
         print("🔄 [SyncManager] Article local mis à jour depuis Firebase : \(item.sku)")
+        return true
+    }
+    
+    // MARK: - Sync Events
+    
+    private func syncEventsFromFirebase(modelContext: ModelContext) async {
+        do {
+            let firestoreEvents = try await firebaseService.fetchEvents()
+            print("📥 [SyncManager] \(firestoreEvents.count) événements récupérés depuis Firebase")
+            
+            // Créer un dictionnaire des events locaux par eventId
+            let fetchDescriptor = FetchDescriptor<Event>()
+            let localEvents = try modelContext.fetch(fetchDescriptor)
+            let localEventsDict = Dictionary(uniqueKeysWithValues: localEvents.map { ($0.eventId, $0) })
+            
+            var eventsCreated = 0
+            var eventsUpdated = 0
+            var eventsDeleted = 0
+            
+            // Set des eventIds Firebase
+            let firebaseEventIds = Set(firestoreEvents.map { $0["eventId"] as? String ?? "" })
+            
+            // Synchroniser chaque événement Firebase
+            for firestoreEvent in firestoreEvents {
+                guard let eventId = firestoreEvent["eventId"] as? String else { continue }
+                
+                if let existingEvent = localEventsDict[eventId] {
+                    // Mettre à jour si Firebase est plus récent
+                    if updateLocalEvent(existingEvent, from: firestoreEvent) {
+                        eventsUpdated += 1
+                    }
+                } else {
+                    // Créer un nouvel événement local
+                    if let newEvent = createEventFromFirestore(firestoreEvent) {
+                        modelContext.insert(newEvent)
+                        eventsCreated += 1
+                    }
+                }
+            }
+            
+            // Supprimer les events locaux qui n'existent plus dans Firebase
+            for localEvent in localEvents {
+                if !firebaseEventIds.contains(localEvent.eventId) {
+                    print("🗑️ [SyncManager] Suppression de l'événement local orphelin : \(localEvent.name)")
+                    modelContext.delete(localEvent)
+                    eventsDeleted += 1
+                }
+            }
+            
+            try modelContext.save()
+            print("✅ [SyncManager] Events synchronisés : \(eventsCreated) créés, \(eventsUpdated) mis à jour, \(eventsDeleted) supprimés")
+            
+        } catch {
+            print("❌ [SyncManager] Erreur sync events: \(error.localizedDescription)")
+            syncErrors.append("Erreur sync événements: \(error.localizedDescription)")
+        }
+    }
+    
+    private func createEventFromFirestore(_ data: [String: Any]) -> Event? {
+        guard let eventId = data["eventId"] as? String,
+              let name = data["name"] as? String else {
+            return nil
+        }
+        
+        let event = Event(
+            eventId: eventId,
+            name: name,
+            clientName: data["clientName"] as? String ?? "",
+            clientPhone: data["clientPhone"] as? String ?? "",
+            clientEmail: data["clientEmail"] as? String ?? "",
+            clientAddress: data["clientAddress"] as? String ?? "",
+            eventAddress: data["eventAddress"] as? String ?? "",
+            setupStartTime: (data["setupStartTime"] as? Date) ?? Date(),
+            startDate: (data["startDate"] as? Date) ?? Date(),
+            endDate: (data["endDate"] as? Date) ?? Date(),
+            status: EventStatus(rawValue: data["status"] as? String ?? "PLANIFICATION") ?? .planning,
+            notes: data["notes"] as? String ?? "",
+            assignedTruckId: data["assignedTruckId"] as? String
+        )
+        
+        return event
+    }
+    
+    private func updateLocalEvent(_ event: Event, from data: [String: Any]) -> Bool {
+        guard let updatedAt = data["updatedAt"] as? Date,
+              updatedAt > event.updatedAt else {
+            return false
+        }
+        
+        event.name = data["name"] as? String ?? event.name
+        event.clientName = data["clientName"] as? String ?? ""
+        event.clientPhone = data["clientPhone"] as? String ?? ""
+        event.clientEmail = data["clientEmail"] as? String ?? ""
+        event.clientAddress = data["clientAddress"] as? String ?? ""
+        event.eventAddress = data["eventAddress"] as? String ?? ""
+        event.notes = data["notes"] as? String ?? ""
+        
+        if let setupStartTime = data["setupStartTime"] as? Date {
+            event.setupStartTime = setupStartTime
+        }
+        if let startDate = data["startDate"] as? Date {
+            event.startDate = startDate
+        }
+        if let endDate = data["endDate"] as? Date {
+            event.endDate = endDate
+        }
+        if let statusStr = data["status"] as? String,
+           let status = EventStatus(rawValue: statusStr) {
+            event.status = status
+        }
+        
+        event.assignedTruckId = data["assignedTruckId"] as? String
+        event.updatedAt = updatedAt
+        
+        print("🔄 [SyncManager] Événement local mis à jour : \(event.name)")
+        return true
+    }
+    
+    // MARK: - Sync Trucks
+    
+    private func syncTrucksFromFirebase(modelContext: ModelContext) async {
+        do {
+            let firestoreTrucks = try await firebaseService.fetchTrucks()
+            print("📥 [SyncManager] \(firestoreTrucks.count) camions récupérés depuis Firebase")
+            
+            // Créer un dictionnaire des trucks locaux par truckId
+            let fetchDescriptor = FetchDescriptor<Truck>()
+            let localTrucks = try modelContext.fetch(fetchDescriptor)
+            let localTrucksDict = Dictionary(uniqueKeysWithValues: localTrucks.map { ($0.truckId, $0) })
+            
+            var trucksCreated = 0
+            var trucksUpdated = 0
+            var trucksDeleted = 0
+            
+            // Set des truckIds Firebase
+            let firebaseTruckIds = Set(firestoreTrucks.map { $0["truckId"] as? String ?? "" })
+            
+            // Synchroniser chaque camion Firebase
+            for firestoreTruck in firestoreTrucks {
+                guard let truckId = firestoreTruck["truckId"] as? String else { continue }
+                
+                if let existingTruck = localTrucksDict[truckId] {
+                    // Mettre à jour si Firebase est plus récent
+                    if updateLocalTruck(existingTruck, from: firestoreTruck) {
+                        trucksUpdated += 1
+                    }
+                } else {
+                    // Créer un nouveau camion local
+                    if let newTruck = createTruckFromFirestore(firestoreTruck) {
+                        modelContext.insert(newTruck)
+                        trucksCreated += 1
+                    }
+                }
+            }
+            
+            // Supprimer les trucks locaux qui n'existent plus dans Firebase
+            for localTruck in localTrucks {
+                if !firebaseTruckIds.contains(localTruck.truckId) {
+                    print("🗑️ [SyncManager] Suppression du camion local orphelin : \(localTruck.licensePlate)")
+                    modelContext.delete(localTruck)
+                    trucksDeleted += 1
+                }
+            }
+            
+            try modelContext.save()
+            print("✅ [SyncManager] Trucks synchronisés : \(trucksCreated) créés, \(trucksUpdated) mis à jour, \(trucksDeleted) supprimés")
+            
+        } catch {
+            print("❌ [SyncManager] Erreur sync trucks: \(error.localizedDescription)")
+            syncErrors.append("Erreur sync camions: \(error.localizedDescription)")
+        }
+    }
+    
+    private func createTruckFromFirestore(_ data: [String: Any]) -> Truck? {
+        guard let truckId = data["truckId"] as? String,
+              let licensePlate = data["licensePlate"] as? String else {
+            return nil
+        }
+        
+        let truck = Truck(
+            truckId: truckId,
+            licensePlate: licensePlate,
+            maxVolume: data["maxVolume"] as? Double ?? 0.0,
+            maxWeight: data["maxWeight"] as? Double ?? 0.0,
+            status: TruckStatus(rawValue: data["status"] as? String ?? "DISPONIBLE") ?? .available,
+            currentDriverId: data["currentDriverId"] as? String,
+            currentLocationId: data["currentLocationId"] as? String
+        )
+        
+        // Gérer le nom optionnel
+        if let name = data["name"] as? String {
+            truck.name = name
+        }
+        
+        return truck
+    }
+    
+    private func updateLocalTruck(_ truck: Truck, from data: [String: Any]) -> Bool {
+        guard let updatedAt = data["updatedAt"] as? Date,
+              updatedAt > truck.updatedAt else {
+            return false
+        }
+        
+        truck.licensePlate = data["licensePlate"] as? String ?? truck.licensePlate
+        truck.name = data["name"] as? String
+        truck.maxVolume = data["maxVolume"] as? Double ?? truck.maxVolume
+        truck.maxWeight = data["maxWeight"] as? Double ?? truck.maxWeight
+        
+        if let statusStr = data["status"] as? String,
+           let status = TruckStatus(rawValue: statusStr) {
+            truck.status = status
+        }
+        
+        truck.currentDriverId = data["currentDriverId"] as? String
+        truck.currentLocationId = data["currentLocationId"] as? String
+        truck.updatedAt = updatedAt
+        
+        print("🔄 [SyncManager] Camion local mis à jour : \(truck.displayName)")
         return true
     }
 }

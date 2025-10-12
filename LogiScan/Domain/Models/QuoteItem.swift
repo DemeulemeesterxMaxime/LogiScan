@@ -19,7 +19,10 @@ final class QuoteItem {
     var unitPrice: Double  // Prix configuré dans StockItem
     var customPrice: Double  // Prix modifié dans le devis
     var totalPrice: Double  // customPrice * quantity
+    
+    @Attribute(.externalStorage)
     var assignedAssets: [String]  // Liste asset IDs spécifiques
+    
     var createdAt: Date
     var updatedAt: Date
 

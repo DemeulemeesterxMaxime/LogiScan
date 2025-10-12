@@ -34,7 +34,15 @@ class FirebaseService: ObservableObject {
     }
 
     private var trucksRef: CollectionReference {
-        db.collection("organizations/\(organizationId)/trucks")
+        db.collection("trucks")
+    }
+
+    private var eventsRef: CollectionReference {
+        db.collection("events")
+    }
+    
+    private func quoteItemsRef(eventId: String) -> CollectionReference {
+        eventsRef.document(eventId).collection("quoteItems")
     }
 
     // MARK: - Stock Items
@@ -294,5 +302,308 @@ class FirebaseService: ObservableObject {
 
         try await batch.commit()
         print("✅ Batch de \(assets.count) assets créés")
+    }
+
+    // MARK: - Trucks
+
+    /// Sauvegarder un camion
+    func saveTruck(_ truck: Truck) async {
+        do {
+            let data: [String: Any] = [
+                "truckId": truck.truckId,
+                "licensePlate": truck.licensePlate,
+                "name": truck.name as Any,
+                "maxVolume": truck.maxVolume,
+                "maxWeight": truck.maxWeight,
+                "status": truck.status.rawValue,
+                "currentDriverId": truck.currentDriverId as Any,
+                "createdAt": Timestamp(date: truck.createdAt),
+                "updatedAt": Timestamp(date: truck.updatedAt),
+            ]
+            try await trucksRef.document(truck.truckId).setData(data)
+            print("✅ Camion sauvegardé dans Firebase: \(truck.displayName)")
+        } catch {
+            print("❌ Erreur sauvegarde camion Firebase: \(error)")
+        }
+    }
+
+    /// Mettre à jour un camion
+    func updateTruck(_ truck: Truck) async {
+        do {
+            let data: [String: Any] = [
+                "licensePlate": truck.licensePlate,
+                "name": truck.name as Any,
+                "maxVolume": truck.maxVolume,
+                "maxWeight": truck.maxWeight,
+                "status": truck.status.rawValue,
+                "currentDriverId": truck.currentDriverId as Any,
+                "updatedAt": Timestamp(date: truck.updatedAt),
+            ]
+            try await trucksRef.document(truck.truckId).setData(data, merge: true)
+            print("✅ Camion mis à jour dans Firebase: \(truck.displayName)")
+        } catch {
+            print("❌ Erreur mise à jour camion Firebase: \(error)")
+        }
+    }
+    
+    /// Supprimer un camion
+    func deleteTruck(_ truckId: String) async {
+        do {
+            try await trucksRef.document(truckId).delete()
+            print("✅ Camion supprimé de Firebase: \(truckId)")
+        } catch {
+            print("❌ Erreur suppression camion Firebase: \(error)")
+        }
+    }
+
+    // MARK: - Events
+
+    /// Sauvegarder un événement
+    func saveEvent(_ event: Event) async {
+        do {
+            let data: [String: Any] = [
+                "eventId": event.eventId,
+                "name": event.name,
+                "clientName": event.clientName,
+                "clientPhone": event.clientPhone,
+                "clientEmail": event.clientEmail,
+                "clientAddress": event.clientAddress,
+                "eventAddress": event.eventAddress,
+                "setupStartTime": Timestamp(date: event.setupStartTime),
+                "startDate": Timestamp(date: event.startDate),
+                "endDate": Timestamp(date: event.endDate),
+                "status": event.status.rawValue,
+                "assignedTruckId": event.assignedTruckId as Any,
+                "notes": event.notes,
+                "createdAt": Timestamp(date: event.createdAt),
+                "updatedAt": Timestamp(date: event.updatedAt),
+            ]
+            try await eventsRef.document(event.eventId).setData(data)
+            print("✅ Événement sauvegardé dans Firebase: \(event.name)")
+        } catch {
+            print("❌ Erreur sauvegarde événement Firebase: \(error)")
+        }
+    }
+
+    /// Mettre à jour un événement
+    func updateEvent(_ event: Event) async {
+        do {
+            let data: [String: Any] = [
+                "name": event.name,
+                "clientName": event.clientName,
+                "clientPhone": event.clientPhone,
+                "clientEmail": event.clientEmail,
+                "clientAddress": event.clientAddress,
+                "eventAddress": event.eventAddress,
+                "setupStartTime": Timestamp(date: event.setupStartTime),
+                "startDate": Timestamp(date: event.startDate),
+                "endDate": Timestamp(date: event.endDate),
+                "status": event.status.rawValue,
+                "assignedTruckId": event.assignedTruckId as Any,
+                "notes": event.notes,
+                "updatedAt": Timestamp(date: event.updatedAt),
+            ]
+            try await eventsRef.document(event.eventId).setData(data, merge: true)
+            print("✅ Événement mis à jour dans Firebase: \(event.name)")
+        } catch {
+            print("❌ Erreur mise à jour événement Firebase: \(error)")
+        }
+    }
+    
+    /// Supprimer un événement
+    func deleteEvent(_ eventId: String) async {
+        do {
+            try await eventsRef.document(eventId).delete()
+            print("✅ Événement supprimé de Firebase: \(eventId)")
+        } catch {
+            print("❌ Erreur suppression événement Firebase: \(error)")
+        }
+    }
+    
+    /// Récupérer tous les événements
+    func fetchEvents() async throws -> [[String: Any]] {
+        let snapshot = try await eventsRef.getDocuments()
+        return snapshot.documents.map { doc in
+            var data = doc.data()
+            // Convertir les Timestamp en Date
+            if let setupTimestamp = data["setupStartTime"] as? Timestamp {
+                data["setupStartTime"] = setupTimestamp.dateValue()
+            }
+            if let startTimestamp = data["startDate"] as? Timestamp {
+                data["startDate"] = startTimestamp.dateValue()
+            }
+            if let endTimestamp = data["endDate"] as? Timestamp {
+                data["endDate"] = endTimestamp.dateValue()
+            }
+            if let createdTimestamp = data["createdAt"] as? Timestamp {
+                data["createdAt"] = createdTimestamp.dateValue()
+            }
+            if let updatedTimestamp = data["updatedAt"] as? Timestamp {
+                data["updatedAt"] = updatedTimestamp.dateValue()
+            }
+            return data
+        }
+    }
+    
+    /// Récupérer tous les camions
+    func fetchTrucks() async throws -> [[String: Any]] {
+        let snapshot = try await trucksRef.getDocuments()
+        return snapshot.documents.map { doc in
+            var data = doc.data()
+            // Convertir les Timestamp en Date
+            if let createdTimestamp = data["createdAt"] as? Timestamp {
+                data["createdAt"] = createdTimestamp.dateValue()
+            }
+            if let updatedTimestamp = data["updatedAt"] as? Timestamp {
+                data["updatedAt"] = updatedTimestamp.dateValue()
+            }
+            return data
+        }
+    }
+    
+    // MARK: - Events CRUD
+    
+    /// Créer un nouvel événement
+    func createEvent(_ event: FirestoreEvent) async throws {
+        let data: [String: Any] = [
+            "eventId": event.eventId,
+            "name": event.name,
+            "clientName": event.clientName,
+            "clientPhone": event.clientPhone,
+            "clientEmail": event.clientEmail,
+            "clientAddress": event.clientAddress,
+            "eventAddress": event.eventAddress,
+            "setupStartTime": Timestamp(date: event.setupStartTime),
+            "startDate": Timestamp(date: event.startDate),
+            "endDate": Timestamp(date: event.endDate),
+            "status": event.status,
+            "notes": event.notes,
+            "assignedTruckId": event.assignedTruckId as Any,
+            "totalAmount": event.totalAmount,
+            "discountPercent": event.discountPercent,
+            "finalAmount": event.finalAmount,
+            "quoteStatus": event.quoteStatus,
+            "paymentStatus": event.paymentStatus,
+            "deliveryFee": event.deliveryFee,
+            "assemblyFee": event.assemblyFee,
+            "disassemblyFee": event.disassemblyFee,
+            "tvaRate": event.tvaRate,
+            "createdAt": Timestamp(date: event.createdAt),
+            "updatedAt": Timestamp(date: event.updatedAt)
+        ]
+        
+        try await eventsRef.document(event.eventId).setData(data)
+        print("✅ Événement créé dans Firebase: \(event.eventId)")
+    }
+    
+    /// Mettre à jour un événement existant
+    func updateEvent(_ event: FirestoreEvent) async throws {
+        let data: [String: Any] = [
+            "name": event.name,
+            "clientName": event.clientName,
+            "clientPhone": event.clientPhone,
+            "clientEmail": event.clientEmail,
+            "clientAddress": event.clientAddress,
+            "eventAddress": event.eventAddress,
+            "setupStartTime": Timestamp(date: event.setupStartTime),
+            "startDate": Timestamp(date: event.startDate),
+            "endDate": Timestamp(date: event.endDate),
+            "status": event.status,
+            "notes": event.notes,
+            "assignedTruckId": event.assignedTruckId as Any,
+            "totalAmount": event.totalAmount,
+            "discountPercent": event.discountPercent,
+            "finalAmount": event.finalAmount,
+            "quoteStatus": event.quoteStatus,
+            "paymentStatus": event.paymentStatus,
+            "deliveryFee": event.deliveryFee,
+            "assemblyFee": event.assemblyFee,
+            "disassemblyFee": event.disassemblyFee,
+            "tvaRate": event.tvaRate,
+            "updatedAt": Timestamp(date: Date())
+        ]
+        
+        try await eventsRef.document(event.eventId).updateData(data)
+        print("✅ Événement mis à jour dans Firebase: \(event.eventId)")
+    }
+    
+    /// Supprimer un événement
+    func deleteEvent(eventId: String) async throws {
+        // Supprimer d'abord tous les quote items
+        let quoteItemsSnapshot = try await quoteItemsRef(eventId: eventId).getDocuments()
+        for doc in quoteItemsSnapshot.documents {
+            try await doc.reference.delete()
+        }
+        
+        // Puis supprimer l'événement
+        try await eventsRef.document(eventId).delete()
+        print("✅ Événement supprimé de Firebase: \(eventId)")
+    }
+    
+    // MARK: - QuoteItems CRUD
+    
+    /// Créer un nouvel item de devis
+    func createQuoteItem(_ quoteItem: FirestoreQuoteItem, forEvent eventId: String) async throws {
+        let data: [String: Any] = [
+            "quoteItemId": quoteItem.quoteItemId,
+            "eventId": quoteItem.eventId,
+            "sku": quoteItem.sku,
+            "name": quoteItem.name,
+            "category": quoteItem.category,
+            "quantity": quoteItem.quantity,
+            "unitPrice": quoteItem.unitPrice,
+            "customPrice": quoteItem.customPrice,
+            "totalPrice": quoteItem.totalPrice,
+            "assignedAssets": quoteItem.assignedAssets,
+            "createdAt": Timestamp(date: quoteItem.createdAt),
+            "updatedAt": Timestamp(date: quoteItem.updatedAt)
+        ]
+        
+        try await quoteItemsRef(eventId: eventId).document(quoteItem.quoteItemId).setData(data)
+        print("✅ QuoteItem créé dans Firebase: \(quoteItem.quoteItemId)")
+    }
+    
+    /// Mettre à jour un item de devis
+    func updateQuoteItem(_ quoteItem: FirestoreQuoteItem, forEvent eventId: String) async throws {
+        let data: [String: Any] = [
+            "quantity": quoteItem.quantity,
+            "customPrice": quoteItem.customPrice,
+            "totalPrice": quoteItem.totalPrice,
+            "assignedAssets": quoteItem.assignedAssets,
+            "updatedAt": Timestamp(date: Date())
+        ]
+        
+        try await quoteItemsRef(eventId: eventId).document(quoteItem.quoteItemId).updateData(data)
+        print("✅ QuoteItem mis à jour dans Firebase: \(quoteItem.quoteItemId)")
+    }
+    
+    /// Supprimer un item de devis
+    func deleteQuoteItem(quoteItemId: String, forEvent eventId: String) async throws {
+        try await quoteItemsRef(eventId: eventId).document(quoteItemId).delete()
+        print("✅ QuoteItem supprimé de Firebase: \(quoteItemId)")
+    }
+    
+    /// Récupérer tous les items d'un devis
+    func fetchQuoteItems(forEvent eventId: String) async throws -> [FirestoreQuoteItem] {
+        let snapshot = try await quoteItemsRef(eventId: eventId).getDocuments()
+        
+        return try snapshot.documents.compactMap { doc in
+            let data = doc.data()
+            
+            return FirestoreQuoteItem(
+                quoteItemId: data["quoteItemId"] as? String ?? "",
+                eventId: data["eventId"] as? String ?? "",
+                sku: data["sku"] as? String ?? "",
+                name: data["name"] as? String ?? "",
+                category: data["category"] as? String ?? "",
+                quantity: data["quantity"] as? Int ?? 0,
+                unitPrice: data["unitPrice"] as? Double ?? 0.0,
+                customPrice: data["customPrice"] as? Double ?? 0.0,
+                totalPrice: data["totalPrice"] as? Double ?? 0.0,
+                assignedAssets: data["assignedAssets"] as? [String] ?? [],
+                createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date(),
+                updatedAt: (data["updatedAt"] as? Timestamp)?.dateValue() ?? Date()
+            )
+        }
     }
 }

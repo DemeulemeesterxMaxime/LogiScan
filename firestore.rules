@@ -2,7 +2,22 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Règles pour les organisations
+    // Règles pour les events (collection racine pour meilleure synchro)
+    match /events/{eventId} {
+      allow read, write: if true;
+      
+      // Règles pour les quoteItems (sous-collection des events)
+      match /quoteItems/{quoteItemId} {
+        allow read, write: if true;
+      }
+    }
+    
+    // Règles pour les trucks (collection racine pour meilleure synchro)
+    match /trucks/{truckId} {
+      allow read, write: if true;
+    }
+    
+    // Règles pour les organizations
     match /organizations/{orgId} {
       // Permettre la lecture et l'écriture pour tous (à sécuriser plus tard avec l'authentification)
       allow read, write: if true;
@@ -17,25 +32,15 @@ service cloud.firestore {
         }
       }
       
-      // Règles pour les events
-      match /events/{eventId} {
-        allow read, write: if true;
-      }
-      
-      // Règles pour les orders
-      match /orders/{orderId} {
-        allow read, write: if true;
-      }
-      
-      // Règles pour les trucks
-      match /trucks/{truckId} {
-        allow read, write: if true;
-      }
-      
       // Règles pour les movements
       match /movements/{movementId} {
         allow read, write: if true;
       }
+    }
+    
+    // Règles pour les orders
+    match /orders/{orderId} {
+      allow read, write: if true;
     }
   }
 }

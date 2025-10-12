@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import SwiftUI
 
 @Model
 final class Event {
@@ -21,8 +22,9 @@ final class Event {
 
     // Informations événement
     var eventAddress: String  // Adresse de l'événement
-    var startDate: Date
-    var endDate: Date
+    var setupStartTime: Date  // Heure de début du montage
+    var startDate: Date  // Début de l'événement
+    var endDate: Date  // Fin de l'événement
     var status: EventStatus
     var notes: String
     var contactInfo: ContactInfo?
@@ -34,6 +36,12 @@ final class Event {
     var finalAmount: Double  // Montant final après remise
     var quoteStatus: QuoteStatus
     var paymentStatus: PaymentStatus
+    
+    // Frais supplémentaires du devis
+    var deliveryFee: Double  // Frais de déplacement
+    var assemblyFee: Double  // Frais de montage
+    var disassemblyFee: Double  // Frais de démontage
+    var tvaRate: Double  // Taux de TVA (ex: 20.0 pour 20%)
 
     var createdAt: Date
     var updatedAt: Date
@@ -41,13 +49,14 @@ final class Event {
     init(
         eventId: String,
         name: String,
-        clientName: String,
-        clientPhone: String,
-        clientEmail: String,
-        clientAddress: String,
-        eventAddress: String,
-        startDate: Date,
-        endDate: Date,
+        clientName: String = "",
+        clientPhone: String = "",
+        clientEmail: String = "",
+        clientAddress: String = "",
+        eventAddress: String = "",
+        setupStartTime: Date = Date(),
+        startDate: Date = Date(),
+        endDate: Date = Date().addingTimeInterval(86400),
         status: EventStatus = .planning,
         notes: String = "",
         contactInfo: ContactInfo? = nil,
@@ -55,7 +64,11 @@ final class Event {
         totalAmount: Double = 0.0,
         discountPercent: Double = 0.0,
         quoteStatus: QuoteStatus = .draft,
-        paymentStatus: PaymentStatus = .pending
+        paymentStatus: PaymentStatus = .pending,
+        deliveryFee: Double = 0.0,
+        assemblyFee: Double = 0.0,
+        disassemblyFee: Double = 0.0,
+        tvaRate: Double = 20.0
     ) {
         self.eventId = eventId
         self.name = name
@@ -64,6 +77,7 @@ final class Event {
         self.clientEmail = clientEmail
         self.clientAddress = clientAddress
         self.eventAddress = eventAddress
+        self.setupStartTime = setupStartTime
         self.startDate = startDate
         self.endDate = endDate
         self.status = status
@@ -75,6 +89,10 @@ final class Event {
         self.finalAmount = totalAmount * (1 - discountPercent / 100)
         self.quoteStatus = quoteStatus
         self.paymentStatus = paymentStatus
+        self.deliveryFee = deliveryFee
+        self.assemblyFee = assemblyFee
+        self.disassemblyFee = disassemblyFee
+        self.tvaRate = tvaRate
         self.createdAt = Date()
         self.updatedAt = Date()
     }
@@ -121,10 +139,22 @@ enum EventStatus: String, CaseIterable, Codable {
         case .cancelled: return "red"
         }
     }
+    
+    var swiftUIColor: Color {
+        switch self {
+        case .planning: return .gray
+        case .confirmed: return .blue
+        case .preparation: return .orange
+        case .inProgress: return .green
+        case .completed: return .teal
+        case .cancelled: return .red
+        }
+    }
 }
 
 enum QuoteStatus: String, Codable, CaseIterable {
     case draft = "BROUILLON"
+    case finalized = "FINALISE"
     case sent = "ENVOYE"
     case accepted = "ACCEPTE"
     case refused = "REFUSE"
@@ -132,6 +162,7 @@ enum QuoteStatus: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .draft: return "Brouillon"
+        case .finalized: return "Finalisé"
         case .sent: return "Envoyé"
         case .accepted: return "Accepté"
         case .refused: return "Refusé"

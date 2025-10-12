@@ -11,16 +11,35 @@ import SwiftUI
 struct TrucksListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var trucks: [Truck]
+    @Query private var events: [Event]
     @StateObject private var syncManager = SyncManager()
     @State private var selectedStatus: TruckStatus? = nil
     @State private var searchText = ""
     @State private var isRefreshing = false
+    @State private var showingTruckForm = false
+    @State private var dateFilterEnabled: Bool = false
+    @State private var selectedDate: Date = Date()
+    @State private var showingDatePicker: Bool = false
 
     var filteredTrucks: [Truck] {
         var items = trucks
 
         if let status = selectedStatus {
             items = items.filter { $0.status == status }
+        }
+        
+        // Filtre par date si activé
+        if dateFilterEnabled {
+            let calendar = Calendar.current
+            let truckIdsForDate = Set(events.filter { event in
+                let startDate = event.startDate
+                let endDate = event.endDate
+                return calendar.isDate(selectedDate, inSameDayAs: startDate) ||
+                       calendar.isDate(selectedDate, inSameDayAs: endDate) ||
+                       (selectedDate >= startDate && selectedDate <= endDate)
+            }.compactMap { $0.assignedTruckId })
+            
+            items = items.filter { truckIdsForDate.contains($0.truckId) }
         }
 
         let searchedItems = items.filteredBySearch(searchText)
@@ -52,10 +71,45 @@ struct TrucksListView: View {
                     }
                     .padding(.horizontal)
                 }
+                
+                // Filtre par date
+                VStack(spacing: 8) {
+                    HStack {
+                        Toggle(isOn: $dateFilterEnabled) {
+                            Label("Filtrer par date", systemImage: "calendar")
+                                .font(.subheadline)
+                        }
+                        .toggleStyle(SwitchToggleStyle(tint: .blue))
+                    }
+                    .padding(.horizontal)
+                    
+                    if dateFilterEnabled {
+                        Button(action: {
+                            showingDatePicker = true
+                        }) {
+                            HStack {
+                                Image(systemName: "calendar")
+                                Text(selectedDate, style: .date)
+                                    .fontWeight(.medium)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.vertical, 8)
 
                 // Liste des camions
                 List(filteredTrucks) { truck in
-                    TruckRow(truck: truck)
+                    NavigationLink(destination: TruckDetailView(truck: truck)) {
+                        TruckRow(truck: truck)
+                    }
                 }
                 .searchable(text: $searchText, prompt: "Rechercher un camion...")
                 .listStyle(.plain)
@@ -76,43 +130,54 @@ struct TrucksListView: View {
             }
             .navigationTitle("Flotte")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if let lastSync = syncManager.lastSyncDate {
-                        Text(lastSync.formatted(date: .omitted, time: .shortened))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
-                        Button(action: {
-                            Task {
-                                await refreshData()
-                            }
-                        }) {
-                            Image(systemName: "arrow.clockwise.circle.fill")
-                                .foregroundColor(.blue)
-                                .font(.title3)
-                        }
-                        
-                        Button(action: { /* TODO: Ajouter camion */  }) {
-                            Image(systemName: "plus")
-                        }
+                    Button(action: { showingTruckForm = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.blue)
+                            .font(.title3)
                     }
                 }
             }
+            .sheet(isPresented: $showingTruckForm) {
+                CreateTruckView()
+            }
+            .sheet(isPresented: $showingDatePicker) {
+                NavigationView {
+                    VStack {
+                        DatePicker(
+                            "Sélectionner une date",
+                            selection: $selectedDate,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
+                        .padding()
+                        
+                        Spacer()
+                    }
+                    .navigationTitle("Choisir une date")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("OK") {
+                                showingDatePicker = false
+                            }
+                        }
+                    }
+                }
+                .presentationDetents([.medium, .large])
+            }
             .onAppear {
-                // Rafraîchissement automatique à l'arrivée sur la page
+                // Rafraîchissement automatique immédiat à l'arrivée sur la page
                 Task {
-                    await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
+                    print("🔄 [TrucksListView] Rafraîchissement automatique au chargement")
+                    await syncManager.syncFromFirebase(modelContext: modelContext)
                 }
             }
         }
     }
-    
+
     // MARK: - Refresh Function
-    
+
     private func refreshData() async {
         print("🔄 [TrucksListView] Pull-to-refresh déclenché")
         isRefreshing = true
@@ -154,9 +219,9 @@ struct TruckRow: View {
             VStack(spacing: 4) {
                 Image(systemName: "truck.box")
                     .font(.title2)
-                    .foregroundColor(Color(truck.status.color))
+                    .foregroundColor(truck.status.swiftUIColor)
 
-                Text(truck.licensePlate)
+                Text(truck.displayName)
                     .font(.caption)
                     .fontWeight(.semibold)
             }
@@ -217,9 +282,9 @@ struct TruckRow: View {
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(status.color).opacity(0.2))
+                    .fill(status.swiftUIColor.opacity(0.2))
             )
-            .foregroundColor(Color(status.color))
+            .foregroundColor(status.swiftUIColor)
     }
 }
 

@@ -106,6 +106,11 @@ struct LogiScanApp: App {
             if authService.isAuthenticated {
                 MainTabView()
                     .environmentObject(authService)
+                    .onAppear {
+                        // Charger les données d'exemple au premier lancement
+                        let context = sharedModelContainer.mainContext
+                        SampleData.createSampleData(modelContext: context)
+                    }
             } else {
                 LoginView()
                     .environmentObject(authService)

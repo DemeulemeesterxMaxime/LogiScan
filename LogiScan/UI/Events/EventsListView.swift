@@ -11,8 +11,11 @@ import SwiftUI
 struct EventsListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var events: [Event]
+    @StateObject private var syncManager = SyncManager()
     @State private var selectedStatus: EventStatus? = nil
     @State private var searchText = ""
+    @State private var showingEventForm = false
+    @State private var isRefreshing = false
 
     var filteredEvents: [Event] {
         var items = events
@@ -50,20 +53,57 @@ struct EventsListView: View {
 
                 // Liste des événements
                 List(filteredEvents) { event in
-                    EventRow(event: event)
+                    NavigationLink(destination: EventDetailView(event: event)) {
+                        EventRow(event: event)
+                    }
                 }
                 .searchable(text: $searchText, prompt: "Rechercher un événement...")
                 .listStyle(.plain)
+                .refreshable {
+                    await refreshData()
+                }
+                .overlay {
+                    if syncManager.isSyncing {
+                        VStack {
+                            ProgressView("Synchronisation...")
+                                .padding()
+                                .background(Color(.systemBackground).opacity(0.9))
+                                .cornerRadius(10)
+                                .shadow(radius: 5)
+                        }
+                    }
+                }
             }
             .navigationTitle("Événements")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { /* TODO: Ajouter événement */  }) {
-                        Image(systemName: "plus")
+                    Button(action: { showingEventForm = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.blue)
+                            .font(.title3)
                     }
                 }
             }
+            .sheet(isPresented: $showingEventForm) {
+                CreateEventView()
+            }
+            .onAppear {
+                // Rafraîchissement automatique immédiat à l'arrivée
+                Task {
+                    print("🔄 [EventsListView] Rafraîchissement automatique au chargement")
+                    await syncManager.syncFromFirebase(modelContext: modelContext)
+                }
+            }
         }
+    }
+
+    // MARK: - Refresh Function
+
+    private func refreshData() async {
+        print("🔄 [EventsListView] Pull-to-refresh déclenché")
+        isRefreshing = true
+        await syncManager.syncFromFirebase(modelContext: modelContext)
+        isRefreshing = false
     }
 }
 
@@ -120,9 +160,9 @@ struct EventRow: View {
             .padding(.vertical, 4)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(status.color).opacity(0.2))
+                    .fill(status.swiftUIColor.opacity(0.2))
             )
-            .foregroundColor(Color(status.color))
+            .foregroundColor(status.swiftUIColor)
     }
 }
 

@@ -11,6 +11,7 @@ import AVFoundation
 
 struct SimpleScannerView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @State private var scannedCode: String? = nil
     @State private var isScanning = false
     @State private var showResult = false
@@ -18,6 +19,12 @@ struct SimpleScannerView: View {
     @State private var errorMessage: String?
     @State private var cameraPermission: AVAuthorizationStatus = .notDetermined
     @State private var showingPermissionAlert = false
+    
+    let onScanComplete: ((ScanResult) -> Void)?
+    
+    init(onScanComplete: ((ScanResult) -> Void)? = nil) {
+        self.onScanComplete = onScanComplete
+    }
     
     var body: some View {
         NavigationView {
@@ -169,7 +176,24 @@ struct SimpleScannerView: View {
     private func handleScannedCode(_ code: String) {
         scannedCode = code
         isScanning = false
-        showResult = true
+        
+        // Créer un ScanResult simple
+        let scanResult = ScanResult(
+            type: .unknown,
+            title: "Code scanné",
+            subtitle: code,
+            status: "Détecté",
+            statusColor: "blue",
+            rawPayload: code
+        )
+        
+        // Appeler le callback si présent
+        if let onScanComplete = onScanComplete {
+            onScanComplete(scanResult)
+            dismiss()
+        } else {
+            showResult = true
+        }
         
         // Feedback haptique
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
