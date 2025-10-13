@@ -528,7 +528,10 @@ struct SignUpView: View {
                     company: company
                 )
                 
+                // 5. Charger l'utilisateur et le définir dans le PermissionService
+                let user = try await firebaseService.fetchUser(userId: userId)
                 await MainActor.run {
+                    PermissionService.shared.setCurrentUser(user)
                     dismiss()
                 }
             } catch {
@@ -570,7 +573,10 @@ struct SignUpView: View {
                 // 4. Marquer le code comme utilisé
                 try await invitationService.useInvitationCode(codeId: invitation.codeId)
                 
+                // 5. Charger l'utilisateur et le définir dans le PermissionService
+                let user = try await firebaseService.fetchUser(userId: userId)
                 await MainActor.run {
+                    PermissionService.shared.setCurrentUser(user)
                     dismiss()
                 }
             } catch {

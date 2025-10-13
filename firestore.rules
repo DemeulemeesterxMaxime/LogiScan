@@ -1,46 +1,93 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Règles pour les events (collection racine pour meilleure synchro)
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserId() {
+      return request.auth.uid;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(getUserId())) &&
+             get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'admin';
+    }
+    
+    function belongsToCompany(companyId) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(getUserId())) &&
+             get(/databases/$(database)/documents/users/$(getUserId())).data.companyId == companyId;
+    }
+    
+    // Règles pour les users
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (userId == getUserId() || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (userId == getUserId() || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // Règles pour les companies
+    match /companies/{companyId} {
+      allow read: if isAuthenticated() && belongsToCompany(companyId);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isAdmin() || belongsToCompany(companyId));
+      allow delete: if isAdmin();
+    }
+    
+    // Règles pour les invitationCodes
+    match /invitationCodes/{codeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isAdmin();
+      allow update: if isAuthenticated() && isAdmin();
+      allow delete: if isAuthenticated() && isAdmin();
+    }
+    
+    // Règles pour les events
     match /events/{eventId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
       
-      // Règles pour les quoteItems (sous-collection des events)
       match /quoteItems/{quoteItemId} {
-        allow read, write: if true;
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
       }
     }
     
-    // Règles pour les trucks (collection racine pour meilleure synchro)
+    // Règles pour les trucks
     match /trucks/{truckId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
     
-    // Règles pour les organizations
+    // Règles pour les organizations (legacy - à migrer vers companies)
     match /organizations/{orgId} {
-      // Permettre la lecture et l'écriture pour tous (à sécuriser plus tard avec l'authentification)
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
       
-      // Règles pour les stockItems
       match /stockItems/{stockItemId} {
-        allow read, write: if true;
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
         
-        // Règles pour les assets (références individuelles)
         match /assets/{assetId} {
-          allow read, write: if true;
+          allow read: if isAuthenticated();
+          allow write: if isAuthenticated();
         }
       }
       
-      // Règles pour les movements
       match /movements/{movementId} {
-        allow read, write: if true;
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated();
       }
     }
     
     // Règles pour les orders
     match /orders/{orderId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
   }
 }

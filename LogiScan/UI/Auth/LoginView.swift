@@ -164,11 +164,35 @@ struct LoginView: View {
         Task {
             do {
                 try await authService.signIn(email: email, password: password)
+                
+                // Charger l'utilisateur et le définir dans le PermissionService
+                guard let userId = authService.currentUserId else {
+                    throw LoginError.userIdNotFound
+                }
+                
+                let firebaseService = FirebaseService()
+                let user = try await firebaseService.fetchUser(userId: userId)
+                
+                await MainActor.run {
+                    PermissionService.shared.setCurrentUser(user)
+                    isLoading = false
+                }
             } catch {
                 await MainActor.run {
                     errorMessage = error.localizedDescription
                     isLoading = false
                 }
+            }
+        }
+    }
+    
+    enum LoginError: LocalizedError {
+        case userIdNotFound
+        
+        var errorDescription: String? {
+            switch self {
+            case .userIdNotFound:
+                return "Impossible de récupérer l'ID utilisateur"
             }
         }
     }

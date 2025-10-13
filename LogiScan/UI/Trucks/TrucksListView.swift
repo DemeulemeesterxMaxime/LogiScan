@@ -129,6 +129,9 @@ struct TrucksListView: View {
                 }
             }
             .navigationTitle("Flotte")
+            .refreshable {
+                await syncManager.syncFromFirebase(modelContext: modelContext)
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingTruckForm = true }) {

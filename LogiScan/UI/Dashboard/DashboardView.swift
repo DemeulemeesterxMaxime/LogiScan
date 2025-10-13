@@ -18,6 +18,9 @@ struct DashboardView: View {
 
     @State private var selectedPeriod: DashboardPeriod = .today
     @State private var isRefreshing = false
+    @State private var isLoadingTestData = false
+    @State private var showTestDataSuccess = false
+    @State private var showingSettings = false
 
     private var assetsOK: Int {
         assets.filter { $0.status == .available }.count
@@ -39,6 +42,28 @@ struct DashboardView: View {
         NavigationView {
             ScrollView {
                 LazyVStack(spacing: 20) {
+                    // Titre en haut
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Tableau de bord")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                            
+                            Text(Date().formatted(date: .long, time: .omitted))
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        if syncManager.isSyncing {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
                     // Header avec période sélectionnée
                     periodSelector
 
@@ -56,9 +81,20 @@ struct DashboardView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Tableau de bord")
             .refreshable {
-                await refreshData()
+                await syncManager.syncFromFirebase(modelContext: modelContext)
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showingSettings = true }) {
+                        Image(systemName: "gearshape.fill")
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
             .overlay {
                 if syncManager.isSyncing {
@@ -71,25 +107,10 @@ struct DashboardView: View {
                     }
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 4) {
-                        if let lastSync = syncManager.lastSyncDate {
-                            Text(lastSync.formatted(date: .omitted, time: .shortened))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Image(systemName: "arrow.clockwise.circle.fill")
-                            .foregroundColor(.blue)
-                            .font(.title3)
-                            .onTapGesture {
-                                Task {
-                                    await refreshData()
-                                }
-                            }
-                    }
-                }
+            .alert("Données de test créées", isPresented: $showTestDataSuccess) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Les données de test ont été créées et synchronisées avec Firebase.")
             }
             .onAppear {
                 // Rafraîchissement automatique à l'arrivée sur la page
@@ -101,7 +122,24 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Refresh Function
+    // MARK: - Test Data Function
+
+    private func loadTestData() {
+        isLoadingTestData = true
+        
+        Task {
+            // Charger les données dans SwiftData
+            SampleData.createSampleData(modelContext: modelContext)
+            
+            // Les données sont maintenant dans SwiftData
+            // L'utilisateur peut les synchroniser manuellement vers Firebase si nécessaire
+            
+            await MainActor.run {
+                isLoadingTestData = false
+                showTestDataSuccess = true
+            }
+        }
+    }
 
     private func refreshData() async {
         print("🔄 [DashboardView] Pull-to-refresh déclenché")
@@ -216,10 +254,10 @@ struct DashboardView: View {
                 // Bouton de test pour charger les données d'exemple
                 QuickActionButton(
                     icon: "arrow.clockwise.circle.fill",
-                    title: "Charger données test",
+                    title: isLoadingTestData ? "Chargement..." : "Charger données test",
                     color: .gray,
                     action: {
-                        SampleData.createSampleData(modelContext: modelContext)
+                        loadTestData()
                     }
                 )
 

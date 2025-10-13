@@ -105,6 +105,9 @@ struct StockListView: View {
             }
             .navigationTitle("Stock")
             .navigationBarTitleDisplayMode(.inline)
+            .refreshable {
+                await syncManager.syncFromFirebase(modelContext: modelContext)
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {

@@ -75,6 +75,9 @@ struct EventsListView: View {
                 }
             }
             .navigationTitle("Événements")
+            .refreshable {
+                await syncManager.syncFromFirebase(modelContext: modelContext)
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingEventForm = true }) {

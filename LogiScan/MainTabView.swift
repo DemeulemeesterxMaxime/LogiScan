@@ -45,14 +45,6 @@ struct MainTabView: View {
                     Image(systemName: "truck.box.fill")
                     Text("Camions")
                 }
-            
-            // Administration (visible uniquement pour Manager+)
-            AdminView()
-                .tabItem {
-                    Image(systemName: "gear")
-                    Text("Admin")
-                }
-                .requiresAnyPermission([.manageMembers, .editCompany])
         }
         .accentColor(.blue)
     }
