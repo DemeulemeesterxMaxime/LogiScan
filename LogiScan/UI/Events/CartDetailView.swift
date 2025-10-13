@@ -294,6 +294,18 @@ struct CartItemDetailRow: View {
 }
 
 #Preview {
+    @Previewable @State var items = [
+        QuoteItem(
+            quoteItemId: UUID().uuidString,
+            eventId: "evt1",
+            sku: "CHR001",
+            name: "Chaise Napoleon III Dorée",
+            category: "Mobilier",
+            quantity: 50,
+            unitPrice: 3.50
+        )
+    ]
+    
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: Event.self, QuoteItem.self, StockItem.self, configurations: config)
     
@@ -309,18 +321,6 @@ struct CartItemDetailRow: View {
         startDate: Date(),
         endDate: Date().addingTimeInterval(86400)
     )
-    
-    @State var items = [
-        QuoteItem(
-            quoteItemId: UUID().uuidString,
-            eventId: "evt1",
-            sku: "CHR001",
-            name: "Chaise Napoleon III Dorée",
-            category: "Mobilier",
-            quantity: 50,
-            unitPrice: 3.50
-        )
-    ]
     
     NavigationStack {
         CartDetailView(event: event, quoteItems: $items)

@@ -136,6 +136,7 @@ struct TrucksListView: View {
                             .foregroundColor(.blue)
                             .font(.title3)
                     }
+                    .requiresPermission(.manageTrucks)
                 }
             }
             .sheet(isPresented: $showingTruckForm) {

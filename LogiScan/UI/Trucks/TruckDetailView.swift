@@ -53,6 +53,7 @@ struct TruckDetailView: View {
                 .buttonStyle(.bordered)
                 .tint(.red)
                 .padding(.horizontal)
+                .requiresPermission(.manageTrucks)
             }
             .padding(.vertical)
         }
@@ -101,6 +102,7 @@ struct TruckDetailView: View {
                         .font(.title3)
                         .foregroundColor(.blue)
                 }
+                .requiresPermission(.manageTrucks)
             }
             
             if truck.name == nil || truck.name?.isEmpty == true {

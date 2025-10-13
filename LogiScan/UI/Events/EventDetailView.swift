@@ -89,6 +89,7 @@ struct EventDetailView: View {
                     Button("Modifier") {
                         startEditing()
                     }
+                    .requiresPermission(.writeEvents)
                 }
             }
         }
@@ -381,21 +382,35 @@ struct EventDetailView: View {
         VStack(spacing: 12) {
             // Bouton Créer/Continuer/Revoir le devis (3 scénarios)
             if event.quoteStatus == .finalized || event.quoteStatus == .sent {
-                // Scénario 3 : Devis finalisé - Revoir le devis (afficher PDF)
-                Button(action: { showingQuotePDF = true }) {
-                    HStack {
-                        Image(systemName: "doc.text.magnifyingglass")
-                        Text("Revoir le devis")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                // Scénario 3 : Devis finalisé - 2 boutons côte à côte
+                HStack(spacing: 12) {
+                    // Bouton gauche : Modifier les articles
+                    NavigationLink(destination: QuoteBuilderView(event: event)) {
+                        HStack {
+                            Image(systemName: "square.and.pencil")
+                            Text("Modifier")
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.orange)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.green)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+                    
+                    // Bouton droite : Consulter le PDF
+                    Button(action: { showingQuotePDF = true }) {
+                        HStack {
+                            Image(systemName: "doc.text.magnifyingglass")
+                            Text("PDF")
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
                 }
             } else if hasExistingQuote {
                 // Scénario 2 : Items existent en draft - Continuer le devis
@@ -443,6 +458,7 @@ struct EventDetailView: View {
             }
             .buttonStyle(.bordered)
             .tint(.red)
+            .requiresPermission(.writeEvents)
         }
         .padding(.horizontal)
     }

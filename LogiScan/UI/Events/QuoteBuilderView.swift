@@ -40,6 +40,7 @@ struct QuoteBuilderView: View {
     @State private var showingCategoryFilter = false  // Pour le sheet de filtres
     @State private var showingCartDetail = false  // Pour naviguer vers CartDetailView
     @State private var quantities: [String: Int] = [:]  // SKU -> Quantity in cart
+    @State private var autoSaveTask: Task<Void, Never>?  // Pour le debounce de la sauvegarde auto
 
     private var assignedTruck: Truck? {
         guard let truckId = event.assignedTruckId else { return nil }
@@ -841,8 +842,8 @@ struct QuoteBuilderView: View {
             print("🔍 Nouvel item ajouté: \(stockItem.name)")
         }
         
-        // Sauvegarde automatique
-        autoSave()
+        // Sauvegarde automatique avec debounce
+        scheduleAutoSave()
     }
     
     private func removeItemFromCart(_ stockItem: StockItem) {
@@ -859,8 +860,8 @@ struct QuoteBuilderView: View {
             }
         }
         
-        // Sauvegarde automatique
-        autoSave()
+        // Sauvegarde automatique avec debounce
+        scheduleAutoSave()
     }
     
     private func removeAllFromCart(_ stockItem: StockItem) {
@@ -868,8 +869,8 @@ struct QuoteBuilderView: View {
         quantities.removeValue(forKey: stockItem.sku)
         print("🔍 Item complètement supprimé: \(stockItem.name)")
         
-        // Sauvegarde automatique
-        autoSave()
+        // Sauvegarde automatique avec debounce
+        scheduleAutoSave()
     }
     
     private func updateCartQuantity(item: StockItem, quantity: Int) {
@@ -881,8 +882,8 @@ struct QuoteBuilderView: View {
             print("🔍 Quantité mise à jour pour \(item.name): \(quantity)")
         }
         
-        // Sauvegarde automatique
-        autoSave()
+        // Sauvegarde automatique avec debounce
+        scheduleAutoSave()
     }
     
     private func clearCart() {
@@ -890,8 +891,8 @@ struct QuoteBuilderView: View {
         quantities.removeAll()
         print("🔍 Panier vidé complètement")
         
-        // Sauvegarde automatique
-        autoSave()
+        // Sauvegarde automatique avec debounce
+        scheduleAutoSave()
     }
 
     private func addItemToQuote(_ stockItem: StockItem) {
@@ -916,8 +917,8 @@ struct QuoteBuilderView: View {
             print("🔍 Quantité mise à jour pour \(item.name): \(quantity)")
         }
         
-        // Sauvegarde automatique
-        autoSave()
+        // Sauvegarde automatique avec debounce
+        scheduleAutoSave()
     }
 
     private func updatePrice(for item: QuoteItem, price: Double) {
@@ -926,8 +927,8 @@ struct QuoteBuilderView: View {
             print("🔍 Prix mis à jour pour \(item.name): \(price)€")
         }
         
-        // Sauvegarde automatique
-        autoSave()
+        // Sauvegarde automatique avec debounce
+        scheduleAutoSave()
     }
 
     private func deleteItem(_ item: QuoteItem) {
@@ -935,8 +936,8 @@ struct QuoteBuilderView: View {
         quantities.removeValue(forKey: item.sku)
         print("🔍 Item supprimé: \(item.name)")
         
-        // Sauvegarde automatique
-        autoSave()
+        // Sauvegarde automatique avec debounce
+        scheduleAutoSave()
     }
     
     // MARK: - Data Loading
@@ -980,6 +981,9 @@ struct QuoteBuilderView: View {
     private func saveQuote(finalize: Bool = false) {
         print("🔍 DEBUG - Sauvegarde du devis")
         print("🔍 Nombre d'items dans le panier: \(quoteItems.count)")
+        
+        // Annuler toute sauvegarde automatique en attente
+        autoSaveTask?.cancel()
         
         // Supprimer les anciens items de cet événement
         let oldItems = allQuoteItems.filter { $0.eventId == event.eventId }
@@ -1090,6 +1094,23 @@ struct QuoteBuilderView: View {
             }
         } catch {
             print("❌ Erreur sauvegarde automatique: \(error)")
+        }
+    }
+    
+    private func scheduleAutoSave() {
+        // Annuler la sauvegarde précédente si elle existe
+        autoSaveTask?.cancel()
+        
+        // Programmer une nouvelle sauvegarde après 2 secondes
+        autoSaveTask = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 secondes
+            
+            // Vérifier si la tâche n'a pas été annulée
+            if !Task.isCancelled {
+                await MainActor.run {
+                    autoSave()
+                }
+            }
         }
     }
 

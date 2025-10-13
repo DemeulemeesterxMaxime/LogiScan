@@ -12,7 +12,7 @@ import Foundation
 /// Service d'authentification Firebase
 @MainActor
 class AuthService: ObservableObject {
-    @Published var currentUser: User?
+    @Published var currentUser: FirebaseAuth.User?
     @Published var isAuthenticated = false
     @Published var userEmail: String?
     @Published var errorMessage: String?

@@ -82,6 +82,7 @@ struct EventsListView: View {
                             .foregroundColor(.blue)
                             .font(.title3)
                     }
+                    .requiresPermission(.writeEvents)
                 }
             }
             .sheet(isPresented: $showingEventForm) {
@@ -139,6 +140,17 @@ struct EventRow: View {
                 if !Calendar.current.isDate(event.startDate, inSameDayAs: event.endDate) {
                     Text("→ \(event.endDate.formatted(date: .abbreviated, time: .omitted))")
                 }
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+            
+            // Date de modification
+            HStack {
+                Label("", systemImage: "clock")
+                    .labelStyle(.iconOnly)
+                    .foregroundColor(.secondary)
+                
+                Text("Modifié: \(event.updatedAt.formatted(date: .abbreviated, time: .shortened))")
             }
             .font(.caption)
             .foregroundColor(.secondary)

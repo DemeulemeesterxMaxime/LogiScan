@@ -606,4 +606,173 @@ class FirebaseService: ObservableObject {
             )
         }
     }
+    
+    // MARK: - Users Management
+    
+    /// Créer un utilisateur entreprise (admin)
+    func createCompanyUser(
+        userId: String,
+        email: String,
+        displayName: String,
+        company: Company
+    ) async throws {
+        let user = User(
+            userId: userId,
+            email: email,
+            displayName: displayName,
+            accountType: .company,
+            companyId: company.companyId,
+            role: .admin
+        )
+        
+        let firestoreUser = user.toFirestoreUser()
+        
+        try await db.collection("users")
+            .document(userId)
+            .setData(from: firestoreUser)
+        
+        print("✅ [FirebaseService] Utilisateur entreprise créé: \(displayName)")
+    }
+    
+    /// Créer un utilisateur employé
+    func createEmployeeUser(
+        userId: String,
+        email: String,
+        displayName: String,
+        companyId: String,
+        role: User.UserRole
+    ) async throws {
+        let user = User(
+            userId: userId,
+            email: email,
+            displayName: displayName,
+            accountType: .employee,
+            companyId: companyId,
+            role: role
+        )
+        
+        let firestoreUser = user.toFirestoreUser()
+        
+        try await db.collection("users")
+            .document(userId)
+            .setData(from: firestoreUser)
+        
+        print("✅ [FirebaseService] Utilisateur employé créé: \(displayName)")
+    }
+    
+    /// Récupérer un utilisateur par ID
+    func fetchUser(userId: String) async throws -> User {
+        let document = try await db.collection("users")
+            .document(userId)
+            .getDocument()
+        
+        guard let firestoreUser = try? document.data(as: FirestoreUser.self) else {
+            throw FirebaseServiceError.userNotFound
+        }
+        
+        return firestoreUser.toSwiftData()
+    }
+    
+    /// Mettre à jour un utilisateur
+    func updateUser(_ user: User) async throws {
+        let firestoreUser = user.toFirestoreUser()
+        
+        try await db.collection("users")
+            .document(user.userId)
+            .setData(from: firestoreUser, merge: true)
+        
+        print("✅ [FirebaseService] Utilisateur mis à jour: \(user.displayName)")
+    }
+    
+    /// Récupérer les membres d'une entreprise
+    func fetchCompanyMembers(companyId: String) async throws -> [User] {
+        let snapshot = try await db.collection("users")
+            .whereField("companyId", isEqualTo: companyId)
+            .getDocuments()
+        
+        let users = try snapshot.documents.compactMap { document -> User? in
+            guard let firestoreUser = try? document.data(as: FirestoreUser.self) else {
+                return nil
+            }
+            return firestoreUser.toSwiftData()
+        }
+        
+        print("✅ [FirebaseService] \(users.count) membres récupérés")
+        return users
+    }
+    
+    /// Changer le rôle d'un utilisateur
+    func updateUserRole(userId: String, newRole: User.UserRole) async throws {
+        try await db.collection("users")
+            .document(userId)
+            .updateData([
+                "role": newRole.rawValue,
+                "updatedAt": Timestamp(date: Date())
+            ])
+        
+        print("✅ [FirebaseService] Rôle mis à jour pour: \(userId)")
+    }
+    
+    /// Transférer le rôle admin (transaction atomique)
+    func transferAdminRole(
+        fromUserId: String,
+        toUserId: String,
+        companyId: String
+    ) async throws {
+        try await db.runTransaction { transaction, errorPointer in
+            // Rétrograder l'ancien admin en manager
+            let oldAdminRef = self.db.collection("users").document(fromUserId)
+            transaction.updateData([
+                "role": User.UserRole.manager.rawValue,
+                "updatedAt": Timestamp(date: Date())
+            ], forDocument: oldAdminRef)
+            
+            // Promouvoir le nouveau admin
+            let newAdminRef = self.db.collection("users").document(toUserId)
+            transaction.updateData([
+                "role": User.UserRole.admin.rawValue,
+                "updatedAt": Timestamp(date: Date())
+            ], forDocument: newAdminRef)
+            
+            // Mettre à jour le ownerId de l'entreprise
+            let companyRef = self.db.collection("companies").document(companyId)
+            transaction.updateData([
+                "ownerId": toUserId
+            ], forDocument: companyRef)
+            
+            return nil
+        }
+        
+        print("✅ [FirebaseService] Rôle admin transféré de \(fromUserId) à \(toUserId)")
+    }
+    
+    /// Retirer un membre de l'entreprise
+    func removeUserFromCompany(userId: String) async throws {
+        try await db.collection("users")
+            .document(userId)
+            .updateData([
+                "companyId": FieldValue.delete(),
+                "role": FieldValue.delete(),
+                "joinedAt": FieldValue.delete(),
+                "updatedAt": Timestamp(date: Date())
+            ])
+        
+        print("✅ [FirebaseService] Utilisateur retiré de l'entreprise: \(userId)")
+    }
+    
+    // MARK: - Errors Extension
+    
+    enum FirebaseServiceError: Error, LocalizedError {
+        case userNotFound
+        case companyNotFound
+        
+        var errorDescription: String? {
+            switch self {
+            case .userNotFound:
+                return "Utilisateur introuvable"
+            case .companyNotFound:
+                return "Entreprise introuvable"
+            }
+        }
+    }
 }

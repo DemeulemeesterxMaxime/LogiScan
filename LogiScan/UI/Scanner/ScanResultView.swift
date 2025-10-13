@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ScanResultView: View {
     let result: ScanResult?
-    let onMovementAction: (MovementType, String?, String?) -> Void
+    let onMovementAction: (MovementType, String, String?, String?) -> Void
     let onScanAgain: () -> Void
     
     @Environment(\.dismiss) private var dismiss
@@ -49,11 +49,14 @@ struct ScanResultView: View {
                 fromLocation: $fromLocation,
                 toLocation: $toLocation,
                 onConfirm: {
-                    onMovementAction(
-                        selectedMovementType,
-                        fromLocation.isEmpty ? nil : fromLocation,
-                        toLocation.isEmpty ? nil : toLocation
-                    )
+                    if let asset = result?.asset {
+                        onMovementAction(
+                            selectedMovementType,
+                            asset.assetId,
+                            fromLocation.isEmpty ? nil : fromLocation,
+                            toLocation.isEmpty ? nil : toLocation
+                        )
+                    }
                     dismiss()
                 }
             )
@@ -295,7 +298,7 @@ struct MovementActionSheet: View {
             statusColor: "green",
             rawPayload: "{\"v\":1,\"type\":\"asset\",\"id\":\"A001\"}"
         ),
-        onMovementAction: { _, _, _ in },
+        onMovementAction: { _, _, _, _ in },
         onScanAgain: { }
     )
 }

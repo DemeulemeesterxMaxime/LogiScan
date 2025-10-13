@@ -3,6 +3,7 @@
 //  LogiScan
 //
 //  Created by Demeulemeester on 30/09/2025.
+//  Refactored on 13/10/2025 - Multi-mode scanner with enhanced UX
 //
 
 import SwiftUI
@@ -61,25 +62,12 @@ struct ScannerMainView: View {
                                 .foregroundColor(.white)
                                 .font(.title3)
                         }
-                        
-                        Button(action: {
-                            if viewModel.isScanning {
-                                viewModel.stopScanning()
-                            } else {
-                                viewModel.startScanning()
-                            }
-                        }) {
-                            Image(systemName: viewModel.isScanning ? "pause.circle" : "play.circle")
-                                .foregroundColor(.white)
-                                .font(.title2)
-                        }
                     }
                 }
             }
         }
         .onAppear {
             checkCameraPermission()
-            // Rafraîchissement automatique à l'arrivée sur la page
             Task {
                 await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
             }
@@ -87,10 +75,11 @@ struct ScannerMainView: View {
         .sheet(isPresented: $viewModel.showResult) {
             ScanResultView(
                 result: viewModel.scanResult,
-                onMovementAction: { type, from, to in
+                onMovementAction: { type, assetId, from, to in
                     Task {
                         await viewModel.createMovement(
                             type: type,
+                            assetId: assetId,
                             fromLocation: from,
                             toLocation: to
                         )
@@ -100,6 +89,18 @@ struct ScannerMainView: View {
                     viewModel.startScanning()
                 }
             )
+        }
+        .sheet(isPresented: $viewModel.showModeSelector) {
+            ScanModeSelectorView(
+                onModeSelected: { mode, truck, event, assets in
+                    viewModel.selectMode(mode, truck: truck, event: event, expectedAssets: assets)
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $viewModel.showScanList) {
+            ScanListView(viewModel: viewModel)
         }
         .alert("Erreur", isPresented: $viewModel.showError) {
             Button("OK") { }
@@ -119,102 +120,53 @@ struct ScannerMainView: View {
     }
     
     private var scannerView: some View {
-        VStack {
-            ZStack {
-                QRScannerView(
-                    scannedCode: $viewModel.scannedCode,
-                    isScanning: $viewModel.isScanning,
-                    onCodeScanned: viewModel.handleScannedCode
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+        ZStack {
+            // Camera View
+            QRScannerView(
+                scannedCode: $viewModel.scannedCode,
+                isScanning: $viewModel.isScanning,
+                onCodeScanned: viewModel.handleScannedCode
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 0))
+            
+            // Scan Overlay with mode indicator and controls
+            ScanOverlayView(
+                viewModel: viewModel,
+                onShowList: {
+                    viewModel.showScanList = true
+                },
+                onChangeMode: {
+                    viewModel.showModeSelector = true
+                }
+            )
+            
+            // Mode Selector Floating Button
+            VStack {
+                Spacer()
                 
-                VStack {
+                HStack {
                     Spacer()
                     
-                    HStack {
-                        Spacer()
-                        
-                        VStack(spacing: 16) {
-                            scanInstructionsOverlay
-                            quickActionButtons
+                    Button(action: {
+                        viewModel.showModeSelector = true
+                    }) {
+                        VStack(spacing: 8) {
+                            Image(systemName: viewModel.currentMode.icon)
+                                .font(.title2)
+                            Text("Mode")
+                                .font(.caption2)
                         }
-                        .padding()
+                        .foregroundColor(.white)
+                        .frame(width: 70, height: 70)
                         .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(.ultraThinMaterial)
+                            Circle()
+                                .fill(viewModel.currentMode.gradient)
+                                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
                         )
-                        .padding()
                     }
+                    .padding()
                 }
             }
-        }
-    }
-    
-    private var scanInstructionsOverlay: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Image(systemName: "qrcode.viewfinder")
-                    .foregroundColor(.white)
-                    .font(.title2)
-                
-                Text("Placez le QR code dans le cadre")
-                    .foregroundColor(.white)
-                    .font(.caption)
-                    .fontWeight(.medium)
-            }
-            
-            if let lastCode = viewModel.scannedCode {
-                Text("Dernier scan: \(lastCode.prefix(20))...")
-                    .foregroundColor(.white.opacity(0.8))
-                    .font(.caption2)
-            }
-        }
-    }
-    
-    private var quickActionButtons: some View {
-        HStack(spacing: 12) {
-            quickActionButton(
-                icon: "cube.box",
-                title: "Stock",
-                action: {
-                    // TODO: Navigation vers stock
-                }
-            )
-            
-            quickActionButton(
-                icon: "truck",
-                title: "Camions",
-                action: {
-                    // TODO: Navigation vers camions
-                }
-            )
-            
-            quickActionButton(
-                icon: "list.clipboard",
-                title: "Ordres",
-                action: {
-                    // TODO: Navigation vers ordres
-                }
-            )
-        }
-    }
-    
-    private func quickActionButton(icon: String, title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.title3)
-                
-                Text(title)
-                    .font(.caption2)
-            }
-            .foregroundColor(.white)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(.ultraThinMaterial)
-            )
         }
     }
     
@@ -285,26 +237,4 @@ struct ScannerMainView: View {
         movementRepository: PreviewMovementRepository()
     )
     .modelContainer(container)
-}
-
-// Repositories de preview simplifiés
-class PreviewAssetRepository: AssetRepositoryProtocol {
-    func getAllAssets() async throws -> [Asset] { [] }
-    func getAssetById(_ id: String) async throws -> Asset? { nil }
-    func getAssetsByLocation(_ locationId: String) async throws -> [Asset] { [] }
-    func getAssetsByEvent(_ eventId: String) async throws -> [Asset] { [] }
-    func saveAsset(_ asset: Asset) async throws { }
-    func deleteAsset(_ asset: Asset) async throws { }
-    func updateAssetLocation(_ assetId: String, locationId: String?) async throws { }
-    func updateAssetStatus(_ assetId: String, status: AssetStatus) async throws { }
-    func searchAssets(_ query: String) async throws -> [Asset] { [] }
-}
-
-class PreviewMovementRepository: MovementRepositoryProtocol {
-    func createMovement(_ movement: Movement) async throws { }
-    func getMovementsByAsset(_ assetId: String) async throws -> [Movement] { [] }
-    func getMovementsByEvent(_ eventId: String) async throws -> [Movement] { [] }
-    func getUnsyncedMovements() async throws -> [Movement] { [] }
-    func markMovementAsSynced(_ movementId: String) async throws { }
-    func getRecentMovements(limit: Int) async throws -> [Movement] { [] }
 }

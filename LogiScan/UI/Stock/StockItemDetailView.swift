@@ -101,10 +101,12 @@ struct StockItemDetailView: View {
                         Button("Modifier l'article", systemImage: "pencil") {
                             showingEditForm = true
                         }
+                        .requiresPermission(.writeStock)
 
                         Button("Modifier les étiquettes", systemImage: "tag") {
                             showingTagEditor = true
                         }
+                        .requiresPermission(.writeStock)
 
                         Button("Historique complet", systemImage: "clock") {
                             showingLocationHistory = true
@@ -115,12 +117,14 @@ struct StockItemDetailView: View {
                         Button("Supprimer l'article", systemImage: "trash", role: .destructive) {
                             showingDeleteAlert = true
                         }
+                        .requiresPermission(.writeStock)
 
                         Divider()
 
                         Button("Créer mouvement", systemImage: "arrow.left.arrow.right") {
                             // TODO: Navigation vers création de mouvement
                         }
+                        .requiresPermission(.writeStock)
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }

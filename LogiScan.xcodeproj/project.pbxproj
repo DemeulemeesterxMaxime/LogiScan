@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		816D52A82E93AC8E00878ABC /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 816D52A72E93AC8E00878ABC /* FirebaseAuth */; };
 		816D52AA2E93AC8E00878ABC /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 816D52A92E93AC8E00878ABC /* FirebaseFirestore */; };
+		81A0AD282E9C5EDD00AFDCDB /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 81A0AD272E9C5EDD00AFDCDB /* FirebaseStorage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +72,7 @@
 			files = (
 				816D52A82E93AC8E00878ABC /* FirebaseAuth in Frameworks */,
 				816D52AA2E93AC8E00878ABC /* FirebaseFirestore in Frameworks */,
+				81A0AD282E9C5EDD00AFDCDB /* FirebaseStorage in Frameworks */,
 			);
 		};
 		81E94FFC2E84495400413192 /* Frameworks */ = {
@@ -126,6 +128,7 @@
 			packageProductDependencies = (
 				816D52A72E93AC8E00878ABC /* FirebaseAuth */,
 				816D52A92E93AC8E00878ABC /* FirebaseFirestore */,
+				81A0AD272E9C5EDD00AFDCDB /* FirebaseStorage */,
 			);
 			productName = LogiScan;
 			productReference = 81E94FEE2E84495200413192 /* LogiScan.app */;
@@ -278,7 +281,7 @@
 				CODE_SIGN_ENTITLEMENTS = LogiScan/LogiScanDebug.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = BB3PGNJBJ2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -315,7 +318,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = BB3PGNJBJ2;
 				ENABLE_PREVIEWS = YES;
@@ -597,6 +600,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 816D52A62E93AC8E00878ABC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
+		};
+		81A0AD272E9C5EDD00AFDCDB /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 816D52A62E93AC8E00878ABC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

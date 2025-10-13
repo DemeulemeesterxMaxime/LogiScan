@@ -111,10 +111,12 @@ struct StockListView: View {
                         Button(action: { showingAddItem = true }) {
                             Label("Nouvel article", systemImage: "plus.circle.fill")
                         }
+                        .requiresPermission(.writeStock)
                         
                         Button(action: { showingQuickActions = true }) {
                             Label("Actions rapides", systemImage: "bolt.fill")
                         }
+                        .requiresPermission(.writeStock)
                     } label: {
                         Image(systemName: "ellipsis.circle.fill")
                             .font(.title3)
