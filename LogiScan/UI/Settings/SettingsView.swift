@@ -6,355 +6,516 @@
 //
 
 import SwiftUI
+import SwiftData
+import PhotosUI
 import FirebaseAuth
 
 struct SettingsView: View {
-    @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authService: AuthService
-    @State private var permissionService = PermissionService.shared
+    @Environment(\.modelContext) private var modelContext
+    @Query private var stockItems: [StockItem]
+    @Query private var events: [Event]
+    @Query private var trucks: [Truck]
     
+    @State private var permissionService = PermissionService.shared
+    @State private var companyService = CompanyService()
+    @State private var firebaseService = FirebaseService()
+    @State private var invitationService = InvitationService()
+    
+    @State private var company: Company?
+    @State private var members: [User] = []
+    @State private var invitationCodes: [InvitationCode] = []
+    @State private var isLoading = true
     @State private var showingLogoutConfirm = false
-    @State private var showingAdminView = false
+    @State private var showingDeleteDataConfirm = false
+    @State private var selectedDeleteType: DeleteType?
+    @State private var isEditingCompany = false
+    @State private var errorMessage: String?
+    @State private var showingNewCodeSheet = false
+    
+    // Formulaire entreprise
+    @State private var editCompanyName = ""
+    @State private var editCompanyEmail = ""
+    @State private var editCompanyPhone = ""
+    @State private var editCompanyAddress = ""
+    @State private var editCompanySiret = ""
+    @State private var selectedLogoItem: PhotosPickerItem?
+    @State private var logoImage: UIImage?
+    @State private var isUploadingLogo = false
+    @State private var isSavingCompany = false
+    
+    enum DeleteType: String {
+        case trucks, stock, events, all
+        
+        var title: String {
+            switch self {
+            case .trucks: return "Supprimer tous les camions"
+            case .stock: return "Supprimer tout le stock"
+            case .events: return "Supprimer tous les événements"
+            case .all: return "Supprimer toutes les données"
+            }
+        }
+    }
     
     var currentUser: User? {
         permissionService.currentUser
     }
     
     var body: some View {
-        NavigationView {
-            List {
-                // Section Profil Utilisateur
-                Section {
-                    userInfoRow
+        List {
+            // Section Profil
+            profileSection
+            
+            // Section Entreprise
+            if currentUser?.companyId != nil {
+                if isLoading {
+                    loadingSection
+                } else if let company = company {
+                    companySection(company: company)
+                    membersSection
                     
-                    if let user = currentUser {
-                        roleRow(user: user)
-                        companyRow(user: user)
+                    // Section Admin
+                    if permissionService.isAdmin() {
+                        invitationSection
                     }
-                } header: {
-                    Text("Mon Profil")
                 }
+            }
+            
+            // Section Gestion des données
+            dataManagementSection
+            
+            // Section Actions
+            actionsSection
+        }
+        .navigationTitle("Paramètres")
+        .navigationBarTitleDisplayMode(.large)
+        .refreshable {
+            await loadData()
+        }
+        .onAppear {
+            Task {
+                await loadData()
+            }
+        }
+        .alert("Déconnexion", isPresented: $showingLogoutConfirm) {
+            Button("Annuler", role: .cancel) {}
+            Button("Se déconnecter", role: .destructive) {
+                logout()
+            }
+        } message: {
+            Text("Voulez-vous vraiment vous déconnecter ?")
+        }
+        .alert(selectedDeleteType?.title ?? "Supprimer", isPresented: $showingDeleteDataConfirm) {
+            Button("Annuler", role: .cancel) {}
+            Button("Supprimer", role: .destructive) {
+                if let type = selectedDeleteType {
+                    deleteData(type: type)
+                }
+            }
+        } message: {
+            Text("Cette action est irréversible. Toutes les données seront supprimées.")
+        }
+        .sheet(isPresented: $showingNewCodeSheet) {
+            if let companyId = company?.companyId {
+                GenerateInvitationView(companyId: companyId) {
+                    Task { await loadData() }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Sections
+    
+    private var profileSection: some View {
+        Section {
+            HStack(spacing: 16) {
+                Circle()
+                    .fill(LinearGradient(colors: [.blue, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 60, height: 60)
+                    .overlay(
+                        Text(initials)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    )
                 
-                // Section Entreprise (visible si membre d'une entreprise)
-                if currentUser?.companyId != nil {
-                    Section {
-                        NavigationLink {
-                            CompanyInfoView()
-                        } label: {
-                            Label("Informations de l'entreprise", systemImage: "building.2")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(currentUser?.displayName ?? "Utilisateur")
+                        .font(.headline)
+                    Text(currentUser?.email ?? "")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.vertical, 8)
+            
+            if let user = currentUser {
+                HStack {
+                    Label("Rôle", systemImage: "person.badge.key")
+                    Spacer()
+                    if let role = user.role {
+                        RoleBadge(role: role)
+                    }
+                }
+            }
+        } header: {
+            Text("Mon Profil")
+        }
+    }
+    
+    private var loadingSection: some View {
+        Section {
+            HStack {
+                Spacer()
+                ProgressView()
+                Spacer()
+            }
+        }
+    }
+    
+    private func companySection(company: Company) -> some View {
+        Section(header: Text("Mon Entreprise")) {
+            if !isEditingCompany {
+                companyReadOnlyView(company: company)
+            } else {
+                companyEditView(company: company)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func companyReadOnlyView(company: Company) -> some View {
+        // Mode lecture
+        if let logoURL = company.logoURL {
+            AsyncImage(url: URL(string: logoURL)) { image in
+                image.resizable().scaledToFit().frame(height: 80)
+            } placeholder: {
+                ProgressView()
+            }
+        }
+        
+        SettingsInfoRow(label: "Nom", value: editCompanyName.isEmpty ? company.name : editCompanyName, icon: "building.2")
+        SettingsInfoRow(label: "Email", value: editCompanyEmail.isEmpty ? company.email : editCompanyEmail, icon: "envelope")
+        
+        if let phone = company.phone {
+            SettingsInfoRow(label: "Téléphone", value: phone, icon: "phone")
+        }
+        if let address = company.address {
+            SettingsInfoRow(label: "Adresse", value: address, icon: "mappin")
+        }
+        if let siret = company.siret {
+            SettingsInfoRow(label: "SIRET", value: siret, icon: "doc.text")
+        }
+        
+        if permissionService.checkPermission(.editCompany) {
+            Button(action: { 
+                startEditing(company: company)
+            }) {
+                Label("Modifier", systemImage: "pencil")
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func companyEditView(company: Company) -> some View {
+        // Mode édition
+        PhotosPicker(selection: $selectedLogoItem, matching: .images) {
+            if let logoImage = logoImage {
+                Image(uiImage: logoImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 80)
+            } else {
+                Label("Changer le logo", systemImage: "photo")
+            }
+        }
+        .onChange(of: selectedLogoItem) { _, newValue in
+            Task {
+                if let data = try? await newValue?.loadTransferable(type: Data.self),
+                   let uiImage = UIImage(data: data) {
+                    logoImage = uiImage
+                }
+            }
+        }
+        
+        TextField("Nom de l'entreprise", text: $editCompanyName)
+        TextField("Email", text: $editCompanyEmail)
+            .keyboardType(.emailAddress)
+            .autocapitalization(.none)
+        TextField("Téléphone", text: $editCompanyPhone)
+            .keyboardType(.phonePad)
+        TextField("Adresse", text: $editCompanyAddress)
+        TextField("SIRET", text: $editCompanySiret)
+        
+        Button(action: { 
+            Task { await saveCompany() }
+        }) {
+            HStack {
+                if isSavingCompany {
+                    ProgressView()
+                }
+                Label(isSavingCompany ? "Enregistrement..." : "Enregistrer", systemImage: "checkmark.circle.fill")
+            }
+        }
+        .disabled(isSavingCompany || editCompanyName.isEmpty || editCompanyEmail.isEmpty)
+        
+        Button("Annuler", role: .cancel) {
+            isEditingCompany = false
+        }
+    }
+    
+    private var membersSection: some View {
+        Section {
+            ForEach(members, id: \.userId) { member in
+                NavigationLink {
+                    MemberDetailView(member: member, companyOwnerId: company?.ownerId ?? "")
+                        .onDisappear {
+                            Task { await loadData() }
+                        }
+                } label: {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(LinearGradient(colors: [.blue.opacity(0.6), .cyan.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Text(memberInitials(member.displayName))
+                                    .font(.subheadline)
+                                    .foregroundColor(.white)
+                            )
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(member.displayName)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                
+                                if member.userId == company?.ownerId {
+                                    Image(systemName: "crown.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.yellow)
+                                }
+                            }
+                            Text(member.email)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                         
-                        NavigationLink {
-                            TeamMembersView()
-                        } label: {
-                            Label("Membres de l'équipe", systemImage: "person.3")
+                        Spacer()
+                        
+                        if let role = member.role {
+                            RoleBadge(role: role)
                         }
-                    } header: {
-                        Text("Entreprise")
                     }
                 }
-                
-                // Section Administration (visible pour Admin uniquement)
-                if permissionService.isAdmin() {
-                    Section {
-                        NavigationLink {
-                            AdminView()
-                        } label: {
-                            Label("Administration complète", systemImage: "gear.badge")
-                        }
-                    } header: {
-                        Text("Administration")
-                    }
-                }
-                
-                // Section Actions
-                Section {
-                    Button(action: { showingLogoutConfirm = true }) {
-                        HStack {
-                            Label("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right")
+            }
+        } header: {
+            HStack {
+                Text("Membres")
+                Spacer()
+                Text("\(members.count)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+    
+    private var invitationSection: some View {
+        Section {
+            ForEach(invitationCodes, id: \.codeId) { code in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(code.code)
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.bold)
+                        
+                        Spacer()
+                        
+                        if code.isActive {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        } else {
+                            Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.red)
-                            Spacer()
                         }
                     }
-                } header: {
-                    Text("Actions")
+                    
+                    Text("\(code.usedCount)/\(code.maxUses) utilisations")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
-            .navigationTitle("Paramètres")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Fermer") {
-                        dismiss()
-                    }
-                }
+            
+            Button(action: { showingNewCodeSheet = true }) {
+                Label("Générer un code", systemImage: "plus.circle.fill")
             }
-            .alert("Déconnexion", isPresented: $showingLogoutConfirm) {
-                Button("Annuler", role: .cancel) {}
-                Button("Se déconnecter", role: .destructive) {
-                    logout()
-                }
-            } message: {
-                Text("Voulez-vous vraiment vous déconnecter ?")
-            }
+        } header: {
+            Text("Codes d'invitation")
         }
     }
     
-    // MARK: - User Info Row
-    
-    private var userInfoRow: some View {
-        HStack(spacing: 16) {
-            // Avatar
-            Circle()
-                .fill(LinearGradient(
-                    colors: [.blue, .cyan],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-                .frame(width: 60, height: 60)
-                .overlay(
-                    Text(initials)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                )
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(currentUser?.displayName ?? "Utilisateur")
-                    .font(.headline)
-                
-                Text(currentUser?.email ?? "")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+    private var dataManagementSection: some View {
+        Section {
+            Button(role: .destructive) {
+                selectedDeleteType = .trucks
+                showingDeleteDataConfirm = true
+            } label: {
+                Label("Supprimer tous les camions (\(trucks.count))", systemImage: "trash")
             }
             
-            Spacer()
-        }
-        .padding(.vertical, 8)
-    }
-    
-    // MARK: - Role Row
-    
-    private func roleRow(user: User) -> some View {
-        HStack {
-            Label("Rôle", systemImage: "person.badge.key")
-            
-            Spacer()
-            
-            if let role = user.role {
-                RoleBadge(role: role)
-            } else {
-                Text("Aucun rôle")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            Button(role: .destructive) {
+                selectedDeleteType = .stock
+                showingDeleteDataConfirm = true
+            } label: {
+                Label("Supprimer tout le stock (\(stockItems.count))", systemImage: "trash")
             }
+            
+            Button(role: .destructive) {
+                selectedDeleteType = .events
+                showingDeleteDataConfirm = true
+            } label: {
+                Label("Supprimer tous les événements (\(events.count))", systemImage: "trash")
+            }
+            
+            Button(role: .destructive) {
+                selectedDeleteType = .all
+                showingDeleteDataConfirm = true
+            } label: {
+                Label("Supprimer toutes les données", systemImage: "trash.fill")
+            }
+        } header: {
+            Text("Gestion des données")
+        } footer: {
+            Text("Actions irréversibles. Utilisez avec précaution.")
         }
     }
     
-    // MARK: - Company Row
-    
-    private func companyRow(user: User) -> some View {
-        HStack {
-            Label("Entreprise", systemImage: "building.2")
-            
-            Spacer()
-            
-            if user.companyId != nil {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-                Text("Membre")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            } else {
-                Text("Aucune")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+    private var actionsSection: some View {
+        Section {
+            Button(action: { showingLogoutConfirm = true }) {
+                Label("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right")
+                    .foregroundColor(.red)
             }
         }
-    }
-    
-    // MARK: - Computed Properties
-    
-    private var initials: String {
-        guard let name = currentUser?.displayName else { return "?" }
-        let components = name.split(separator: " ")
-        if components.count >= 2 {
-            let first = components[0].prefix(1)
-            let last = components[1].prefix(1)
-            return "\(first)\(last)".uppercased()
-        } else if let first = components.first {
-            return String(first.prefix(1)).uppercased()
-        }
-        return "?"
     }
     
     // MARK: - Actions
     
-    private func logout() {
-        Task {
-            do {
-                try await authService.signOut()
-                permissionService.clearCurrentUser()
-            } catch {
-                print("❌ [SettingsView] Erreur déconnexion: \(error)")
-            }
-        }
-    }
-}
-
-// MARK: - Company Info View
-
-struct CompanyInfoView: View {
-    @State private var companyService = CompanyService()
-    @State private var permissionService = PermissionService.shared
-    
-    @State private var company: Company?
-    @State private var isLoading = true
-    @State private var errorMessage: String?
-    
-    var body: some View {
-        List {
-            if isLoading {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                }
-            } else if let company = company {
-                Section {
-                    SettingsCompanyInfoRow(title: "Nom", value: company.name, icon: "building.2")
-                    
-                    if let address = company.address {
-                        SettingsCompanyInfoRow(title: "Adresse", value: address, icon: "mappin.circle")
-                    }
-                    
-                    if let phone = company.phone {
-                        SettingsCompanyInfoRow(title: "Téléphone", value: phone, icon: "phone.circle")
-                    }
-                    
-                    SettingsCompanyInfoRow(title: "Email", value: company.email, icon: "envelope.circle")
-                    
-                    if let siret = company.siret {
-                        SettingsCompanyInfoRow(title: "SIRET", value: siret, icon: "doc.text")
-                    }
-                } header: {
-                    Text("Informations")
-                }
-            } else if let error = errorMessage {
-                Section {
-                    Text(error)
-                        .foregroundColor(.red)
-                }
-            }
-        }
-        .navigationTitle("Mon Entreprise")
-        .navigationBarTitleDisplayMode(.inline)
-        .refreshable {
-            await loadCompanyData()
-        }
-        .onAppear {
-            Task {
-                await loadCompanyData()
-            }
-        }
+    private func startEditing(company: Company) {
+        editCompanyName = company.name
+        editCompanyEmail = company.email
+        editCompanyPhone = company.phone ?? ""
+        editCompanyAddress = company.address ?? ""
+        editCompanySiret = company.siret ?? ""
+        isEditingCompany = true
     }
     
-    private func loadCompanyData() async {
-        isLoading = true
-        errorMessage = nil
+    private func saveCompany() async {
+        guard let company = company else { return }
+        isSavingCompany = true
         
         do {
-            guard let companyId = permissionService.currentUser?.companyId else {
-                errorMessage = "Aucune entreprise associée"
+            var updatedCompany = Company(
+                companyId: company.companyId,
+                name: editCompanyName,
+                logoURL: company.logoURL,
+                address: editCompanyAddress.isEmpty ? nil : editCompanyAddress,
+                phone: editCompanyPhone.isEmpty ? nil : editCompanyPhone,
+                email: editCompanyEmail,
+                siret: editCompanySiret.isEmpty ? nil : editCompanySiret,
+                createdAt: company.createdAt,
+                ownerId: company.ownerId
+            )
+            
+            // Upload logo si modifié
+            if let logoImage = logoImage {
+                let logoURL = try await companyService.uploadLogo(logoImage, companyId: company.companyId)
+                updatedCompany = Company(
+                    companyId: updatedCompany.companyId,
+                    name: updatedCompany.name,
+                    logoURL: logoURL,
+                    address: updatedCompany.address,
+                    phone: updatedCompany.phone,
+                    email: updatedCompany.email,
+                    siret: updatedCompany.siret,
+                    createdAt: updatedCompany.createdAt,
+                    ownerId: updatedCompany.ownerId
+                )
+            }
+            
+            try await companyService.updateCompany(updatedCompany)
+            
+            await MainActor.run {
+                self.company = updatedCompany
+                isEditingCompany = false
+                isSavingCompany = false
+                self.logoImage = nil
+                self.selectedLogoItem = nil
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isSavingCompany = false
+            }
+        }
+    }
+    
+    private func deleteData(type: DeleteType) {
+        Task {
+            do {
+                switch type {
+                case .trucks:
+                    for truck in trucks {
+                        modelContext.delete(truck)
+                    }
+                case .stock:
+                    for item in stockItems {
+                        modelContext.delete(item)
+                    }
+                case .events:
+                    for event in events {
+                        modelContext.delete(event)
+                    }
+                case .all:
+                    for truck in trucks {
+                        modelContext.delete(truck)
+                    }
+                    for item in stockItems {
+                        modelContext.delete(item)
+                    }
+                    for event in events {
+                        modelContext.delete(event)
+                    }
+                }
+                
+                try modelContext.save()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+    
+    private func loadData() async {
+        isLoading = true
+        
+        do {
+            guard let companyId = currentUser?.companyId else {
                 isLoading = false
                 return
             }
             
             let loadedCompany = try await companyService.fetchCompany(companyId: companyId)
+            let loadedMembers = try await firebaseService.fetchCompanyMembers(companyId: companyId)
+            
+            var loadedCodes: [InvitationCode] = []
+            if permissionService.isAdmin() {
+                loadedCodes = try await invitationService.fetchInvitationCodes(companyId: companyId)
+            }
             
             await MainActor.run {
                 self.company = loadedCompany
-                self.isLoading = false
-            }
-        } catch {
-            await MainActor.run {
-                self.errorMessage = error.localizedDescription
-                self.isLoading = false
-            }
-        }
-    }
-}
-
-// MARK: - Team Members View
-
-struct TeamMembersView: View {
-    @State private var firebaseService = FirebaseService()
-    @State private var permissionService = PermissionService.shared
-    
-    @State private var members: [User] = []
-    @State private var isLoading = true
-    @State private var errorMessage: String?
-    
-    var body: some View {
-        List {
-            if isLoading {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                }
-            } else if !members.isEmpty {
-                Section {
-                    ForEach(members, id: \.userId) { member in
-                        TeamMemberRow(member: member)
-                    }
-                } header: {
-                    HStack {
-                        Text("Membres")
-                        Spacer()
-                        Text("\(members.count)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            } else if let error = errorMessage {
-                Section {
-                    Text(error)
-                        .foregroundColor(.red)
-                }
-            }
-        }
-        .navigationTitle("Équipe")
-        .navigationBarTitleDisplayMode(.inline)
-        .refreshable {
-            await loadMembers()
-        }
-        .onAppear {
-            Task {
-                await loadMembers()
-            }
-        }
-    }
-    
-    private func loadMembers() async {
-        isLoading = true
-        errorMessage = nil
-        
-        do {
-            guard let companyId = permissionService.currentUser?.companyId else {
-                errorMessage = "Aucune entreprise associée"
-                isLoading = false
-                return
-            }
-            
-            let loadedMembers = try await firebaseService.fetchCompanyMembers(companyId: companyId)
-            
-            await MainActor.run {
                 self.members = loadedMembers
+                self.invitationCodes = loadedCodes
                 self.isLoading = false
             }
         } catch {
@@ -364,81 +525,29 @@ struct TeamMembersView: View {
             }
         }
     }
-}
-
-// MARK: - Supporting Views
-
-struct SettingsCompanyInfoRow: View {
-    let title: String
-    let value: String
-    let icon: String
     
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(.blue)
-                .frame(width: 24)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Text(value)
-                    .font(.subheadline)
-            }
-            
-            Spacer()
+    private func logout() {
+        Task {
+            try? await authService.signOut()
+            permissionService.clearCurrentUser()
         }
-        .padding(.vertical, 4)
-    }
-}
-
-struct TeamMemberRow: View {
-    let member: User
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Avatar
-            Circle()
-                .fill(LinearGradient(
-                    colors: [.blue.opacity(0.6), .cyan.opacity(0.6)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ))
-                .frame(width: 40, height: 40)
-                .overlay(
-                    Text(initials)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                )
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(member.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                
-                Text(member.email)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            if let role = member.role {
-                RoleBadge(role: role)
-            }
-        }
-        .padding(.vertical, 4)
     }
     
     private var initials: String {
-        let components = member.displayName.split(separator: " ")
+        guard let name = currentUser?.displayName else { return "?" }
+        let components = name.split(separator: " ")
         if components.count >= 2 {
-            let first = components[0].prefix(1)
-            let last = components[1].prefix(1)
-            return "\(first)\(last)".uppercased()
+            return "\(components[0].prefix(1))\(components[1].prefix(1))".uppercased()
+        } else if let first = components.first {
+            return String(first.prefix(1)).uppercased()
+        }
+        return "?"
+    }
+    
+    private func memberInitials(_ name: String) -> String {
+        let components = name.split(separator: " ")
+        if components.count >= 2 {
+            return "\(components[0].prefix(1))\(components[1].prefix(1))".uppercased()
         } else if let first = components.first {
             return String(first.prefix(1)).uppercased()
         }
@@ -446,7 +555,265 @@ struct TeamMemberRow: View {
     }
 }
 
+// MARK: - Supporting Views
+
+struct SettingsInfoRow: View {
+    let label: String
+    let value: String
+    let icon: String
+    
+    var body: some View {
+        HStack {
+            Label(label, systemImage: icon)
+            Spacer()
+            Text(value)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+struct GenerateInvitationView: View {
+    let companyId: String
+    let onDismiss: () -> Void
+    
+    @Environment(\.dismiss) var dismiss
+    @State private var invitationService = InvitationService()
+    @State private var validityDays = 30
+    @State private var maxUses = 10
+    @State private var isGenerating = false
+    @State private var errorMessage: String?
+    @State private var generatedCode: InvitationCode?
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    Stepper("Validité: \(validityDays) jours", value: $validityDays, in: 1...365)
+                    Stepper("Utilisations max: \(maxUses)", value: $maxUses, in: 1...100)
+                } header: {
+                    Text("Paramètres")
+                }
+                
+                if let code = generatedCode {
+                    Section {
+                        HStack {
+                            Text(code.code)
+                                .font(.system(.title3, design: .monospaced))
+                                .fontWeight(.bold)
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                UIPasteboard.general.string = code.code
+                            }) {
+                                Label("Copier", systemImage: "doc.on.doc")
+                            }
+                        }
+                    } header: {
+                        Text("Code généré")
+                    }
+                }
+                
+                if let error = errorMessage {
+                    Section {
+                        Text(error)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("Nouveau code")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Fermer") {
+                        onDismiss()
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .primaryAction) {
+                    Button(isGenerating ? "Génération..." : "Générer") {
+                        Task {
+                            await generateCode()
+                        }
+                    }
+                    .disabled(isGenerating || generatedCode != nil)
+                }
+            }
+        }
+    }
+    
+    private func generateCode() async {
+        isGenerating = true
+        errorMessage = nil
+        
+        guard let userId = PermissionService.shared.currentUser?.userId else {
+            errorMessage = "Utilisateur non identifié"
+            isGenerating = false
+            return
+        }
+        
+        do {
+            let code = try await invitationService.generateInvitationCode(
+                companyId: companyId,
+                companyName: "",
+                role: .standardEmployee,
+                createdBy: userId,
+                validityDays: validityDays,
+                maxUses: maxUses
+            )
+            
+            await MainActor.run {
+                self.generatedCode = code
+                self.isGenerating = false
+            }
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+                self.isGenerating = false
+            }
+        }
+    }
+}
+
+struct MemberDetailView: View {
+    let member: User
+    let companyOwnerId: String
+    
+    @Environment(\.dismiss) var dismiss
+    @State private var firebaseService = FirebaseService()
+    @State private var selectedRole: User.UserRole
+    @State private var isSaving = false
+    @State private var showingDeleteConfirm = false
+    @State private var errorMessage: String?
+    
+    init(member: User, companyOwnerId: String) {
+        self.member = member
+        self.companyOwnerId = companyOwnerId
+        _selectedRole = State(initialValue: member.role ?? .limitedEmployee)
+    }
+    
+    var isOwner: Bool {
+        member.userId == companyOwnerId
+    }
+    
+    var body: some View {
+        Form {
+            Section {
+                HStack {
+                    Text("Nom")
+                    Spacer()
+                    Text(member.displayName)
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack {
+                    Text("Email")
+                    Spacer()
+                    Text(member.email)
+                        .foregroundColor(.secondary)
+                }
+                
+                if isOwner {
+                    Label("Propriétaire", systemImage: "crown.fill")
+                        .foregroundColor(.yellow)
+                }
+            } header: {
+                Text("Informations")
+            }
+            
+            if !isOwner {
+                Section {
+                    Picker("Rôle", selection: $selectedRole) {
+                        ForEach(User.UserRole.allCases, id: \.self) { role in
+                            Text(role.displayName).tag(role)
+                        }
+                    }
+                } header: {
+                    Text("Permissions")
+                }
+                
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteConfirm = true
+                    } label: {
+                        Label("Retirer de l'entreprise", systemImage: "person.badge.minus")
+                    }
+                }
+            }
+            
+            if let error = errorMessage {
+                Section {
+                    Text(error)
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .navigationTitle("Détails")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if !isOwner && selectedRole != member.role {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(isSaving ? "Enregistrement..." : "Enregistrer") {
+                        Task { await saveMember() }
+                    }
+                    .disabled(isSaving)
+                }
+            }
+        }
+        .alert("Retirer le membre", isPresented: $showingDeleteConfirm) {
+            Button("Annuler", role: .cancel) {}
+            Button("Retirer", role: .destructive) {
+                Task { await removeMember() }
+            }
+        } message: {
+            Text("Voulez-vous vraiment retirer \(member.displayName) de votre entreprise ?")
+        }
+    }
+    
+    private func saveMember() async {
+        isSaving = true
+        
+        do {
+            let updatedMember = User(
+                userId: member.userId,
+                email: member.email,
+                displayName: member.displayName,
+                photoURL: member.photoURL,
+                accountType: member.accountType,
+                companyId: member.companyId,
+                role: selectedRole
+            )
+            try await firebaseService.updateUser(updatedMember)
+            
+            await MainActor.run {
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                isSaving = false
+            }
+        }
+    }
+    
+    private func removeMember() async {
+        do {
+            try await firebaseService.removeUserFromCompany(userId: member.userId)
+            await MainActor.run {
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
+
 #Preview {
-    SettingsView()
-        .environmentObject(AuthService())
+    NavigationView {
+        SettingsView()
+            .environmentObject(AuthService())
+    }
 }

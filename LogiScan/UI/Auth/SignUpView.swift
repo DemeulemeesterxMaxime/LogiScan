@@ -514,8 +514,17 @@ struct SignUpView: View {
                 // 3. Upload du logo si présent
                 if let logoImage = selectedLogoImage {
                     let logoURL = try await companyService.uploadLogo(logoImage, companyId: company.companyId)
-                    var updatedCompany = company
-                    updatedCompany.logoURL = logoURL
+                    let updatedCompany = Company(
+                        companyId: company.companyId,
+                        name: company.name,
+                        logoURL: logoURL,
+                        address: company.address,
+                        phone: company.phone,
+                        email: company.email,
+                        siret: company.siret,
+                        createdAt: company.createdAt,
+                        ownerId: company.ownerId
+                    )
                     try await companyService.updateCompany(updatedCompany)
                 }
                 

@@ -10,7 +10,7 @@ import SwiftData
 
 class SampleData {
     static func createSampleData(modelContext: ModelContext) {
-        // Fonction désactivée - Aucune donnée de test n'est créée
-        print("ℹ️ Création des données de test désactivée")
+        // Fonction désactivée - Utiliser l'interface Firebase pour créer les données
+        print("ℹ️ [SampleData] Fonction désactivée - Créez les données via l'interface")
     }
 }

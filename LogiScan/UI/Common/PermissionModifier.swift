@@ -10,21 +10,15 @@ import SwiftUI
 /// Modifier pour afficher/cacher une vue selon les permissions
 struct RequiresPermission: ViewModifier {
     let permission: User.Permission
-    @State private var hasPermission = false
+    @State private var permissionService = PermissionService.shared
     
     func body(content: Content) -> some View {
         Group {
-            if hasPermission {
+            if permissionService.checkPermission(permission) {
                 content
             } else {
                 EmptyView()
             }
-        }
-        .onAppear {
-            hasPermission = PermissionService.shared.checkPermission(permission)
-        }
-        .onChange(of: PermissionService.shared.currentUser) { _, _ in
-            hasPermission = PermissionService.shared.checkPermission(permission)
         }
     }
 }
@@ -32,21 +26,15 @@ struct RequiresPermission: ViewModifier {
 /// Modifier pour afficher/cacher selon plusieurs permissions (toutes requises)
 struct RequiresAllPermissions: ViewModifier {
     let permissions: [User.Permission]
-    @State private var hasPermissions = false
+    @State private var permissionService = PermissionService.shared
     
     func body(content: Content) -> some View {
         Group {
-            if hasPermissions {
+            if permissionService.checkAllPermissions(permissions) {
                 content
             } else {
                 EmptyView()
             }
-        }
-        .onAppear {
-            hasPermissions = PermissionService.shared.checkAllPermissions(permissions)
-        }
-        .onChange(of: PermissionService.shared.currentUser) { _, _ in
-            hasPermissions = PermissionService.shared.checkAllPermissions(permissions)
         }
     }
 }
@@ -54,42 +42,30 @@ struct RequiresAllPermissions: ViewModifier {
 /// Modifier pour afficher/cacher selon plusieurs permissions (au moins une requise)
 struct RequiresAnyPermission: ViewModifier {
     let permissions: [User.Permission]
-    @State private var hasPermission = false
+    @State private var permissionService = PermissionService.shared
     
     func body(content: Content) -> some View {
         Group {
-            if hasPermission {
+            if permissionService.checkAnyPermission(permissions) {
                 content
             } else {
                 EmptyView()
             }
-        }
-        .onAppear {
-            hasPermission = PermissionService.shared.checkAnyPermission(permissions)
-        }
-        .onChange(of: PermissionService.shared.currentUser) { _, _ in
-            hasPermission = PermissionService.shared.checkAnyPermission(permissions)
         }
     }
 }
 
 /// Modifier pour n'afficher que pour les admins
 struct RequiresAdmin: ViewModifier {
-    @State private var isAdmin = false
+    @State private var permissionService = PermissionService.shared
     
     func body(content: Content) -> some View {
         Group {
-            if isAdmin {
+            if permissionService.isAdmin() {
                 content
             } else {
                 EmptyView()
             }
-        }
-        .onAppear {
-            isAdmin = PermissionService.shared.isAdmin()
-        }
-        .onChange(of: PermissionService.shared.currentUser) { _, _ in
-            isAdmin = PermissionService.shared.isAdmin()
         }
     }
 }

@@ -587,7 +587,7 @@ class FirebaseService: ObservableObject {
     func fetchQuoteItems(forEvent eventId: String) async throws -> [FirestoreQuoteItem] {
         let snapshot = try await quoteItemsRef(eventId: eventId).getDocuments()
         
-        return try snapshot.documents.compactMap { doc in
+        return snapshot.documents.compactMap { doc in
             let data = doc.data()
             
             return FirestoreQuoteItem(

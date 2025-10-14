@@ -526,7 +526,7 @@ struct AdminView: View {
         .onAppear {
             if let company = company {
                 editCompanyName = company.name
-                editCompanyEmail = company.email ?? ""
+                editCompanyEmail = company.email
                 editCompanyPhone = company.phone ?? ""
                 editCompanyAddress = company.address ?? ""
                 editCompanySiret = company.siret ?? ""

@@ -40,7 +40,7 @@ struct QuotePDFView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        if let url = pdfURL {
+                        if pdfURL != nil {
                             showShareSheet = true
                         }
                     }) {

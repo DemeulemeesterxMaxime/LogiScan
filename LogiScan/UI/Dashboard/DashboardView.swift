@@ -20,7 +20,6 @@ struct DashboardView: View {
     @State private var isRefreshing = false
     @State private var isLoadingTestData = false
     @State private var showTestDataSuccess = false
-    @State private var showingSettings = false
 
     private var assetsOK: Int {
         assets.filter { $0.status == .available }.count
@@ -42,17 +41,11 @@ struct DashboardView: View {
         NavigationView {
             ScrollView {
                 LazyVStack(spacing: 20) {
-                    // Titre en haut
+                    // Date du jour en haut
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Tableau de bord")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                            
-                            Text(Date().formatted(date: .long, time: .omitted))
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
+                        Text(Date().formatted(date: .long, time: .omitted))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                         
                         Spacer()
                         
@@ -84,17 +77,15 @@ struct DashboardView: View {
             .refreshable {
                 await syncManager.syncFromFirebase(modelContext: modelContext)
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Tableau de bord")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingSettings = true }) {
+                    NavigationLink(destination: SettingsView()) {
                         Image(systemName: "gearshape.fill")
                             .foregroundColor(.blue)
                     }
                 }
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
             }
             .overlay {
                 if syncManager.isSyncing {
@@ -139,6 +130,50 @@ struct DashboardView: View {
                 showTestDataSuccess = true
             }
         }
+    }
+    
+    // MARK: - Debug Function
+    
+    private func debugPermissions() {
+        print("\n" + String(repeating: "=", count: 60))
+        print("🔧 DEBUG PERMISSIONS - Dashboard")
+        print(String(repeating: "=", count: 60))
+        
+        let permService = PermissionService.shared
+        
+        if let user = permService.currentUser {
+            print("✅ Utilisateur connecté:")
+            print("   📧 Email: \(user.email)")
+            print("   👤 Nom: \(user.displayName)")
+            print("   🏢 Type compte: \(user.accountType.displayName)")
+            
+            if let role = user.role {
+                print("   👔 Rôle: \(role.displayName)")
+                print("\n📋 Permissions du rôle \(role.displayName):")
+                for permission in role.permissions {
+                    let hasIt = permService.checkPermission(permission)
+                    print("   \(hasIt ? "✅" : "❌") \(permission.displayName)")
+                }
+            } else {
+                print("   ⚠️ Aucun rôle défini!")
+            }
+            
+            print("\n🎯 Permissions critiques:")
+            print("   writeEvents: \(permService.checkPermission(.writeEvents) ? "✅ OUI" : "❌ NON")")
+            print("   manageTrucks: \(permService.checkPermission(.manageTrucks) ? "✅ OUI" : "❌ NON")")
+            print("   manageMembers: \(permService.checkPermission(.manageMembers) ? "✅ OUI" : "❌ NON")")
+            print("   editCompany: \(permService.checkPermission(.editCompany) ? "✅ OUI" : "❌ NON")")
+            
+        } else {
+            print("❌ AUCUN UTILISATEUR CONNECTÉ")
+            print("⚠️ PermissionService.shared.currentUser est nil")
+            print("\n💡 Solutions:")
+            print("   1. Se connecter via LoginView")
+            print("   2. Vérifier que LoginView.swift appelle:")
+            print("      PermissionService.shared.setCurrentUser(user)")
+        }
+        
+        print(String(repeating: "=", count: 60) + "\n")
     }
 
     private func refreshData() async {
@@ -258,6 +293,16 @@ struct DashboardView: View {
                     color: .gray,
                     action: {
                         loadTestData()
+                    }
+                )
+                
+                // 🔧 Bouton de debug temporaire pour tester les permissions
+                QuickActionButton(
+                    icon: "person.badge.key.fill",
+                    title: "Debug Permissions",
+                    color: .orange,
+                    action: {
+                        debugPermissions()
                     }
                 )
 

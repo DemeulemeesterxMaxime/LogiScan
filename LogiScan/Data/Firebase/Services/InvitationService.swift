@@ -92,15 +92,17 @@ final class InvitationService {
     func fetchInvitationCodes(companyId: String) async throws -> [InvitationCode] {
         let snapshot = try await db.collection("invitationCodes")
             .whereField("companyId", isEqualTo: companyId)
-            .order(by: "createdAt", descending: true)
             .getDocuments()
         
-        let codes = snapshot.documents.compactMap { document -> InvitationCode? in
+        var codes = snapshot.documents.compactMap { document -> InvitationCode? in
             guard let firestoreCode = try? document.data(as: FirestoreInvitationCode.self) else {
                 return nil
             }
             return firestoreCode.toSwiftData()
         }
+        
+        // Trier en mémoire au lieu de dans Firestore
+        codes.sort { $0.createdAt > $1.createdAt }
         
         print("✅ [InvitationService] \(codes.count) codes récupérés")
         return codes
