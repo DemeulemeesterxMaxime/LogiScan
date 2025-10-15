@@ -54,6 +54,8 @@ struct AdminView: View {
     // Génération code
     @State private var newCodeValidityDays = 30
     @State private var newCodeMaxUses = 10
+    @State private var newCodeRole: User.UserRole = .standardEmployee
+
     
     var body: some View {
         NavigationStack {
@@ -402,9 +404,44 @@ struct AdminView: View {
         NavigationStack {
             Form {
                 Section("Paramètres du code") {
+                    // Sélection du rôle
+                    Picker("Rôle attribué", selection: $newCodeRole) {
+                        Label("👤 Employé", systemImage: "person")
+                            .tag(User.UserRole.standardEmployee)
+                        Label("👥 Employé limité", systemImage: "person.crop.circle")
+                            .tag(User.UserRole.limitedEmployee)
+                        Label("👔 Manager", systemImage: "person.2")
+                            .tag(User.UserRole.manager)
+                        Label("⚙️ Admin", systemImage: "star")
+                            .tag(User.UserRole.admin)
+                    }
+                    .pickerStyle(.menu)
+                    
                     Stepper("Validité: \(newCodeValidityDays) jours", value: $newCodeValidityDays, in: 1...365)
                     
                     Stepper("Utilisations max: \(newCodeMaxUses)", value: $newCodeMaxUses, in: 1...100)
+                }
+                
+                Section("Permissions du rôle") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Ce code donnera le rôle: **\(roleDisplayName(newCodeRole))**")
+                            .font(.subheadline)
+                        
+                        Text("Permissions incluses:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
+                        
+                        ForEach(rolePermissions(newCodeRole), id: \.self) { permission in
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .font(.caption)
+                                Text(permissionDisplayName(permission))
+                                    .font(.caption)
+                            }
+                        }
+                    }
                 }
                 
                 Section {
@@ -630,7 +667,7 @@ struct AdminView: View {
                 let code = try await invitationService.generateInvitationCode(
                     companyId: companyId,
                     companyName: company?.name ?? "COMPANY",
-                    role: .standardEmployee,  // Par défaut
+                    role: newCodeRole,  // Utilise le rôle sélectionné
                     createdBy: createdBy,
                     validityDays: newCodeValidityDays,
                     maxUses: newCodeMaxUses
@@ -957,6 +994,62 @@ enum AdminError: Error, LocalizedError {
         case .notAuthorized:
             return "Vous n'avez pas les permissions nécessaires"
         }
+    }
+}
+
+// MARK: - Helper Functions Extension
+
+extension AdminView {
+    private func roleDisplayName(_ role: User.UserRole) -> String {
+        switch role {
+        case .admin:
+            return "Administrateur"
+        case .manager:
+            return "Manager"
+        case .standardEmployee:
+            return "Employé Standard"
+        case .limitedEmployee:
+            return "Employé Limité"
+        }
+    }
+    
+    private func rolePermissions(_ role: User.UserRole) -> [String] {
+        switch role {
+        case .admin:
+            return [
+                "Gestion complète de l'entreprise",
+                "Gestion des membres et permissions",
+                "Création et gestion des codes d'invitation",
+                "Gestion des événements et devis",
+                "Gestion du stock et des camions",
+                "Accès au scanner et inventaire",
+                "Accès aux rapports et statistiques"
+            ]
+        case .manager:
+            return [
+                "Gestion des événements et devis",
+                "Gestion du stock et des camions",
+                "Accès au scanner et inventaire",
+                "Accès aux rapports",
+                "Validation des mouvements"
+            ]
+        case .standardEmployee:
+            return [
+                "Accès au scanner",
+                "Consultation du stock",
+                "Consultation des événements",
+                "Mouvements de base"
+            ]
+        case .limitedEmployee:
+            return [
+                "Accès au scanner",
+                "Consultation du stock (limitée)"
+            ]
+        }
+    }
+    
+    private func permissionDisplayName(_ permission: String) -> String {
+        return permission
     }
 }
 
