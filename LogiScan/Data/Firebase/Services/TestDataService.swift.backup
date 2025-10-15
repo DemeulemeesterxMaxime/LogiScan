@@ -1,0 +1,280 @@
+//
+//  TestDataService.swift
+//  LogiScan
+//
+//  Created by Demeulemeester on 13/10/2025.
+//
+
+import Foundation
+import FirebaseFirestore
+
+/// Service pour créer des données de test dans Firebase
+@MainActor
+final class TestDataService {
+    private let db = Firestore.firestore()
+    private let firebaseService = FirebaseService()
+    
+    /// Créer un jeu complet de données de test
+    /// - 2 événements
+    /// - 2 camions
+    /// - 5 articles de stock
+    /// - 20 assets individuels
+    func createTestData() async throws {
+        print("🧪 [TestData] Début de la création des données de test...")
+        
+        // 1. Créer 2 camions
+        let trucks = try await createTestTrucks()
+        print("✅ [TestData] 2 camions créés")
+        
+        // 2. Créer 2 événements
+        let events = try await createTestEvents()
+        print("✅ [TestData] 2 événements créés")
+        
+        // 3. Créer 5 articles de stock avec 4 assets chacun (20 total)
+        try await createTestStockAndAssets()
+        print("✅ [TestData] 5 articles et 20 assets créés")
+        
+        print("🎉 [TestData] Données de test créées avec succès!")
+    }
+    
+    // MARK: - Trucks
+    
+    private func createTestTrucks() async throws -> [Truck] {
+        let trucks = [
+            Truck(
+                name: "Camion A - Mercedes Sprinter",
+                status: .available,
+                currentLocationId: "DEPOT"
+            ),
+            Truck(
+                name: "Camion B - Iveco Daily",
+                status: .inTransit,
+                currentLocationId: "EN_ROUTE"
+            )
+        ]
+        
+        for truck in trucks {
+            try await firebaseService.createTruck(truck.toFirestoreTruck())
+        }
+        
+        return trucks
+    }
+    
+    // MARK: - Events
+    
+    private func createTestEvents() async throws -> [Event] {
+        let calendar = Calendar.current
+        let today = Date()
+        
+        let events = [
+            Event(
+                eventId: UUID().uuidString,
+                name: "Mariage Sophie & Marc",
+                clientName: "Sophie Dubois",
+                clientPhone: "+33612345678",
+                clientEmail: "sophie.dubois@email.com",
+                clientAddress: "75 Avenue des Champs-Élysées, 75008 Paris",
+                eventAddress: "Château de Versailles, 78000 Versailles",
+                setupStartTime: calendar.date(byAdding: .day, value: 7, to: today)!,
+                startDate: calendar.date(byAdding: .day, value: 7, to: today)!,
+                endDate: calendar.date(byAdding: .day, value: 8, to: today)!,
+                status: .confirmed,
+                notes: "Mariage élégant avec 150 invités. Décor blanc et or."
+            ),
+            Event(
+                eventId: UUID().uuidString,
+                name: "Conférence Tech Summit 2025",
+                clientName: "Tech Events SAS",
+                clientPhone: "+33687654321",
+                clientEmail: "contact@techsummit.fr",
+                clientAddress: "10 Rue de la Paix, 75002 Paris",
+                eventAddress: "Palais des Congrès, 75017 Paris",
+                setupStartTime: calendar.date(byAdding: .day, value: 14, to: today)!,
+                startDate: calendar.date(byAdding: .day, value: 14, to: today)!,
+                endDate: calendar.date(byAdding: .day, value: 16, to: today)!,
+                status: .pending,
+                notes: "Conférence sur 3 jours avec 500 participants."
+            )
+        ]
+        
+        for event in events {
+            try await firebaseService.createEvent(event.toFirestoreEvent())
+            
+            // Ajouter des items de devis pour chaque événement
+            if event.name.contains("Mariage") {
+                try await createWeddingQuoteItems(eventId: event.eventId)
+            } else {
+                try await createConferenceQuoteItems(eventId: event.eventId)
+            }
+        }
+        
+        return events
+    }
+    
+    private func createWeddingQuoteItems(eventId: String) async throws {
+        let items = [
+            QuoteItem(
+                quoteItemId: UUID().uuidString,
+                eventId: eventId,
+                sku: "CHR001",
+                name: "Chaise Napoleon III Dorée",
+                category: "Mobilier",
+                quantity: 150,
+                unitPrice: 3.50
+            ),
+            QuoteItem(
+                quoteItemId: UUID().uuidString,
+                eventId: eventId,
+                sku: "TBL001",
+                name: "Table Ronde 180cm",
+                category: "Mobilier",
+                quantity: 15,
+                unitPrice: 25.00
+            ),
+            QuoteItem(
+                quoteItemId: UUID().uuidString,
+                eventId: eventId,
+                sku: "NAP001",
+                name: "Nappe Blanche Rectangulaire",
+                category: "Linge",
+                quantity: 15,
+                unitPrice: 8.00
+            )
+        ]
+        
+        for item in items {
+            try await firebaseService.createQuoteItem(item.toFirestoreQuoteItem())
+        }
+    }
+    
+    private func createConferenceQuoteItems(eventId: String) async throws {
+        let items = [
+            QuoteItem(
+                quoteItemId: UUID().uuidString,
+                eventId: eventId,
+                sku: "CHR002",
+                name: "Chaise Conférence Noire",
+                category: "Mobilier",
+                quantity: 500,
+                unitPrice: 2.50
+            ),
+            QuoteItem(
+                quoteItemId: UUID().uuidString,
+                eventId: eventId,
+                sku: "POD001",
+                name: "Pupitre Conférencier",
+                category: "Équipement",
+                quantity: 3,
+                unitPrice: 45.00
+            ),
+            QuoteItem(
+                quoteItemId: UUID().uuidString,
+                eventId: eventId,
+                sku: "SCR001",
+                name: "Écran Projection 3x2m",
+                category: "Équipement",
+                quantity: 2,
+                unitPrice: 120.00
+            )
+        ]
+        
+        for item in items {
+            try await firebaseService.createQuoteItem(item.toFirestoreQuoteItem())
+        }
+    }
+    
+    // MARK: - Stock & Assets
+    
+    private func createTestStockAndAssets() async throws {
+        let stockItems = [
+            StockItem(
+                sku: "CHR001",
+                name: "Chaise Napoleon III Dorée",
+                category: "Mobilier",
+                description: "Chaise élégante style Napoleon III avec finition dorée",
+                purchasePrice: 45.00,
+                dailyRentalPrice: 3.50,
+                availableQuantity: 200,
+                reservedQuantity: 150,
+                maintenanceQuantity: 10,
+                totalQuantity: 360,
+                tags: ["Mariage", "Luxe", "Classique"]
+            ),
+            StockItem(
+                sku: "TBL001",
+                name: "Table Ronde 180cm",
+                category: "Mobilier",
+                description: "Table ronde diamètre 180cm, capacité 10 personnes",
+                purchasePrice: 250.00,
+                dailyRentalPrice: 25.00,
+                availableQuantity: 30,
+                reservedQuantity: 15,
+                maintenanceQuantity: 2,
+                totalQuantity: 47,
+                tags: ["Mariage", "Réception", "Grande capacité"]
+            ),
+            StockItem(
+                sku: "CHR002",
+                name: "Chaise Conférence Noire",
+                category: "Mobilier",
+                description: "Chaise conférence empilable, structure métal noire",
+                purchasePrice: 35.00,
+                dailyRentalPrice: 2.50,
+                availableQuantity: 800,
+                reservedQuantity: 500,
+                maintenanceQuantity: 20,
+                totalQuantity: 1320,
+                tags: ["Conférence", "Entreprise", "Empilable"]
+            ),
+            StockItem(
+                sku: "NAP001",
+                name: "Nappe Blanche Rectangulaire",
+                category: "Linge",
+                description: "Nappe blanche 220x150cm, 100% polyester",
+                purchasePrice: 15.00,
+                dailyRentalPrice: 8.00,
+                availableQuantity: 100,
+                reservedQuantity: 15,
+                maintenanceQuantity: 5,
+                totalQuantity: 120,
+                tags: ["Linge", "Blanc", "Classique"]
+            ),
+            StockItem(
+                sku: "POD001",
+                name: "Pupitre Conférencier",
+                category: "Équipement",
+                description: "Pupitre en bois avec microphone intégré",
+                purchasePrice: 450.00,
+                dailyRentalPrice: 45.00,
+                availableQuantity: 5,
+                reservedQuantity: 3,
+                maintenanceQuantity: 0,
+                totalQuantity: 8,
+                tags: ["Conférence", "Audio", "Bois"]
+            )
+        ]
+        
+        for stockItem in stockItems {
+            // Créer le stock item
+            try await firebaseService.createStockItem(stockItem.toFirestoreStockItem())
+            
+            // Créer 4 assets pour chaque article (20 total)
+            for i in 1...4 {
+                let asset = Asset(
+                    assetId: UUID().uuidString,
+                    sku: stockItem.sku,
+                    name: stockItem.name,
+                    serialNumber: "\(stockItem.sku)-\(String(format: "%03d", i))",
+                    status: i <= 2 ? .available : (i == 3 ? .reserved : .inUse),
+                    currentLocationId: i <= 2 ? "DEPOT" : "TRUCK_A",
+                    condition: .good,
+                    lastMaintenanceDate: Date().addingTimeInterval(-30 * 24 * 3600),
+                    purchasePrice: stockItem.purchasePrice,
+                    dailyRentalPrice: stockItem.dailyRentalPrice
+                )
+                
+                try await firebaseService.createAsset(asset.toFirestoreAsset())
+            }
+        }
+    }
+}

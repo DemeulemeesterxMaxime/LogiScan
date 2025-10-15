@@ -203,40 +203,42 @@ struct ScanListItemRow: View {
 // MARK: - Preview
 
 #Preview {
-    let viewModel = ScannerViewModel(
-        assetRepository: PreviewAssetRepository(),
-        movementRepository: PreviewMovementRepository()
-    )
-    
-    // Simuler une session avec des items
-    viewModel.scanList = [
-        ScanListItem(
-            asset: Asset(
-                assetId: "A001",
-                sku: "LED-SPOT-50W",
-                name: "Projecteur LED 50W",
-                category: "Éclairage",
-                weight: 2.5,
-                volume: 0.01,
-                value: 150.0,
-                qrPayload: ""
-            ),
-            isScanned: true
-        ),
-        ScanListItem(
-            asset: Asset(
-                assetId: "A002",
-                sku: "LED-PAR-64",
-                name: "Projecteur PAR 64",
-                category: "Éclairage",
-                weight: 3.0,
-                volume: 0.015,
-                value: 200.0,
-                qrPayload: ""
-            ),
-            isScanned: false
+    ScanListView(viewModel: {
+        let viewModel = ScannerViewModel(
+            assetRepository: PreviewAssetRepository(),
+            movementRepository: PreviewMovementRepository()
         )
-    ]
-    
-    return ScanListView(viewModel: viewModel)
+        
+        // Simuler une session avec des items
+        viewModel.scanList = [
+            ScanListItem(
+                asset: Asset(
+                    assetId: "A001",
+                    sku: "LED-SPOT-50W",
+                    name: "Projecteur LED 50W",
+                    category: "Éclairage",
+                    weight: 2.5,
+                    volume: 0.01,
+                    value: 150.0,
+                    qrPayload: ""
+                ),
+                isScanned: true
+            ),
+            ScanListItem(
+                asset: Asset(
+                    assetId: "A002",
+                    sku: "LED-PAR-64",
+                    name: "Projecteur PAR 64",
+                    category: "Éclairage",
+                    weight: 3.0,
+                    volume: 0.015,
+                    value: 200.0,
+                    qrPayload: ""
+                ),
+                isScanned: false
+            )
+        ]
+        
+        return viewModel
+    }())
 }

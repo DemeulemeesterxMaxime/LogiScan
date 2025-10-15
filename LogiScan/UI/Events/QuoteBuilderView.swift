@@ -19,9 +19,16 @@ struct QuoteBuilderView: View {
     @Query private var stockItems: [StockItem]
     @Query private var trucks: [Truck]
     @Query private var allQuoteItems: [QuoteItem]
+    @Query private var allAssets: [Asset]
+    @Query private var allReservations: [AssetReservation]
+    @Query private var allScanLists: [ScanList]
     
     @StateObject private var firebaseService = FirebaseService()
     @StateObject private var syncManager = SyncManager()
+    @StateObject private var eventService = EventService()
+    @StateObject private var availabilityService = AvailabilityService()
+    @StateObject private var reservationService = ReservationService()
+    @StateObject private var scanListService = ScanListService()
 
     let event: Event
 
@@ -40,7 +47,13 @@ struct QuoteBuilderView: View {
     @State private var showingCategoryFilter = false  // Pour le sheet de filtres
     @State private var showingCartDetail = false  // Pour naviguer vers CartDetailView
     @State private var quantities: [String: Int] = [:]  // SKU -> Quantity in cart
+    @State private var availabilityWarnings: [String: String] = [:]  // SKU -> Warning message
+    @State private var availabilityResults: [String: AvailabilityResult] = [:]  // SKU -> Result
+    @State private var hasLoadedInitialData = false  // Flag pour charger une seule fois
     @State private var autoSaveTask: Task<Void, Never>?  // Pour le debounce de la sauvegarde auto
+    @State private var isSaving = false  // Indicateur de sauvegarde en cours
+    @State private var generatedScanList: ScanList? = nil  // Liste de scan générée
+    @State private var showingScanList = false  // Afficher la liste de scan
 
     private var assignedTruck: Truck? {
         guard let truckId = event.assignedTruckId else { return nil }
@@ -133,6 +146,7 @@ struct QuoteBuilderView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button("Annuler") {
+                    print("🔴 BOUTON ANNULER CLIQUÉ - dismiss() appelé")
                     dismiss()
                 }
             }
@@ -143,13 +157,24 @@ struct QuoteBuilderView: View {
                         alertMessage = "Le panier est vide. Ajoutez des articles avant d'enregistrer."
                         showAlert = true
                     } else {
-                        saveQuote()
+                        // Bouton "Enregistrer" : sauvegarde sans fermer la vue
+                        Task {
+                            isSaving = true
+                            await saveQuote(finalize: false)  // NE PAS finaliser ni fermer
+                            isSaving = false
+                        }
                     }
                 }) {
-                    Text("Enregistrer")
-                        .fontWeight(.semibold)
+                    if isSaving {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(0.8)
+                    } else {
+                        Text("Enregistrer")
+                            .fontWeight(.semibold)
+                    }
                 }
-                .disabled(quoteItems.isEmpty)
+                .disabled(quoteItems.isEmpty || isSaving)
             }
         }
         .sheet(isPresented: $showingScanner) {
@@ -167,13 +192,33 @@ struct QuoteBuilderView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showingScanList) {
+            if let scanList = generatedScanList {
+                NavigationStack {
+                    EventScanListView(scanList: scanList)
+                }
+            }
+        }
         .alert("Information", isPresented: $showAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(alertMessage)
         }
         .onAppear {
-            loadExistingQuoteItems()
+            // Charger UNE SEULE FOIS au premier affichage
+            if !hasLoadedInitialData {
+                hasLoadedInitialData = true
+                
+                // Charger immédiatement les données locales
+                loadExistingQuoteItems()
+                
+                // Synchroniser en arrière-plan APRÈS le chargement initial (non bloquant)
+                Task {
+                    await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
+                }
+            }
+        }
+        .onDisappear {
         }
     }
 
@@ -264,14 +309,25 @@ struct QuoteBuilderView: View {
                     StockItemCard(
                         item: item,
                         quantityInCart: quantities[item.sku] ?? 0,
+                        availabilityResult: availabilityResults[item.sku],
+                        warning: availabilityWarnings[item.sku],
                         onAdd: {
-                            addItemToCart(item)
+                            // Utiliser DispatchQueue pour éviter les modifications d'état pendant le render
+                            DispatchQueue.main.async {
+                                addItemToCart(item)
+                            }
                         },
                         onRemove: {
-                            removeItemFromCart(item)
+                            // Utiliser DispatchQueue pour éviter les modifications d'état pendant le render
+                            DispatchQueue.main.async {
+                                removeItemFromCart(item)
+                            }
                         },
                         onQuantityChange: { newQuantity in
-                            updateCartQuantity(item: item, quantity: newQuantity)
+                            // Utiliser DispatchQueue pour éviter les modifications d'état pendant le render
+                            DispatchQueue.main.async {
+                                updateCartQuantity(item: item, quantity: newQuantity)
+                            }
                         }
                     )
                 }
@@ -542,18 +598,29 @@ struct QuoteBuilderView: View {
         VStack(spacing: 12) {
             // Bouton principal : Terminer le devis
             Button(action: {
-                saveQuote(finalize: true)
+                Task {
+                    isSaving = true
+                    await saveQuote(finalize: true)
+                    isSaving = false
+                }
             }) {
                 HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("Terminer le devis")
+                    if isSaving {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.9)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                    }
+                    Text(isSaving ? "Sauvegarde..." : "Terminer le devis")
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue)
+                .background(isSaving ? Color.gray : Color.blue)
                 .foregroundColor(.white)
                 .cornerRadius(12)
             }
+            .disabled(isSaving)
             
             // Bouton secondaire : Continuer les achats
             Button(action: {
@@ -575,7 +642,9 @@ struct QuoteBuilderView: View {
             // Bouton danger : Vider le panier
             Button(action: {
                 clearCart()
-                showingCartSummary = false
+                // Ne PAS fermer la sheet automatiquement
+                // L'utilisateur peut fermer manuellement ou continuer à ajouter
+                print("🗑️ Panier vidé - Sheet reste ouverte")
             }) {
                 Text("Vider le panier")
                     .foregroundColor(.red)
@@ -820,14 +889,74 @@ struct QuoteBuilderView: View {
     // MARK: - Cart Actions
     
     private func addItemToCart(_ stockItem: StockItem) {
-        // Vérifier si l'item existe déjà dans le panier local
+        print("🔵 DÉBUT addItemToCart - Article: \(stockItem.name)")
+        print("🔵 QuoteItems avant: \(quoteItems.count)")
+        
+        // ÉTAPE 1: Vérifier la disponibilité AVANT d'ajouter
+        let requestedQuantity = quantities[stockItem.sku, default: 0] + 1
+        let availabilityResult = availabilityService.checkAvailability(
+            for: stockItem,
+            event: event,
+            requestedQuantity: requestedQuantity,
+            allAssets: allAssets,
+            allReservations: allReservations
+        )
+        
+        // Stocker le résultat pour l'UI
+        availabilityResults[stockItem.sku] = availabilityResult
+        
+        // Si stock insuffisant, afficher l'alerte et arrêter
+        if !availabilityResult.canFulfill {
+            availabilityWarnings[stockItem.sku] = availabilityResult.warning
+            alertMessage = availabilityResult.warning ?? "Stock insuffisant"
+            showAlert = true
+            print("❌ Stock insuffisant pour \(stockItem.name)")
+            return
+        }
+        
+        // Effacer les warnings précédents
+        availabilityWarnings.removeValue(forKey: stockItem.sku)
+        
+        // ÉTAPE 2: Vérifier si l'item existe déjà dans le panier local
         if let existingIndex = quoteItems.firstIndex(where: { $0.sku == stockItem.sku }) {
-            // Item existe, augmenter la quantité
-            quoteItems[existingIndex].updateQuantity(quoteItems[existingIndex].quantity + 1)
+            print("🔵 Article existant trouvé à l'index \(existingIndex)")
+            let existingItem = quoteItems[existingIndex]
+            
+            // Augmenter la quantité DANS L'ÉTAT LOCAL SEULEMENT
+            existingItem.updateQuantity(existingItem.quantity + 1)
             quantities[stockItem.sku, default: 0] += 1
-            print("🔍 Quantité augmentée pour \(stockItem.name): \(quoteItems[existingIndex].quantity)")
+            print("🔍 Quantité augmentée pour \(stockItem.name): \(existingItem.quantity)")
+            print("✅ Article ajouté au panier LOCAL (pas encore sauvegardé)")
+            
+            // ÉTAPE 3: Réserver un asset additionnel en arrière-plan
+            Task {
+                do {
+                    let newAssignedIds = try await reservationService.adjustReservations(
+                        for: existingItem,
+                        stockItem: stockItem,
+                        newQuantity: existingItem.quantity,
+                        event: event,
+                        allAssets: allAssets,
+                        allReservations: allReservations,
+                        modelContext: modelContext
+                    )
+                    
+                    await MainActor.run {
+                        existingItem.assignedAssets = newAssignedIds
+                        print("✅ Réservation ajustée: \(newAssignedIds.count) assets")
+                    }
+                } catch {
+                    print("❌ Erreur ajustement réservation: \(error)")
+                    await MainActor.run {
+                        alertMessage = "Erreur lors de la réservation: \(error.localizedDescription)"
+                        showAlert = true
+                    }
+                }
+            }
+            
         } else {
-            // Nouvel item, créer et ajouter au State local
+            print("🔵 Nouvel article - Création du QuoteItem")
+            // Nouvel item, créer et ajouter au State local UNIQUEMENT
             let quoteItem = QuoteItem(
                 quoteItemId: UUID().uuidString,
                 eventId: event.eventId,
@@ -840,59 +969,169 @@ struct QuoteBuilderView: View {
             quoteItems.append(quoteItem)
             quantities[stockItem.sku] = 1
             print("🔍 Nouvel item ajouté: \(stockItem.name)")
-        }
-        
-        // Sauvegarde automatique avec debounce
-        scheduleAutoSave()
-    }
-    
-    private func removeItemFromCart(_ stockItem: StockItem) {
-        if let existingIndex = quoteItems.firstIndex(where: { $0.sku == stockItem.sku }) {
-            let currentQuantity = quoteItems[existingIndex].quantity
-            if currentQuantity > 1 {
-                quoteItems[existingIndex].updateQuantity(currentQuantity - 1)
-                quantities[stockItem.sku, default: 1] -= 1
-                print("🔍 Quantité diminuée pour \(stockItem.name): \(currentQuantity - 1)")
-            } else {
-                quoteItems.remove(at: existingIndex)
-                quantities.removeValue(forKey: stockItem.sku)
-                print("🔍 Item supprimé: \(stockItem.name)")
+            print("✅ Article ajouté au panier LOCAL (pas encore sauvegardé)")
+            
+            // ÉTAPE 3: Réserver automatiquement les assets en arrière-plan
+            Task {
+                do {
+                    let assignedIds = try await reservationService.reserveAssets(
+                        for: quoteItem,
+                        stockItem: stockItem,
+                        event: event,
+                        allAssets: allAssets,
+                        existingReservations: allReservations,
+                        modelContext: modelContext
+                    )
+                    
+                    await MainActor.run {
+                        quoteItem.assignedAssets = assignedIds
+                        print("✅ \(assignedIds.count) assets réservés pour \(stockItem.name)")
+                    }
+                } catch {
+                    print("❌ Erreur réservation: \(error)")
+                    await MainActor.run {
+                        alertMessage = "Erreur lors de la réservation: \(error.localizedDescription)"
+                        showAlert = true
+                        // Retirer l'item du panier car pas d'assets réservés
+                        if let index = quoteItems.firstIndex(where: { $0.sku == stockItem.sku }) {
+                            quoteItems.remove(at: index)
+                            quantities.removeValue(forKey: stockItem.sku)
+                        }
+                    }
+                }
             }
         }
         
-        // Sauvegarde automatique avec debounce
-        scheduleAutoSave()
+        print("🔵 QuoteItems après: \(quoteItems.count)")
+        print("🔵 FIN addItemToCart")
+        print("⚠️ RAPPEL: Les modifications ne seront sauvegardées qu'au clic sur 'Enregistrer'")
+    }
+    
+    private func removeItemFromCart(_ stockItem: StockItem) {
+        print("🔵 DÉBUT removeItemFromCart - Article: \(stockItem.name)")
+        
+        if let existingIndex = quoteItems.firstIndex(where: { $0.sku == stockItem.sku }) {
+            let item = quoteItems[existingIndex]
+            let currentQuantity = item.quantity
+            
+            if currentQuantity > 1 {
+                // Diminuer la quantité DANS L'ÉTAT LOCAL SEULEMENT
+                item.updateQuantity(currentQuantity - 1)
+                quantities[stockItem.sku, default: 1] -= 1
+                print("🔍 Quantité diminuée pour \(stockItem.name): \(currentQuantity - 1)")
+                print("✅ Quantité mise à jour dans le panier LOCAL (pas encore sauvegardée)")
+                
+                // Libérer un asset en arrière-plan
+                Task {
+                    do {
+                        let newAssignedIds = try await reservationService.adjustReservations(
+                            for: item,
+                            stockItem: stockItem,
+                            newQuantity: currentQuantity - 1,
+                            event: event,
+                            allAssets: allAssets,
+                            allReservations: allReservations,
+                            modelContext: modelContext
+                        )
+                        
+                        await MainActor.run {
+                            item.assignedAssets = newAssignedIds
+                            print("🔓 Réservation ajustée: \(newAssignedIds.count) assets")
+                        }
+                    } catch {
+                        print("❌ Erreur libération réservation: \(error)")
+                    }
+                }
+                
+            } else {
+                // Supprimer complètement l'item DU STATE LOCAL SEULEMENT
+                quoteItems.remove(at: existingIndex)
+                quantities.removeValue(forKey: stockItem.sku)
+                availabilityWarnings.removeValue(forKey: stockItem.sku)
+                availabilityResults.removeValue(forKey: stockItem.sku)
+                print("🔍 Item supprimé du panier LOCAL: \(stockItem.name)")
+                print("✅ Suppression effective dans le panier LOCAL (pas encore sauvegardée)")
+                
+                // Libérer toutes les réservations en arrière-plan
+                Task {
+                    do {
+                        try await reservationService.releaseReservations(
+                            for: item,
+                            event: event,
+                            allReservations: allReservations,
+                            modelContext: modelContext
+                        )
+                        print("🔓 Toutes les réservations libérées pour \(stockItem.name)")
+                    } catch {
+                        print("❌ Erreur libération réservations: \(error)")
+                    }
+                }
+            }
+        }
+        
+        print("🔵 FIN removeItemFromCart")
+        print("⚠️ RAPPEL: Les modifications ne seront sauvegardées qu'au clic sur 'Enregistrer'")
     }
     
     private func removeAllFromCart(_ stockItem: StockItem) {
+        print("🔵 DÉBUT removeAllFromCart - Article: \(stockItem.name)")
+        
+        // Trouver l'item avant de le supprimer
+        if let item = quoteItems.first(where: { $0.sku == stockItem.sku }) {
+            // Libérer toutes les réservations en arrière-plan
+            Task {
+                do {
+                    try await reservationService.releaseReservations(
+                        for: item,
+                        event: event,
+                        allReservations: allReservations,
+                        modelContext: modelContext
+                    )
+                    print("🔓 Toutes les réservations libérées pour \(stockItem.name)")
+                } catch {
+                    print("❌ Erreur libération réservations: \(error)")
+                }
+            }
+        }
+        
+        // Supprimer du STATE LOCAL SEULEMENT
         quoteItems.removeAll { $0.sku == stockItem.sku }
         quantities.removeValue(forKey: stockItem.sku)
-        print("🔍 Item complètement supprimé: \(stockItem.name)")
-        
-        // Sauvegarde automatique avec debounce
-        scheduleAutoSave()
+        availabilityWarnings.removeValue(forKey: stockItem.sku)
+        availabilityResults.removeValue(forKey: stockItem.sku)
+        print("🔍 Item complètement supprimé du panier LOCAL: \(stockItem.name)")
+        print("✅ Suppression effective dans le panier LOCAL (pas encore sauvegardée)")
+        print("🔵 FIN removeAllFromCart")
+        print("⚠️ RAPPEL: Les modifications ne seront sauvegardées qu'au clic sur 'Enregistrer'")
     }
     
     private func updateCartQuantity(item: StockItem, quantity: Int) {
+        print("🔵 DÉBUT updateCartQuantity - Article: \(item.name), Quantité: \(quantity)")
+        
         if quantity <= 0 {
             removeAllFromCart(item)
         } else if let existingIndex = quoteItems.firstIndex(where: { $0.sku == item.sku }) {
+            // Mettre à jour la quantité DANS L'ÉTAT LOCAL SEULEMENT
             quoteItems[existingIndex].updateQuantity(quantity)
             quantities[item.sku] = quantity
             print("🔍 Quantité mise à jour pour \(item.name): \(quantity)")
+            print("✅ Quantité mise à jour dans le panier LOCAL (pas encore sauvegardée)")
         }
         
-        // Sauvegarde automatique avec debounce
-        scheduleAutoSave()
+        print("🔵 FIN updateCartQuantity")
+        print("⚠️ RAPPEL: Les modifications ne seront sauvegardées qu'au clic sur 'Enregistrer'")
     }
     
     private func clearCart() {
+        print("🔵 DÉBUT clearCart")
+        
+        // Vider le panier LOCAL SEULEMENT
         quoteItems.removeAll()
         quantities.removeAll()
-        print("🔍 Panier vidé complètement")
-        
-        // Sauvegarde automatique avec debounce
-        scheduleAutoSave()
+        print("🔍 Panier LOCAL vidé complètement")
+        print("✅ Panier vidé dans l'état LOCAL (pas encore sauvegardé)")
+        print("🔵 FIN clearCart")
+        print("⚠️ RAPPEL: Les modifications ne seront sauvegardées qu'au clic sur 'Enregistrer'")
     }
 
     private func addItemToQuote(_ stockItem: StockItem) {
@@ -912,38 +1151,50 @@ struct QuoteBuilderView: View {
     }
 
     private func updateQuantity(for item: QuoteItem, quantity: Int) {
+        print("🔵 DÉBUT updateQuantity - Article: \(item.name), Quantité: \(quantity)")
+        
         if let existingIndex = quoteItems.firstIndex(where: { $0.quoteItemId == item.quoteItemId }) {
+            // Mettre à jour la quantité DANS L'ÉTAT LOCAL SEULEMENT
             quoteItems[existingIndex].updateQuantity(quantity)
             print("🔍 Quantité mise à jour pour \(item.name): \(quantity)")
+            print("✅ Quantité mise à jour dans le panier LOCAL (pas encore sauvegardée)")
         }
         
-        // Sauvegarde automatique avec debounce
-        scheduleAutoSave()
+        print("🔵 FIN updateQuantity")
+        print("⚠️ RAPPEL: Les modifications ne seront sauvegardées qu'au clic sur 'Enregistrer'")
     }
 
     private func updatePrice(for item: QuoteItem, price: Double) {
+        print("🔵 DÉBUT updatePrice - Article: \(item.name), Prix: \(price)€")
+        
         if let existingIndex = quoteItems.firstIndex(where: { $0.quoteItemId == item.quoteItemId }) {
+            // Mettre à jour le prix DANS L'ÉTAT LOCAL SEULEMENT
             quoteItems[existingIndex].updateCustomPrice(price)
             print("🔍 Prix mis à jour pour \(item.name): \(price)€")
+            print("✅ Prix mis à jour dans le panier LOCAL (pas encore sauvegardé)")
         }
         
-        // Sauvegarde automatique avec debounce
-        scheduleAutoSave()
+        print("🔵 FIN updatePrice")
+        print("⚠️ RAPPEL: Les modifications ne seront sauvegardées qu'au clic sur 'Enregistrer'")
     }
 
     private func deleteItem(_ item: QuoteItem) {
+        print("🔵 DÉBUT deleteItem - Article: \(item.name)")
+        
+        // Supprimer du STATE LOCAL SEULEMENT
         quoteItems.removeAll { $0.quoteItemId == item.quoteItemId }
         quantities.removeValue(forKey: item.sku)
-        print("🔍 Item supprimé: \(item.name)")
-        
-        // Sauvegarde automatique avec debounce
-        scheduleAutoSave()
+        print("🔍 Item supprimé du panier LOCAL: \(item.name)")
+        print("✅ Suppression effective dans le panier LOCAL (pas encore sauvegardée)")
+        print("🔵 FIN deleteItem")
+        print("⚠️ RAPPEL: Les modifications ne seront sauvegardées qu'au clic sur 'Enregistrer'")
     }
     
     // MARK: - Data Loading
     
     private func loadExistingQuoteItems() {
         print("🔍 DEBUG - Chargement des items existants pour eventId: \(event.eventId)")
+        print("🔍 Statut du devis: \(event.quoteStatus.displayName)")
         print("🔍 Nombre total de QuoteItems en base: \(allQuoteItems.count)")
         
         // Charger les items existants depuis la DB
@@ -951,17 +1202,31 @@ struct QuoteBuilderView: View {
         print("🔍 Items trouvés pour cet événement: \(existingItems.count)")
         
         if !existingItems.isEmpty {
-            // Copier les items dans le State local
-            quoteItems = existingItems
+            // IMPORTANT: Créer des COPIES propres pour éviter les conflits SwiftData
+            // Ne jamais utiliser directement les objets de la @Query
+            quoteItems = existingItems.map { item in
+                let newItem = QuoteItem(
+                    quoteItemId: item.quoteItemId,
+                    eventId: item.eventId,
+                    sku: item.sku,
+                    name: item.name,
+                    category: item.category,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice
+                )
+                newItem.customPrice = item.customPrice
+                newItem.assignedAssets = item.assignedAssets
+                return newItem
+            }
             
-            print("🔍 Items chargés:")
-            for item in existingItems {
+            print("🔍 Items chargés dans le panier LOCAL:")
+            for item in quoteItems {
                 print("  - \(item.name): \(item.quantity)x à \(item.customPrice)€")
             }
             
             // Reconstruire le dictionnaire des quantités
             quantities = [:]
-            for item in existingItems {
+            for item in quoteItems {
                 quantities[item.sku] = item.quantity
             }
             
@@ -969,100 +1234,127 @@ struct QuoteBuilderView: View {
             globalDiscount = event.discountPercent
             
             print("🔍 Remise chargée: \(globalDiscount)%")
+            print("✅ Devis existant chargé avec succès")
         } else {
             print("🔍 Aucun item existant - nouveau devis")
             quoteItems = []
+            print("✅ Panier vide - prêt pour créer un nouveau devis")
         }
         
-        // Toujours afficher le catalogue
+        // Toujours afficher le catalogue (ne pas ouvrir la sheet automatiquement)
         showingCartSummary = false
     }
     
-    private func saveQuote(finalize: Bool = false) {
-        print("🔍 DEBUG - Sauvegarde du devis")
+    private func saveQuote(finalize: Bool = false) async {
+        print("💾 DEBUG - Sauvegarde du devis (finalize: \(finalize))")
         print("🔍 Nombre d'items dans le panier: \(quoteItems.count)")
         
         // Annuler toute sauvegarde automatique en attente
         autoSaveTask?.cancel()
         
-        // Supprimer les anciens items de cet événement
-        let oldItems = allQuoteItems.filter { $0.eventId == event.eventId }
-        print("🔍 Suppression de \(oldItems.count) anciens items")
-        for oldItem in oldItems {
-            modelContext.delete(oldItem)
-        }
-        
-        // Insérer les nouveaux items
-        for item in quoteItems {
-            print("🔍 Insertion de: \(item.name) - Quantité: \(item.quantity)")
-            modelContext.insert(item)
-        }
-        
-        // Mettre à jour l'événement
-        event.updateTotalAmount(finalTotal)
-        event.discountPercent = discountPercentage
-        event.quoteStatus = finalize ? .finalized : .draft
-        
-        print("🔍 Total du devis: \(finalTotal)€")
-        print("🔍 Remise: \(discountPercentage)%")
-        print("🔍 Statut: \(finalize ? "finalisé" : "brouillon")")
-
         do {
-            // Sauvegarder le contexte
-            try modelContext.save()
-            print("✅ Sauvegarde réussie dans SwiftData")
+            // Supprimer les anciens items de cet événement
+            let oldItems = allQuoteItems.filter { $0.eventId == event.eventId }
+            print("🗑️ Suppression de \(oldItems.count) anciens items")
+            for oldItem in oldItems {
+                modelContext.delete(oldItem)
+            }
             
-            // Vérification immédiate
-            print("✅ Vérification - Items sauvegardés:")
+            // Insérer les nouveaux items
             for item in quoteItems {
-                print("  - \(item.name): \(item.quantity)x à \(item.customPrice)€")
+                print("➕ Insertion de: \(item.name) - Quantité: \(item.quantity)")
+                modelContext.insert(item)
             }
             
-            // Synchroniser avec Firebase
-            Task {
-                await syncToFirebase()
+            // Mettre à jour l'événement
+            event.updateTotalAmount(finalTotal)
+            event.discountPercent = discountPercentage
+            event.quoteStatus = finalize ? .finalized : .draft
+            event.updatedAt = Date() // Forcer la mise à jour
+            
+            print("💰 Total du devis: \(finalTotal)€")
+            print("🎯 Remise: \(discountPercentage)%")
+            print("📋 Statut: \(finalize ? "finalisé" : "brouillon")")
+
+            // Utiliser EventService pour sauvegarder (local + Firebase)
+            print("📤 Utilisation d'EventService pour la sauvegarde...")
+            try await eventService.saveEventWithQuoteItems(
+                event: event,
+                quoteItems: quoteItems,
+                modelContext: modelContext
+            )
+            print("✅ Sauvegarde complète réussie (local + Firebase)")
+            
+            // Fermer l'interface sur le Main Thread (SEULEMENT si finalisé)
+            await MainActor.run {
+                if finalize {
+                    // Finalisation : fermer d'abord la sheet si ouverte
+                    if showingCartSummary {
+                        print("🔽 Fermeture de la sheet du panier...")
+                        showingCartSummary = false
+                        
+                        // Attendre que la sheet se ferme avant de dismiss
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            print("🔙 Retour à EventDetailView après finalisation")
+                            dismiss()
+                        }
+                    } else {
+                        // Pas de sheet ouverte, dismiss direct
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            print("🔙 Retour à EventDetailView après finalisation")
+                            dismiss()
+                        }
+                    }
+                } else {
+                    // Sauvegarde simple : rester sur la vue
+                    print("✅ Sauvegarde brouillon réussie - Vue reste ouverte")
+                    alertMessage = "✅ Devis sauvegardé avec succès"
+                    showAlert = true
+                }
             }
             
-            // Fermer la sheet du panier si elle est ouverte
-            showingCartSummary = false
-            
-            // Attendre un peu avant de dismiss pour que la sheet se ferme proprement
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                dismiss()
-            }
         } catch {
-            print("❌ Erreur de sauvegarde: \(error)")
-            alertMessage = "Erreur lors de la sauvegarde: \(error.localizedDescription)"
-            showAlert = true
+            print("❌ Erreur lors de la sauvegarde: \(error.localizedDescription)")
+            await MainActor.run {
+                alertMessage = "Erreur lors de la sauvegarde: \(error.localizedDescription)"
+                showAlert = true
+            }
         }
     }
     
-    private func syncToFirebase() async {
+    private func syncToFirebase() async throws {
         print("🔄 Synchronisation Firebase - Événement: \(event.eventId)")
         
         do {
             // 1. Synchroniser l'événement
+            print("📝 Conversion de l'événement en FirestoreEvent...")
             let firestoreEvent = event.toFirestoreEvent()
+            print("📤 Envoi de l'événement à Firebase...")
             try await firebaseService.updateEvent(firestoreEvent)
             print("✅ Événement synchronisé avec Firebase")
             
             // 2. Supprimer les anciens quote items de Firebase
+            print("🔍 Récupération des anciens items Firebase...")
             let oldFirestoreItems = try await firebaseService.fetchQuoteItems(forEvent: event.eventId)
+            print("🗑️ \(oldFirestoreItems.count) anciens items trouvés, suppression...")
             for oldItem in oldFirestoreItems {
                 try await firebaseService.deleteQuoteItem(quoteItemId: oldItem.quoteItemId, forEvent: event.eventId)
             }
             print("✅ Anciens items supprimés de Firebase")
             
             // 3. Créer les nouveaux quote items dans Firebase
-            for item in quoteItems {
+            print("📤 Création de \(quoteItems.count) nouveaux items dans Firebase...")
+            for (index, item) in quoteItems.enumerated() {
+                print("  ➡️ Item \(index + 1)/\(quoteItems.count): \(item.name) x\(item.quantity)")
                 let firestoreItem = item.toFirestoreQuoteItem()
                 try await firebaseService.createQuoteItem(firestoreItem, forEvent: event.eventId)
             }
             print("✅ Nouveaux items synchronisés avec Firebase (\(quoteItems.count) items)")
             
         } catch {
-            print("❌ Erreur synchronisation Firebase: \(error.localizedDescription)")
-            // Ne pas bloquer l'utilisateur, les données sont déjà sauvegardées localement
+            print("❌ ERREUR FIREBASE SYNC: \(error.localizedDescription)")
+            print("❌ Détails: \(error)")
+            throw error
         }
     }
     
@@ -1088,9 +1380,9 @@ struct QuoteBuilderView: View {
             try modelContext.save()
             print("✅ Sauvegarde automatique réussie")
             
-            // Synchroniser avec Firebase en arrière-plan
+            // Synchroniser avec Firebase en arrière-plan (erreurs ignorées car auto-save)
             Task {
-                await syncToFirebase()
+                try? await syncToFirebase()
             }
         } catch {
             print("❌ Erreur sauvegarde automatique: \(error)")
@@ -1113,18 +1405,57 @@ struct QuoteBuilderView: View {
             }
         }
     }
-
+    
     private func saveDraft() {
-        saveQuote()
+        Task {
+            await saveQuote()
+        }
     }
 
     private func generateInvoice() {
-        // Sauvegarder d'abord
-        saveDraft()
-
-        // TODO: Naviguer vers InvoicePreviewView
-        alertMessage = "Génération de facture à venir..."
-        showAlert = true
+        Task { @MainActor in
+            isSaving = true
+            
+            do {
+                // 1. Sauvegarder et finaliser le devis
+                await saveQuote(finalize: true)
+                
+                // 2. Générer la liste de scan
+                print("📋 Génération de la liste de préparation...")
+                let scanList = try scanListService.generateScanList(
+                    from: event,
+                    quoteItems: quoteItems,
+                    modelContext: modelContext
+                )
+                
+                generatedScanList = scanList
+                
+                // 3. Afficher un message de succès
+                await MainActor.run {
+                    isSaving = false
+                    alertMessage = "✅ Devis finalisé et liste de préparation créée (\(scanList.totalItems) articles)"
+                    showAlert = true
+                    
+                    // 4. Proposer d'ouvrir la liste de scan
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        showingScanList = true
+                    }
+                }
+                
+            } catch let error as ScanListError {
+                await MainActor.run {
+                    isSaving = false
+                    alertMessage = "⚠️ Erreur : \(error.localizedDescription)"
+                    showAlert = true
+                }
+            } catch {
+                await MainActor.run {
+                    isSaving = false
+                    alertMessage = "❌ Erreur lors de la finalisation : \(error.localizedDescription)"
+                    showAlert = true
+                }
+            }
+        }
     }
 }
 
@@ -1410,91 +1741,153 @@ struct CategoryChip: View {
 struct StockItemCard: View {
     let item: StockItem
     let quantityInCart: Int
+    let availabilityResult: AvailabilityResult?
+    let warning: String?
     let onAdd: () -> Void
     let onRemove: () -> Void
     let onQuantityChange: (Int) -> Void
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Image placeholder ou icône catégorie
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue.opacity(0.1))
-                    .frame(width: 70, height: 70)
-                
-                Image(systemName: categoryIcon(for: item.category))
-                    .font(.title2)
-                    .foregroundColor(.blue)
-            }
-            
-            // Informations article
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.name)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .lineLimit(2)
-                
-                Text(item.category)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                HStack(spacing: 8) {
-                    Text("\(Int(item.effectivePrice))€")
-                        .font(.headline)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                // Image placeholder ou icône catégorie
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.blue.opacity(0.1))
+                        .frame(width: 70, height: 70)
+                    
+                    Image(systemName: categoryIcon(for: item.category))
+                        .font(.title2)
                         .foregroundColor(.blue)
+                }
+                
+                // Informations article
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .lineLimit(2)
                     
-                    if item.availableQuantity > 0 {
-                        Label("\(item.availableQuantity) dispo", systemImage: "checkmark.circle.fill")
-                            .font(.caption2)
-                            .foregroundColor(.green)
-                    } else {
-                        Label("Stock limité", systemImage: "exclamationmark.circle.fill")
-                            .font(.caption2)
-                            .foregroundColor(.orange)
+                    Text(item.category)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    HStack(spacing: 8) {
+                        Text("\(Int(item.effectivePrice))€")
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                        
+                        // Badge de disponibilité intelligent
+                        if let result = availabilityResult {
+                            availabilityBadge(for: result)
+                        } else if item.availableQuantity > 0 {
+                            Label("\(item.availableQuantity) dispo", systemImage: "checkmark.circle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.green)
+                        } else {
+                            Label("Stock limité", systemImage: "exclamationmark.circle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
                     }
+                }
+                
+                Spacer()
+                
+                // Contrôles quantité
+                if quantityInCart > 0 {
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            print("➖ Bouton moins cliqué pour: \(item.name)")
+                            onRemove()
+                        }) {
+                            Image(systemName: "minus.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.red)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Text("\(quantityInCart)")
+                            .font(.headline)
+                            .frame(minWidth: 30)
+                        
+                        Button(action: {
+                            print("➕ Bouton plus cliqué pour: \(item.name)")
+                            onAdd()
+                        }) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.blue)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } else {
+                    Button(action: {
+                        print("🆕 Bouton Ajouter cliqué pour: \(item.name)")
+                        onAdd()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus.circle.fill")
+                            Text("Ajouter")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .cornerRadius(20)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             
-            Spacer()
-            
-            // Contrôles quantité
-            if quantityInCart > 0 {
-                HStack(spacing: 12) {
-                    Button(action: onRemove) {
-                        Image(systemName: "minus.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.red)
-                    }
-                    
-                    Text("\(quantityInCart)")
-                        .font(.headline)
-                        .frame(minWidth: 30)
-                    
-                    Button(action: onAdd) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.blue)
-                    }
+            // Warning de disponibilité
+            if let warning = warning {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                    Text(warning)
+                        .font(.caption)
                 }
-            } else {
-                Button(action: onAdd) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Ajouter")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color.blue)
-                    .cornerRadius(20)
-                }
+                .foregroundColor(.orange)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
             }
         }
         .padding()
         .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(12)
+    }
+    
+    @ViewBuilder
+    private func availabilityBadge(for result: AvailabilityResult) -> some View {
+        let available = result.availableQuantity
+        let severity = result.severity
+        
+        if available == 0 {
+            Label("Épuisé", systemImage: "xmark.circle.fill")
+                .font(.caption2)
+                .foregroundColor(.red)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.red.opacity(0.15))
+                .cornerRadius(8)
+        } else if severity == .warning {
+            Label("\(available) dispo", systemImage: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundColor(.orange)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.15))
+                .cornerRadius(8)
+        } else {
+            Label("\(available) dispo", systemImage: "checkmark.circle.fill")
+                .font(.caption2)
+                .foregroundColor(.green)
+        }
     }
     
     private func categoryIcon(for category: String) -> String {

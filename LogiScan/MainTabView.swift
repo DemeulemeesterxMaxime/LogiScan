@@ -9,6 +9,8 @@ import SwiftData
 import SwiftUI
 
 struct MainTabView: View {
+    @Environment(\.modelContext) private var modelContext
+    
     var body: some View {
         TabView {
             // Dashboard
@@ -18,8 +20,11 @@ struct MainTabView: View {
                     Text("Tableau de bord")
                 }
 
-            // Scanner QR - Version simplifiée sans repositories
-            SimpleScannerView()
+            // Scanner QR - Version complète avec repositories
+            ScannerMainView(
+                assetRepository: AssetRepository(modelContext: modelContext),
+                movementRepository: MovementRepository(modelContext: modelContext)
+            )
                 .tabItem {
                     Image(systemName: "qrcode.viewfinder")
                     Text("Scanner")

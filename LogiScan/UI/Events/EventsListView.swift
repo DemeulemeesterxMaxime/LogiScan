@@ -16,6 +16,10 @@ struct EventsListView: View {
     @State private var searchText = ""
     @State private var showingEventForm = false
     @State private var isRefreshing = false
+    
+    // ✅ État de navigation géré ici pour survivre aux reconstructions
+    @State private var navigationPath = NavigationPath()
+    @State private var activeEventQuoteBuilder: String? = nil  // EventID actif
 
     var filteredEvents: [Event] {
         var items = events
@@ -29,7 +33,7 @@ struct EventsListView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack(path: $navigationPath) {
             VStack {
                 // Filtres par statut
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -53,7 +57,7 @@ struct EventsListView: View {
 
                 // Liste des événements
                 List(filteredEvents) { event in
-                    NavigationLink(destination: EventDetailView(event: event)) {
+                    NavigationLink(value: event) {
                         EventRow(event: event)
                     }
                 }
@@ -90,6 +94,9 @@ struct EventsListView: View {
             }
             .sheet(isPresented: $showingEventForm) {
                 CreateEventView()
+            }
+            .navigationDestination(for: Event.self) { event in
+                EventDetailView(event: event, activeQuoteBuilder: $activeEventQuoteBuilder)
             }
             .onAppear {
                 // Rafraîchissement automatique immédiat à l'arrivée

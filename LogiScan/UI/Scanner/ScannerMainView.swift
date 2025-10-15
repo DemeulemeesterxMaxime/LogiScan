@@ -16,6 +16,8 @@ struct ScannerMainView: View {
     @StateObject private var syncManager = SyncManager()
     @State private var showingPermissionAlert = false
     @State private var cameraPermission: AVAuthorizationStatus = .notDetermined
+    @State private var showModeDetails = false
+    @State private var scrollOffset: CGFloat = 0
     
     init(
         assetRepository: AssetRepositoryProtocol,
@@ -42,35 +44,10 @@ struct ScannerMainView: View {
             }
             .navigationTitle("Scanner")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if let lastSync = syncManager.lastSyncDate {
-                        Text(lastSync.formatted(date: .omitted, time: .shortened))
-                            .font(.caption)
-                            .foregroundColor(.white)
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
-                        Button(action: {
-                            Task {
-                                await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
-                            }
-                        }) {
-                            Image(systemName: "arrow.clockwise.circle.fill")
-                                .foregroundColor(.white)
-                                .font(.title3)
-                        }
-                    }
-                }
-            }
+            // Toolbar retiré - pas d'heure ni de bouton d'actualisation
         }
         .onAppear {
             checkCameraPermission()
-            Task {
-                await syncManager.syncFromFirebaseIfNeeded(modelContext: modelContext, forceRefresh: true)
-            }
         }
         .sheet(isPresented: $viewModel.showResult) {
             ScanResultView(
@@ -120,54 +97,101 @@ struct ScannerMainView: View {
     }
     
     private var scannerView: some View {
-        ZStack {
-            // Camera View
-            QRScannerView(
-                scannedCode: $viewModel.scannedCode,
-                isScanning: $viewModel.isScanning,
-                onCodeScanned: viewModel.handleScannedCode
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 0))
-            
-            // Scan Overlay with mode indicator and controls
-            ScanOverlayView(
-                viewModel: viewModel,
-                onShowList: {
-                    viewModel.showScanList = true
-                },
-                onChangeMode: {
-                    viewModel.showModeSelector = true
-                }
-            )
-            
-            // Mode Selector Floating Button
-            VStack {
-                Spacer()
+        GeometryReader { geometry in
+            ZStack {
+                // Camera View
+                QRScannerView(
+                    scannedCode: $viewModel.scannedCode,
+                    isScanning: $viewModel.isScanning,
+                    onCodeScanned: viewModel.handleScannedCode
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 0))
                 
-                HStack {
+                // Overlay avec contrôles
+                VStack(spacing: 0) {
                     Spacer()
                     
-                    Button(action: {
-                        viewModel.showModeSelector = true
-                    }) {
-                        VStack(spacing: 8) {
-                            Image(systemName: viewModel.currentMode.icon)
-                                .font(.title2)
-                            Text("Mode")
-                                .font(.caption2)
-                        }
-                        .foregroundColor(.white)
-                        .frame(width: 70, height: 70)
-                        .background(
-                            Circle()
-                                .fill(viewModel.currentMode.gradient)
-                                .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
-                        )
+                    // Session Progress (si applicable)
+                    if let session = viewModel.currentSession, viewModel.currentMode != .free {
+                        sessionProgressView(session: session)
+                            .padding(.horizontal)
+                            .padding(.bottom, 12)
+                            .transition(.move(edge: .bottom))
                     }
-                    .padding()
+                    
+                    // Sélecteur de mode horizontal (style appareil photo iOS)
+                    CameraStyleModeSelectorView(
+                        viewModel: viewModel,
+                        showModeDetails: $showModeDetails
+                    )
+                    .frame(height: 120)
+                    .background(
+                        Rectangle()
+                            .fill(.black.opacity(0.4))
+                            .blur(radius: 20)
+                    )
+                }
+                
+                // Bouton liste (en haut à droite)
+                if !viewModel.scanList.isEmpty {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            
+                            Button(action: {
+                                viewModel.showScanList = true
+                            }) {
+                                VStack(spacing: 4) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(.ultraThinMaterial)
+                                            .frame(width: 50, height: 50)
+                                        
+                                        Image(systemName: "list.clipboard")
+                                            .font(.title3)
+                                            .foregroundColor(.white)
+                                        
+                                        // Badge avec nombre d'items
+                                        if let expected = viewModel.currentSession?.expectedAssets {
+                                            Text("\(viewModel.currentSession?.scannedAssets.count ?? 0)/\(expected.count)")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .padding(4)
+                                                .background(Circle().fill(Color.red))
+                                                .offset(x: 18, y: -18)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding()
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 60)
+                }
+                
+                // Success/Duplicate animations
+                VStack {
+                    Spacer()
+                        .frame(height: geometry.size.height * 0.3)
+                    
+                    if viewModel.showSuccessAnimation {
+                        successAnimationView
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                    
+                    if viewModel.showDuplicateWarning {
+                        duplicateWarningView
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                    
+                    Spacer()
                 }
             }
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.showSuccessAnimation)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.showDuplicateWarning)
     }
     
     private var permissionView: some View {
@@ -222,6 +246,101 @@ struct ScannerMainView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - Helper Views
+    
+    private func sessionProgressView(session: ScanSession) -> some View {
+        VStack(spacing: 12) {
+            // Progress Bar
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Progression")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    Spacer()
+                    
+                    Text("\(session.scannedAssets.count)/\(session.expectedAssets?.count ?? 0)")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(viewModel.currentMode.color)
+                }
+                
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.white.opacity(0.3))
+                            .frame(height: 12)
+                        
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(viewModel.currentMode.gradient)
+                            .frame(width: geometry.size.width * session.progress, height: 12)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.8), value: session.progress)
+                    }
+                }
+                .frame(height: 12)
+            }
+        }
+        .foregroundColor(.white)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+        )
+    }
+    
+    private var successAnimationView: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 80, height: 80)
+                    .scaleEffect(viewModel.showSuccessAnimation ? 1.2 : 0.8)
+                    .opacity(viewModel.showSuccessAnimation ? 0.3 : 0)
+                
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 60, height: 60)
+                
+                Image(systemName: "checkmark")
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .animation(
+                .spring(response: 0.3, dampingFraction: 0.6)
+                    .repeatCount(1),
+                value: viewModel.showSuccessAnimation
+            )
+            
+            Text("Asset scanné !")
+                .font(.headline)
+                .foregroundColor(.white)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+        )
+    }
+    
+    private var duplicateWarningView: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.title2)
+                .foregroundColor(.yellow)
+            
+            Text("Déjà scanné !")
+                .font(.headline)
+                .foregroundColor(.white)
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.orange.opacity(0.9))
+                .shadow(color: .orange.opacity(0.4), radius: 8, y: 4)
+        )
     }
 }
 

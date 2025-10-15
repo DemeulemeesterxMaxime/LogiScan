@@ -469,9 +469,85 @@ class SyncManager: ObservableObject {
             try modelContext.save()
             print("✅ [SyncManager] Events synchronisés : \(eventsCreated) créés, \(eventsUpdated) mis à jour, \(eventsDeleted) supprimés")
             
+            // Synchroniser les QuoteItems pour chaque événement
+            await syncQuoteItemsFromFirebase(modelContext: modelContext)
+            
         } catch {
             print("❌ [SyncManager] Erreur sync events: \(error.localizedDescription)")
             syncErrors.append("Erreur sync événements: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Synchronise les QuoteItems depuis Firebase pour tous les événements
+    private func syncQuoteItemsFromFirebase(modelContext: ModelContext) async {
+        do {
+            print("🔄 [SyncManager] Début synchronisation QuoteItems...")
+            
+            // Récupérer tous les événements locaux
+            let fetchDescriptor = FetchDescriptor<Event>()
+            let localEvents = try modelContext.fetch(fetchDescriptor)
+            
+            var totalItemsCreated = 0
+            var totalItemsUpdated = 0
+            var totalItemsDeleted = 0
+            
+            // Pour chaque événement, synchroniser ses items
+            for event in localEvents {
+                // Récupérer les items Firebase pour cet événement
+                let firestoreItems = try await firebaseService.fetchQuoteItems(forEvent: event.eventId)
+                print("📥 [SyncManager] \(firestoreItems.count) items récupérés pour événement: \(event.name)")
+                
+                // Récupérer les items locaux pour cet événement
+                let eventId = event.eventId
+                let localItemsDescriptor = FetchDescriptor<QuoteItem>(
+                    predicate: #Predicate<QuoteItem> { item in
+                        item.eventId == eventId
+                    }
+                )
+                let localItems = try modelContext.fetch(localItemsDescriptor)
+                let localItemsDict = Dictionary(uniqueKeysWithValues: localItems.map { ($0.quoteItemId, $0) })
+                
+                // Set des itemIds Firebase
+                let firebaseItemIds = Set(firestoreItems.map { $0.quoteItemId })
+                
+                // Synchroniser chaque item Firebase
+                for firestoreItem in firestoreItems {
+                    if let existingItem = localItemsDict[firestoreItem.quoteItemId] {
+                        // Mettre à jour si Firebase est plus récent
+                        if firestoreItem.updatedAt > existingItem.updatedAt {
+                            existingItem.quantity = firestoreItem.quantity
+                            existingItem.customPrice = firestoreItem.customPrice
+                            existingItem.totalPrice = firestoreItem.totalPrice
+                            existingItem.assignedAssets = firestoreItem.assignedAssets
+                            existingItem.updatedAt = firestoreItem.updatedAt
+                            totalItemsUpdated += 1
+                            print("🔄 [SyncManager] QuoteItem mis à jour: \(existingItem.name)")
+                        }
+                    } else {
+                        // Créer un nouvel item local
+                        let newItem = firestoreItem.toQuoteItem()
+                        modelContext.insert(newItem)
+                        totalItemsCreated += 1
+                        print("➕ [SyncManager] QuoteItem créé: \(newItem.name)")
+                    }
+                }
+                
+                // Supprimer les items locaux qui n'existent plus dans Firebase
+                for localItem in localItems {
+                    if !firebaseItemIds.contains(localItem.quoteItemId) {
+                        print("🗑️ [SyncManager] Suppression QuoteItem local orphelin: \(localItem.name)")
+                        modelContext.delete(localItem)
+                        totalItemsDeleted += 1
+                    }
+                }
+            }
+            
+            try modelContext.save()
+            print("✅ [SyncManager] QuoteItems synchronisés : \(totalItemsCreated) créés, \(totalItemsUpdated) mis à jour, \(totalItemsDeleted) supprimés")
+            
+        } catch {
+            print("❌ [SyncManager] Erreur sync QuoteItems: \(error.localizedDescription)")
+            syncErrors.append("Erreur sync QuoteItems: \(error.localizedDescription)")
         }
     }
     

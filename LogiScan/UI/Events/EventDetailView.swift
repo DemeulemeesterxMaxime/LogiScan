@@ -12,9 +12,13 @@ struct EventDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Query private var trucks: [Truck]
-    @Query private var allQuoteItems: [QuoteItem]
+    // ❌ SUPPRIMÉ: @Query private var allQuoteItems: [QuoteItem]
+    // Cette Query rendait la vue hyper-réactive et causait des reconstructions intempestives
     
-    let event: Event
+    let event: Event  // ✅ Revenir à l'Event directement mais isoler l'observation
+    
+    // ✅ Binding depuis le parent pour survivre aux reconstructions
+    @Binding var activeQuoteBuilder: String?  // EventID actif dans QuoteBuilder
     
     @State private var isEditing = false
     @State private var showDeleteConfirmation = false
@@ -22,6 +26,26 @@ struct EventDetailView: View {
     @State private var showAlert = false
     @State private var alertMessage = ""
     @State private var showingQuotePDF = false
+    
+    // 🔍 LOG: Compteur pour tracer les reconstructions de la vue
+    @State private var viewRebuildCount = 0
+    
+    // ✅ Cache local chargé une seule fois pour hasExistingQuote
+    @State private var cachedQuoteItemsCount: Int = 0
+    
+    // ✅ Computed property pour savoir si QuoteBuilder est actif pour CET event
+    private var isShowingQuoteBuilder: Bool {
+        get { activeQuoteBuilder == event.eventId }
+        nonmutating set {
+            if newValue {
+                activeQuoteBuilder = event.eventId
+            } else {
+                if activeQuoteBuilder == event.eventId {
+                    activeQuoteBuilder = nil
+                }
+            }
+        }
+    }
     
     // États d'édition
     @State private var editedName = ""
@@ -67,6 +91,19 @@ struct EventDetailView: View {
             }
             .padding(.vertical)
         }
+        .background(
+            // ✅ NavigationLink ISOLÉ au niveau du body, hors de la hiérarchie réactive
+            NavigationLink(
+                destination: QuoteBuilderView(event: event),
+                isActive: Binding(
+                    get: { isShowingQuoteBuilder },
+                    set: { isShowingQuoteBuilder = $0 }
+                )
+            ) {
+                EmptyView()
+            }
+            .hidden()
+        )
         .navigationTitle(event.name)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isEditing)
@@ -112,6 +149,10 @@ struct EventDetailView: View {
         }
         .sheet(isPresented: $showingQuotePDF) {
             QuotePDFView(event: event, quoteItems: eventQuoteItems)
+        }
+        .onAppear {
+            // Charger le compteur une seule fois au chargement
+            loadQuoteItemsCount()
         }
         .overlay {
             if isSaving {
@@ -385,7 +426,9 @@ struct EventDetailView: View {
                 // Scénario 3 : Devis finalisé - 2 boutons côte à côte
                 HStack(spacing: 12) {
                     // Bouton gauche : Modifier les articles
-                    NavigationLink(destination: QuoteBuilderView(event: event)) {
+                    Button(action: {
+                        isShowingQuoteBuilder = true
+                    }) {
                         HStack {
                             Image(systemName: "square.and.pencil")
                             Text("Modifier")
@@ -412,29 +455,14 @@ struct EventDetailView: View {
                         .cornerRadius(12)
                     }
                 }
-            } else if hasExistingQuote {
-                // Scénario 2 : Items existent en draft - Continuer le devis
-                NavigationLink(destination: QuoteBuilderView(event: event)) {
-                    HStack {
-                        Image(systemName: "doc.text")
-                        Text("Continuer le devis")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.orange)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
             } else {
-                // Scénario 1 : Pas d'items - Créer le devis
-                NavigationLink(destination: QuoteBuilderView(event: event)) {
+                // Scénario 1 & 2 : Button stable avec navigation programmatique
+                Button(action: {
+                    isShowingQuoteBuilder = true
+                }) {
                     HStack {
-                        Image(systemName: "doc.text.fill")
-                        Text("Créer le devis")
+                        Image(systemName: hasExistingQuote ? "doc.text" : "doc.text.fill")
+                        Text(hasExistingQuote ? "Continuer le devis" : "Créer le devis")
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
@@ -442,7 +470,7 @@ struct EventDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue)
+                    .background(hasExistingQuote ? Color.orange : Color.blue)
                     .foregroundColor(.white)
                     .cornerRadius(12)
                 }
@@ -464,14 +492,32 @@ struct EventDetailView: View {
     }
     
     private var hasExistingQuote: Bool {
-        !allQuoteItems.filter { $0.eventId == event.eventId }.isEmpty
+        // Utilise le cache au lieu de la Query réactive
+        cachedQuoteItemsCount > 0
     }
     
     private var eventQuoteItems: [QuoteItem] {
-        allQuoteItems.filter { $0.eventId == event.eventId }
+        // Query directe sans observation pour le PDF uniquement
+        let eventId = event.eventId  // Capturer dans une variable locale pour le Predicate
+        let descriptor = FetchDescriptor<QuoteItem>(
+            predicate: #Predicate { $0.eventId == eventId }
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
     
     // MARK: - Actions
+    
+    private func loadQuoteItemsCount() {
+        let eventId = event.eventId  // Capturer dans une variable locale
+        let descriptor = FetchDescriptor<QuoteItem>(
+            predicate: #Predicate { $0.eventId == eventId }
+        )
+        if let items = try? modelContext.fetch(descriptor) {
+            cachedQuoteItemsCount = items.count
+        } else {
+            cachedQuoteItemsCount = 0
+        }
+    }
     
     private func startEditing() {
         editedName = event.name
@@ -599,11 +645,16 @@ struct EventInfoRow: View {
 }
 
 #Preview {
+    @Previewable @State var activeQuoteBuilder: String? = nil
+    
     NavigationStack {
-        EventDetailView(event: Event(
-            eventId: "EVT-001",
-            name: "Concert Jazz Festival"
-        ))
+        EventDetailView(
+            event: Event(
+                eventId: "EVT-001",
+                name: "Concert Jazz Festival"
+            ),
+            activeQuoteBuilder: $activeQuoteBuilder
+        )
     }
     .modelContainer(for: [Event.self, Truck.self], inMemory: true)
 }

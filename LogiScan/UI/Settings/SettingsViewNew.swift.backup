@@ -44,13 +44,6 @@ struct SettingsView: View {
     @State private var isUploadingLogo = false
     @State private var isSavingCompany = false
     
-    // FocusState pour gérer le clavier
-    @FocusState private var focusedField: CompanyField?
-    
-    enum CompanyField: Hashable {
-        case name, email, phone, address, siret
-    }
-    
     enum DeleteType: String {
         case trucks, stock, events, all
         
@@ -182,122 +175,85 @@ struct SettingsView: View {
     }
     
     private func companySection(company: Company) -> some View {
-        Section(header: Text("Mon Entreprise")) {
+        Section {
             if !isEditingCompany {
-                companyReadOnlyView(company: company)
+                // Mode lecture
+                if let logoURL = company.logoURL {
+                    AsyncImage(url: URL(string: logoURL)) { image in
+                        image.resizable().scaledToFit().frame(height: 80)
+                    } placeholder: {
+                        ProgressView()
+                    }
+                }
+                
+                InfoRow(label: "Nom", value: editCompanyName.isEmpty ? company.name : editCompanyName, icon: "building.2")
+                InfoRow(label: "Email", value: editCompanyEmail.isEmpty ? company.email : editCompanyEmail, icon: "envelope")
+                
+                if let phone = company.phone {
+                    InfoRow(label: "Téléphone", value: phone, icon: "phone")
+                }
+                if let address = company.address {
+                    InfoRow(label: "Adresse", value: address, icon: "mappin")
+                }
+                if let siret = company.siret {
+                    InfoRow(label: "SIRET", value: siret, icon: "doc.text")
+                }
+                
+                if permissionService.hasPermission(.editCompany) {
+                    Button(action: { 
+                        startEditing(company: company)
+                    }) {
+                        Label("Modifier", systemImage: "pencil")
+                    }
+                }
             } else {
-                companyEditView(company: company)
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func companyReadOnlyView(company: Company) -> some View {
-        // Mode lecture
-        if let logoURL = company.logoURL {
-            AsyncImage(url: URL(string: logoURL)) { image in
-                image.resizable().scaledToFit().frame(height: 80)
-            } placeholder: {
-                ProgressView()
-            }
-        }
-        
-        SettingsInfoRow(label: "Nom", value: editCompanyName.isEmpty ? company.name : editCompanyName, icon: "building.2")
-        SettingsInfoRow(label: "Email", value: editCompanyEmail.isEmpty ? company.email : editCompanyEmail, icon: "envelope")
-        
-        if let phone = company.phone {
-            SettingsInfoRow(label: "Téléphone", value: phone, icon: "phone")
-        }
-        if let address = company.address {
-            SettingsInfoRow(label: "Adresse", value: address, icon: "mappin")
-        }
-        if let siret = company.siret {
-            SettingsInfoRow(label: "SIRET", value: siret, icon: "doc.text")
-        }
-        
-        if permissionService.checkPermission(.editCompany) {
-            Button(action: { 
-                startEditing(company: company)
-            }) {
-                Label("Modifier", systemImage: "pencil")
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func companyEditView(company: Company) -> some View {
-        // Mode édition
-        PhotosPicker(selection: $selectedLogoItem, matching: .images) {
-            if let logoImage = logoImage {
-                Image(uiImage: logoImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 80)
-            } else {
-                Label("Changer le logo", systemImage: "photo")
-            }
-        }
-        .onChange(of: selectedLogoItem) { _, newValue in
-            Task {
-                if let data = try? await newValue?.loadTransferable(type: Data.self),
-                   let uiImage = UIImage(data: data) {
-                    logoImage = uiImage
+                // Mode édition
+                PhotosPicker(selection: $selectedLogoItem, matching: .images) {
+                    if let logoImage = logoImage {
+                        Image(uiImage: logoImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 80)
+                    } else {
+                        Label("Changer le logo", systemImage: "photo")
+                    }
+                }
+                .onChange(of: selectedLogoItem) { _, newValue in
+                    Task {
+                        if let data = try? await newValue?.loadTransferable(type: Data.self),
+                           let uiImage = UIImage(data: data) {
+                            logoImage = uiImage
+                        }
+                    }
+                }
+                
+                TextField("Nom de l'entreprise", text: $editCompanyName)
+                TextField("Email", text: $editCompanyEmail)
+                    .keyboardType(.emailAddress)
+                    .autocapitalization(.none)
+                TextField("Téléphone", text: $editCompanyPhone)
+                    .keyboardType(.phonePad)
+                TextField("Adresse", text: $editCompanyAddress)
+                TextField("SIRET", text: $editCompanySiret)
+                
+                Button(action: { 
+                    Task { await saveCompany() }
+                }) {
+                    HStack {
+                        if isSavingCompany {
+                            ProgressView()
+                        }
+                        Label(isSavingCompany ? "Enregistrement..." : "Enregistrer", systemImage: "checkmark.circle.fill")
+                    }
+                }
+                .disabled(isSavingCompany || editCompanyName.isEmpty || editCompanyEmail.isEmpty)
+                
+                Button("Annuler", role: .cancel) {
+                    isEditingCompany = false
                 }
             }
-        }
-        
-        // TextFields avec IDs stables et FocusState
-        TextField("Nom de l'entreprise", text: $editCompanyName)
-            .id("companyName")
-            .focused($focusedField, equals: .name)
-            .textContentType(.organizationName)
-            .submitLabel(.next)
-            .onSubmit { focusedField = .email }
-        
-        TextField("Email", text: $editCompanyEmail)
-            .id("companyEmail")
-            .focused($focusedField, equals: .email)
-            .keyboardType(.emailAddress)
-            .autocapitalization(.none)
-            .textContentType(.emailAddress)
-            .submitLabel(.next)
-            .onSubmit { focusedField = .phone }
-        
-        TextField("Téléphone", text: $editCompanyPhone)
-            .id("companyPhone")
-            .focused($focusedField, equals: .phone)
-            .keyboardType(.phonePad)
-            .textContentType(.telephoneNumber)
-        
-        TextField("Adresse", text: $editCompanyAddress)
-            .id("companyAddress")
-            .focused($focusedField, equals: .address)
-            .textContentType(.fullStreetAddress)
-            .submitLabel(.next)
-            .onSubmit { focusedField = .siret }
-        
-        TextField("SIRET", text: $editCompanySiret)
-            .id("companySiret")
-            .focused($focusedField, equals: .siret)
-            .submitLabel(.done)
-            .onSubmit { focusedField = nil }
-        
-        Button(action: { 
-            focusedField = nil // Fermer le clavier
-            Task { await saveCompany() }
-        }) {
-            HStack {
-                if isSavingCompany {
-                    ProgressView()
-                }
-                Label(isSavingCompany ? "Enregistrement..." : "Enregistrer", systemImage: "checkmark.circle.fill")
-            }
-        }
-        .disabled(isSavingCompany || editCompanyName.isEmpty || editCompanyEmail.isEmpty)
-        
-        Button("Annuler", role: .cancel) {
-            focusedField = nil // Fermer le clavier
-            isEditingCompany = false
+        } header: {
+            Text("Mon Entreprise")
         }
     }
     
@@ -448,36 +404,24 @@ struct SettingsView: View {
     
     private func saveCompany() async {
         guard let company = company else { return }
-        
-        // Capturer les valeurs localement avant toute modification d'état
-        let name = editCompanyName
-        let email = editCompanyEmail
-        let phone = editCompanyPhone
-        let address = editCompanyAddress
-        let siret = editCompanySiret
-        let logoToUpload = logoImage
-        
-        // Mettre à jour l'état UI une seule fois au début
-        await MainActor.run {
-            isSavingCompany = true
-        }
+        isSavingCompany = true
         
         do {
             var updatedCompany = Company(
                 companyId: company.companyId,
-                name: name,
+                name: editCompanyName,
                 logoURL: company.logoURL,
-                address: address.isEmpty ? nil : address,
-                phone: phone.isEmpty ? nil : phone,
-                email: email,
-                siret: siret.isEmpty ? nil : siret,
+                address: editCompanyAddress.isEmpty ? nil : editCompanyAddress,
+                phone: editCompanyPhone.isEmpty ? nil : editCompanyPhone,
+                email: editCompanyEmail,
+                siret: editCompanySiret.isEmpty ? nil : editCompanySiret,
                 createdAt: company.createdAt,
                 ownerId: company.ownerId
             )
             
             // Upload logo si modifié
-            if let logoToUpload = logoToUpload {
-                let logoURL = try await companyService.uploadLogo(logoToUpload, companyId: company.companyId)
+            if let logoImage = logoImage {
+                let logoURL = try await companyService.uploadLogo(logoImage, companyId: company.companyId)
                 updatedCompany = Company(
                     companyId: updatedCompany.companyId,
                     name: updatedCompany.name,
@@ -493,13 +437,12 @@ struct SettingsView: View {
             
             try await companyService.updateCompany(updatedCompany)
             
-            // Mettre à jour tous les états UI en une seule fois à la fin
             await MainActor.run {
                 self.company = updatedCompany
+                isEditingCompany = false
+                isSavingCompany = false
                 self.logoImage = nil
                 self.selectedLogoItem = nil
-                self.isSavingCompany = false
-                self.isEditingCompany = false
             }
         } catch {
             await MainActor.run {
@@ -606,7 +549,7 @@ struct SettingsView: View {
 
 // MARK: - Supporting Views
 
-struct SettingsInfoRow: View {
+struct InfoRow: View {
     let label: String
     let value: String
     let icon: String
@@ -696,18 +639,9 @@ struct GenerateInvitationView: View {
         isGenerating = true
         errorMessage = nil
         
-        guard let userId = PermissionService.shared.currentUser?.userId else {
-            errorMessage = "Utilisateur non identifié"
-            isGenerating = false
-            return
-        }
-        
         do {
-            let code = try await invitationService.generateInvitationCode(
+            let code = try await invitationService.generateCode(
                 companyId: companyId,
-                companyName: "",
-                role: .standardEmployee,
-                createdBy: userId,
                 validityDays: validityDays,
                 maxUses: maxUses
             )
@@ -824,15 +758,8 @@ struct MemberDetailView: View {
         isSaving = true
         
         do {
-            let updatedMember = User(
-                userId: member.userId,
-                email: member.email,
-                displayName: member.displayName,
-                photoURL: member.photoURL,
-                accountType: member.accountType,
-                companyId: member.companyId,
-                role: selectedRole
-            )
+            var updatedMember = member
+            updatedMember.role = selectedRole
             try await firebaseService.updateUser(updatedMember)
             
             await MainActor.run {
@@ -848,7 +775,7 @@ struct MemberDetailView: View {
     
     private func removeMember() async {
         do {
-            try await firebaseService.removeUserFromCompany(userId: member.userId)
+            try await firebaseService.removeMemberFromCompany(userId: member.userId)
             await MainActor.run {
                 dismiss()
             }
