@@ -157,10 +157,10 @@ struct QuoteBuilderView: View {
                         alertMessage = "Le panier est vide. Ajoutez des articles avant d'enregistrer."
                         showAlert = true
                     } else {
-                        // Bouton "Enregistrer" : sauvegarde sans fermer la vue
+                        // Bouton "Enregistrer" : sauvegarde ET fermer la vue
                         Task {
                             isSaving = true
-                            await saveQuote(finalize: false)  // NE PAS finaliser ni fermer
+                            await saveQuote(finalize: true)  // Finaliser et fermer
                             isSaving = false
                         }
                     }
@@ -1308,8 +1308,6 @@ struct QuoteBuilderView: View {
                 } else {
                     // Sauvegarde simple : rester sur la vue
                     print("✅ Sauvegarde brouillon réussie - Vue reste ouverte")
-                    alertMessage = "✅ Devis sauvegardé avec succès"
-                    showAlert = true
                 }
             }
             
