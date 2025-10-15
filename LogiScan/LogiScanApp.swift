@@ -14,6 +14,7 @@ import SwiftUI
 struct LogiScanApp: App {
     let sharedModelContainer: ModelContainer
     @StateObject private var authService = AuthService()
+    @StateObject private var userSessionService = UserSessionService()
 
     init() {
         // 🔥 INITIALISATION FIREBASE
@@ -108,18 +109,72 @@ struct LogiScanApp: App {
     var body: some Scene {
         WindowGroup {
             if authService.isAuthenticated {
-                MainTabView()
-                    .environmentObject(authService)
-                    .onAppear {
-                        // Charger les données d'exemple au premier lancement
-                        let context = sharedModelContainer.mainContext
-                        SampleData.createSampleData(modelContext: context)
+                if userSessionService.isLoading {
+                    // Écran de chargement pendant la récupération du profil
+                    LoadingView()
+                } else if let user = userSessionService.currentUser {
+                    // Utilisateur chargé avec succès
+                    MainTabView()
+                        .environmentObject(authService)
+                        .environmentObject(userSessionService)
+                        .onAppear {
+                            // Charger les données d'exemple au premier lancement
+                            let context = sharedModelContainer.mainContext
+                            SampleData.createSampleData(modelContext: context)
+                        }
+                } else if let error = userSessionService.error {
+                    // Erreur de chargement du profil
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 60))
+                            .foregroundColor(.red)
+                        
+                        Text("Erreur de chargement")
+                            .font(.headline)
+                        
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        Button("Réessayer") {
+                            Task {
+                                await userSessionService.loadUserSession()
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        
+                        Button("Se déconnecter") {
+                            authService.signOut()
+                            userSessionService.clearSession()
+                        }
+                        .buttonStyle(.bordered)
                     }
+                    .padding()
+                } else {
+                    // État initial : chargement en cours
+                    LoadingView()
+                }
             } else {
                 LoginView()
                     .environmentObject(authService)
+                    .environmentObject(userSessionService)
             }
         }
         .modelContainer(sharedModelContainer)
+        .onChange(of: authService.isAuthenticated) { oldValue, newValue in
+            Task {
+                if newValue {
+                    // Utilisateur vient de se connecter → Charger la session
+                    print("🔐 [App] Utilisateur connecté, chargement de la session...")
+                    await userSessionService.loadUserSession()
+                } else {
+                    // Utilisateur vient de se déconnecter → Effacer la session
+                    print("👋 [App] Utilisateur déconnecté, nettoyage de la session...")
+                    userSessionService.clearSession()
+                }
+            }
+        }
     }
 }
