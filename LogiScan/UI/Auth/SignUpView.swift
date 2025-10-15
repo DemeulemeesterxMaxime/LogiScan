@@ -558,18 +558,22 @@ struct SignUpView: View {
         
         Task {
             do {
-                // 1. Valider le code d'invitation
-                let invitationService = InvitationService()
-                let invitation = try await invitationService.validateCode(invitationCode)
+                // 1. Normaliser le code (enlever les espaces, mettre en majuscules)
+                let normalizedCode = invitationCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                print("🔑 [SignUpView] Code saisi: '\(invitationCode)' → Normalisé: '\(normalizedCode)'")
                 
-                // 2. Créer le compte Firebase Auth
+                // 2. Valider le code d'invitation
+                let invitationService = InvitationService()
+                let invitation = try await invitationService.validateCode(normalizedCode)
+                
+                // 3. Créer le compte Firebase Auth
                 try await authService.signUp(email: email, password: password, name: name)
                 
                 guard let userId = authService.currentUserId else {
                     throw SignUpError.userIdNotFound
                 }
                 
-                // 3. Créer l'utilisateur LogiScan avec le rôle spécifié
+                // 4. Créer l'utilisateur LogiScan avec le rôle spécifié
                 let firebaseService = FirebaseService()
                 try await firebaseService.createEmployeeUser(
                     userId: userId,
@@ -579,10 +583,10 @@ struct SignUpView: View {
                     role: invitation.role
                 )
                 
-                // 4. Marquer le code comme utilisé
+                // 5. Marquer le code comme utilisé
                 try await invitationService.useInvitationCode(codeId: invitation.codeId)
                 
-                // 5. Charger l'utilisateur et le définir dans le PermissionService
+                // 6. Charger l'utilisateur et le définir dans le PermissionService
                 let user = try await firebaseService.fetchUser(userId: userId)
                 await MainActor.run {
                     PermissionService.shared.setCurrentUser(user)

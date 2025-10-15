@@ -45,29 +45,63 @@ final class InvitationService {
     
     /// Valider un code d'invitation
     func validateCode(_ codeString: String) async throws -> InvitationCode {
+        // Normaliser le code (trim + uppercase)
+        let normalizedCode = codeString.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        
+        print("🔍 [InvitationService] Validation du code: '\(normalizedCode)'")
+        print("   📝 Code original: '\(codeString)'")
+        
         let snapshot = try await db.collection("invitationCodes")
-            .whereField("code", isEqualTo: codeString)
+            .whereField("code", isEqualTo: normalizedCode)
             .whereField("isActive", isEqualTo: true)
             .limit(to: 1)
             .getDocuments()
         
+        print("📊 [InvitationService] Résultats trouvés: \(snapshot.documents.count)")
+        
         guard let document = snapshot.documents.first else {
+            // Debug: Lister tous les codes actifs disponibles
+            print("⚠️ [InvitationService] Code non trouvé! Listing des codes actifs...")
+            
+            let allCodes = try await db.collection("invitationCodes")
+                .whereField("isActive", isEqualTo: true)
+                .getDocuments()
+            
+            print("📋 Codes actifs disponibles (\(allCodes.documents.count) au total):")
+            for doc in allCodes.documents {
+                if let code = doc.data()["code"] as? String,
+                   let companyName = doc.data()["companyName"] as? String,
+                   let role = doc.data()["role"] as? String {
+                    print("   ✅ \(code) - \(companyName) - Rôle: \(role)")
+                }
+            }
+            
             throw InvitationError.invalidCode
         }
         
         guard let firestoreCode = try? document.data(as: FirestoreInvitationCode.self) else {
+            print("❌ [InvitationService] Erreur parsing du document")
             throw InvitationError.invalidCode
         }
         
         let code = firestoreCode.toSwiftData()
         
+        print("✅ [InvitationService] Code valide trouvé:")
+        print("   🏢 Entreprise: \(code.companyName)")
+        print("   👤 Rôle: \(code.role.rawValue)")
+        print("   📅 Expire le: \(code.expiresAt.formatted())")
+        print("   📊 Utilisations: \(code.usedCount)/\(code.maxUses)")
+        
         // Vérifier la validité
         guard code.isValid else {
             if code.expiresAt < Date() {
+                print("❌ Code expiré!")
                 throw InvitationError.expiredCode
             } else if code.usedCount >= code.maxUses {
+                print("❌ Nombre max d'utilisations atteint!")
                 throw InvitationError.maxUsesReached
             } else {
+                print("❌ Code inactif!")
                 throw InvitationError.inactiveCode
             }
         }
