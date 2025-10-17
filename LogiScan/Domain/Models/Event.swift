@@ -26,8 +26,15 @@ final class Event {
     var startDate: Date  // Début de l'événement
     var endDate: Date  // Fin de l'événement
     var status: EventStatus
+    var _logisticsStatus: LogisticsStatus?  // Privé, optionnel pour compatibilité
     var notes: String
     var contactInfo: ContactInfo?
+    
+    // Computed property pour toujours avoir une valeur
+    var logisticsStatus: LogisticsStatus {
+        get { _logisticsStatus ?? .inStock }
+        set { _logisticsStatus = newValue }
+    }
 
     // Devis et facturation
     var assignedTruckId: String?
@@ -58,6 +65,7 @@ final class Event {
         startDate: Date = Date(),
         endDate: Date = Date().addingTimeInterval(86400),
         status: EventStatus = .planning,
+        logisticsStatus: LogisticsStatus = .inStock,
         notes: String = "",
         contactInfo: ContactInfo? = nil,
         assignedTruckId: String? = nil,
@@ -81,6 +89,7 @@ final class Event {
         self.startDate = startDate
         self.endDate = endDate
         self.status = status
+        self._logisticsStatus = logisticsStatus
         self.notes = notes
         self.contactInfo = contactInfo
         self.assignedTruckId = assignedTruckId
@@ -111,18 +120,36 @@ final class Event {
 }
 
 enum EventStatus: String, CaseIterable, Codable {
-    case planning = "PLANIFICATION"
-    case confirmed = "CONFIRME"
-    case preparation = "PREPARATION"
-    case inProgress = "EN_COURS"
-    case completed = "TERMINE"
-    case cancelled = "ANNULE"
+    case planning = "PLANIFICATION"       // Création, devis en cours
+    case confirmed = "CONFIRME"           // Contrat signé
+    case inProgress = "EN_COURS"          // Préparation/événement en cours
+    case completed = "TERMINE"            // Tout est rangé
+    case cancelled = "ANNULE"             // Annulé
+
+    // Décodage personnalisé pour gérer la migration depuis PREPARATION
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        
+        // Migration : PREPARATION → PLANIFICATION
+        if rawValue == "PREPARATION" {
+            self = .planning
+        } else if let status = EventStatus(rawValue: rawValue) {
+            self = status
+        } else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Cannot initialize EventStatus from invalid String value \(rawValue)"
+                )
+            )
+        }
+    }
 
     var displayName: String {
         switch self {
         case .planning: return "Planification"
         case .confirmed: return "Confirmé"
-        case .preparation: return "En préparation"
         case .inProgress: return "En cours"
         case .completed: return "Terminé"
         case .cancelled: return "Annulé"
@@ -133,10 +160,19 @@ enum EventStatus: String, CaseIterable, Codable {
         switch self {
         case .planning: return "gray"
         case .confirmed: return "blue"
-        case .preparation: return "orange"
         case .inProgress: return "green"
         case .completed: return "teal"
         case .cancelled: return "red"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .planning: return "calendar.badge.clock"
+        case .confirmed: return "checkmark.seal.fill"
+        case .inProgress: return "arrow.triangle.2.circlepath"
+        case .completed: return "checkmark.circle.fill"
+        case .cancelled: return "xmark.circle.fill"
         }
     }
     
@@ -144,7 +180,6 @@ enum EventStatus: String, CaseIterable, Codable {
         switch self {
         case .planning: return .gray
         case .confirmed: return .blue
-        case .preparation: return .orange
         case .inProgress: return .green
         case .completed: return .teal
         case .cancelled: return .red

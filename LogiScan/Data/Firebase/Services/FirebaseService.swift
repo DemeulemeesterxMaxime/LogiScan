@@ -7,6 +7,7 @@
 
 import Combine
 import FirebaseFirestore
+import FirebaseAuth
 import Foundation
 
 /// Service principal pour interagir avec Firestore
@@ -422,8 +423,14 @@ class FirebaseService: ObservableObject {
     
     /// Récupérer tous les événements
     func fetchEvents() async throws -> [[String: Any]] {
+        print("🔥 DEBUG Firebase: Début fetchEvents...")
+        print("   User ID: \(Auth.auth().currentUser?.uid ?? "NON AUTHENTIFIÉ")")
+        
         let snapshot = try await eventsRef.getDocuments()
-        return snapshot.documents.map { doc in
+        print("   📥 Snapshot reçu: \(snapshot.documents.count) documents")
+        
+        let results = snapshot.documents.map { doc in
+            print("      - Document ID: \(doc.documentID)")
             var data = doc.data()
             // Convertir les Timestamp en Date
             if let setupTimestamp = data["setupStartTime"] as? Timestamp {
@@ -443,6 +450,9 @@ class FirebaseService: ObservableObject {
             }
             return data
         }
+        
+        print("   ✅ Retour de \(results.count) événements")
+        return results
     }
     
     /// Récupérer tous les camions

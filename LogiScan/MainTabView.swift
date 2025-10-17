@@ -11,6 +11,15 @@ import SwiftUI
 struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
     
+    init() {
+        // Configuration de la TabBar pour qu'elle s'adapte au mode clair/sombre
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()  // Fond translucide adaptatif
+        
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+    
     var body: some View {
         TabView {
             // Dashboard

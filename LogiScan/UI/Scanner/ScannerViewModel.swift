@@ -151,6 +151,13 @@ class ScannerViewModel: ObservableObject {
     
     private func processScannedCode(_ code: String) async {
         do {
+            // D'abord, vérifier si c'est un SKU simple (code-barres)
+            // Format SKU simple: pas de ':' ou de '{'
+            if !code.contains(":") && !code.contains("{") {
+                await handleDirectSKUScan(code)
+                return
+            }
+            
             // Analyser le payload QR pour déterminer le type
             let payload = try parseQRPayload(code)
             
@@ -167,6 +174,109 @@ class ScannerViewModel: ObservableObject {
             
         } catch {
             await showErrorMessage(error.localizedDescription)
+        }
+    }
+    
+    // MARK: - Direct SKU Scan
+    
+    private func handleDirectSKUScan(_ sku: String) async {
+        do {
+            print("🔍 [Scanner] Scan direct SKU: \(sku)")
+            
+            // Rechercher tous les assets avec ce SKU
+            let assets = try await assetRepository.searchAssets(sku)
+            
+            guard !assets.isEmpty else {
+                await showErrorMessage("Aucun asset trouvé pour le SKU: \(sku)")
+                playErrorSound()
+                return
+            }
+            
+            print("📦 [Scanner] Trouvé \(assets.count) asset(s) avec SKU \(sku)")
+            
+            // Si un seul asset, le traiter directement
+            if assets.count == 1 {
+                let asset = assets[0]
+                await handleSingleAssetScan(asset, fromSKU: sku)
+                return
+            }
+            
+            // Si plusieurs assets, selon le mode:
+            switch currentMode {
+            case .free:
+                // Mode libre: afficher la liste pour choisir
+                await showAssetSelectionSheet(assets: assets, sku: sku)
+                
+            case .inventory:
+                // Mode inventaire: scanner tous les assets de ce SKU
+                await handleMultipleAssetsScan(assets, fromSKU: sku)
+                
+            default:
+                // Modes workflow: chercher le premier disponible dans la liste attendue
+                if let expectedAssets = currentSession?.expectedAssets {
+                    let availableAsset = assets.first { expectedAssets.contains($0.assetId) }
+                    if let asset = availableAsset {
+                        await handleSingleAssetScan(asset, fromSKU: sku)
+                    } else {
+                        await showErrorMessage("Asset \(sku) non attendu dans cette liste")
+                        playErrorSound()
+                    }
+                } else {
+                    // Pas de liste: prendre le premier disponible
+                    let availableAsset = assets.first { $0.status == .available }
+                    if let asset = availableAsset {
+                        await handleSingleAssetScan(asset, fromSKU: sku)
+                    } else {
+                        await showErrorMessage("Aucun asset \(sku) disponible")
+                        playErrorSound()
+                    }
+                }
+            }
+        } catch {
+            await showErrorMessage("Erreur lors de la recherche SKU: \(error.localizedDescription)")
+            playErrorSound()
+        }
+    }
+    
+    private func handleSingleAssetScan(_ asset: Asset, fromSKU sku: String) async {
+        do {
+            // Créer un payload virtuel pour réutiliser la logique existante
+            let payload = QRPayload(
+                v: 1,
+                type: "asset",
+                id: asset.assetId,
+                sku: sku,
+                sn: asset.serialNumber,
+                skus: nil
+            )
+            
+            await handleAssetScan(payload)
+        }
+    }
+    
+    private func handleMultipleAssetsScan(_ assets: [Asset], fromSKU sku: String) async {
+        // Mode inventaire: scanner tous les assets
+        for asset in assets {
+            await handleSingleAssetScan(asset, fromSKU: sku)
+            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s entre chaque
+        }
+    }
+    
+    @Published var showAssetSelection = false
+    @Published var assetsForSelection: [Asset] = []
+    @Published var skuForSelection: String = ""
+    
+    private func showAssetSelectionSheet(assets: [Asset], sku: String) async {
+        assetsForSelection = assets
+        skuForSelection = sku
+        showAssetSelection = true
+        stopScanning()
+    }
+    
+    func selectAssetFromSheet(_ asset: Asset) {
+        showAssetSelection = false
+        Task {
+            await handleSingleAssetScan(asset, fromSKU: skuForSelection)
         }
     }
     

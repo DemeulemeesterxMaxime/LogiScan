@@ -1285,6 +1285,22 @@ struct QuoteBuilderView: View {
             )
             print("✅ Sauvegarde complète réussie (local + Firebase)")
             
+            // Si finalisation, créer automatiquement la ScanList
+            if finalize {
+                print("📋 Création automatique de la liste de scan...")
+                do {
+                    let scanList = try scanListService.generateScanList(
+                        from: event,
+                        quoteItems: quoteItems,
+                        modelContext: modelContext
+                    )
+                    print("✅ ScanList créée automatiquement: \(scanList.totalItems) articles")
+                } catch {
+                    print("⚠️ Erreur création ScanList (non bloquant): \(error)")
+                    // Ne pas bloquer la finalisation si la liste échoue
+                }
+            }
+            
             // Fermer l'interface sur le Main Thread (SEULEMENT si finalisé)
             await MainActor.run {
                 if finalize {

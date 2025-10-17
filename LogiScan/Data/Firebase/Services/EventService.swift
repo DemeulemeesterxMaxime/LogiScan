@@ -7,6 +7,7 @@
 
 import Foundation
 import FirebaseFirestore
+import FirebaseAuth
 import SwiftData
 
 /// Service dédié à la gestion des événements et devis
@@ -187,6 +188,76 @@ final class EventService: ObservableObject {
         // TODO: Implémenter deleteEvent dans FirebaseService si nécessaire
         
         print("✅ [EventService] Événement supprimé")
+    }
+    
+    // MARK: - Migration (Temporaire - À supprimer après migration)
+    
+    /// Migration ponctuelle : ajouter logisticsStatus aux anciens événements
+    /// ⚠️ À exécuter UNE SEULE FOIS puis supprimer ce code
+    func migrateOldEventsToLogisticsStatus() async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("❌ Migration impossible: utilisateur non connecté")
+            return
+        }
+        
+        print("🔄 [Migration] Début de la migration logisticsStatus...")
+        print("   User ID: \(userId)")
+        
+        // Récupérer TOUS les événements de l'utilisateur
+        let snapshot = try await db.collection("events")
+            .whereField("userId", isEqualTo: userId)
+            .getDocuments()
+        
+        print("   📊 \(snapshot.documents.count) événements trouvés")
+        
+        var migratedCount = 0
+        var alreadyMigratedCount = 0
+        
+        for document in snapshot.documents {
+            let data = document.data()
+            let eventId = document.documentID
+            let eventName = data["name"] as? String ?? "Sans nom"
+            
+            // Vérifier si logisticsStatus existe déjà
+            if data["logisticsStatus"] != nil {
+                alreadyMigratedCount += 1
+                print("   ⏭️  \(eventName) - déjà migré")
+                continue
+            }
+            
+            // Déterminer le logisticsStatus selon le status de l'événement
+            let eventStatus = data["status"] as? String ?? "PLANIFICATION"
+            let logisticsStatus: String
+            
+            switch eventStatus {
+            case "PLANIFICATION", "CONFIRME":
+                logisticsStatus = "EN_STOCK"  // Matériel au stock
+            case "EN_COURS":
+                logisticsStatus = "SUR_SITE"  // En cours d'événement
+            case "TERMINE":
+                logisticsStatus = "RENDU"     // Tout est rentré
+            case "ANNULE":
+                logisticsStatus = "EN_STOCK"  // Par défaut si annulé
+            default:
+                logisticsStatus = "EN_STOCK"
+            }
+            
+            // Mettre à jour l'événement
+            try await db.collection("events")
+                .document(eventId)
+                .updateData([
+                    "logisticsStatus": logisticsStatus,
+                    "updatedAt": Timestamp(date: Date())
+                ])
+            
+            migratedCount += 1
+            print("   ✅ \(eventName) → \(logisticsStatus)")
+        }
+        
+        print("✅ [Migration] Terminée:")
+        print("   - \(migratedCount) événements migrés")
+        print("   - \(alreadyMigratedCount) déjà à jour")
+        print("   - Total: \(snapshot.documents.count) événements")
     }
 }
 

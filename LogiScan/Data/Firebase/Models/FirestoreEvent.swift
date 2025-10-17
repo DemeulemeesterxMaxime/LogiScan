@@ -20,6 +20,7 @@ struct FirestoreEvent: Codable {
     var startDate: Date
     var endDate: Date
     var status: String
+    var logisticsStatus: String?  // Optionnel pour compatibilité avec anciens événements
     var notes: String
     var assignedTruckId: String?
     var totalAmount: Double
@@ -46,6 +47,7 @@ struct FirestoreEvent: Codable {
         case startDate
         case endDate
         case status
+        case logisticsStatus
         case notes
         case assignedTruckId
         case totalAmount
@@ -79,6 +81,7 @@ extension Event {
             startDate: startDate,
             endDate: endDate,
             status: status.rawValue,
+            logisticsStatus: logisticsStatus.rawValue,
             notes: notes,
             assignedTruckId: assignedTruckId,
             totalAmount: totalAmount,
@@ -111,6 +114,7 @@ extension FirestoreEvent {
             startDate: startDate,
             endDate: endDate,
             status: EventStatus(rawValue: status) ?? .planning,
+            logisticsStatus: logisticsStatus.flatMap { LogisticsStatus(rawValue: $0) } ?? .inStock,
             notes: notes,
             assignedTruckId: assignedTruckId,
             totalAmount: totalAmount,
