@@ -24,6 +24,10 @@ struct EventScanListView: View {
     @State private var selectedFilter: ScanItemStatus? = nil
     @State private var searchText = ""
     
+    // Throttling pour éviter les scans trop rapides
+    @State private var lastScanTime: Date?
+    private let minimumScanInterval: TimeInterval = 1.0 // 1 seconde entre chaque scan
+    
     private var filteredItems: [PreparationListItem] {
         var items = scanList.items
         
@@ -313,6 +317,24 @@ struct EventScanListView: View {
     // MARK: - Actions
     
     private func handleScan(_ result: ScannedAssetResult) {
+        // Vérifier le throttling (1 scan par seconde max)
+        let now = Date()
+        if let lastTime = lastScanTime {
+            let elapsed = now.timeIntervalSince(lastTime)
+            if elapsed < minimumScanInterval {
+                print("⏱️ Scan ignoré : trop rapide (\(String(format: "%.2f", elapsed))s)")
+                
+                // Feedback visuel
+                alertTitle = "⏱️ Trop rapide"
+                alertMessage = "Attendez 1 seconde entre chaque scan"
+                showAlert = true
+                return
+            }
+        }
+        
+        // Mettre à jour le timestamp
+        lastScanTime = now
+        
         Task { @MainActor in
             do {
                 try scanListService.recordScan(

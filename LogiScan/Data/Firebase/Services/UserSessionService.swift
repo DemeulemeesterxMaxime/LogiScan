@@ -50,6 +50,10 @@ class UserSessionService: ObservableObject {
             currentUser = user
             PermissionService.shared.setCurrentUser(user)
             
+            // ✅ NOUVEAU : Stocker userId dans UserDefaults pour la création des tâches
+            UserDefaults.standard.set(userId, forKey: "currentUserId")
+            print("💾 [UserSession] UserId stocké dans UserDefaults: \(userId)")
+            
         } catch {
             print("❌ [UserSession] Erreur chargement: \(error.localizedDescription)")
             self.error = "Impossible de charger votre profil: \(error.localizedDescription)"
@@ -62,6 +66,10 @@ class UserSessionService: ObservableObject {
     func clearSession() {
         currentUser = nil
         PermissionService.shared.clearCurrentUser()
+        
+        // ✅ NOUVEAU : Supprimer userId de UserDefaults
+        UserDefaults.standard.removeObject(forKey: "currentUserId")
+        
         error = nil
         print("🧹 [UserSession] Session effacée")
     }

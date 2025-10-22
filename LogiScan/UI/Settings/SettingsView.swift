@@ -361,9 +361,16 @@ struct SettingsView: View {
             ForEach(invitationCodes, id: \.codeId) { code in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(code.code)
-                            .font(.system(.body, design: .monospaced))
-                            .fontWeight(.bold)
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let customName = code.customName {
+                                Text(customName)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            Text(code.code)
+                                .font(.system(.body, design: .monospaced))
+                                .fontWeight(.bold)
+                        }
                         
                         Spacer()
                         
@@ -376,9 +383,41 @@ struct SettingsView: View {
                         }
                     }
                     
-                    Text("\(code.usedCount)/\(code.maxUses) utilisations")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack {
+                        Text("\(code.usedCount)/\(code.maxUses) utilisations")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text("•")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(roleDisplayName(code.role))
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        deleteCode(code)
+                    } label: {
+                        Label("Supprimer", systemImage: "trash")
+                    }
+                    
+                    if code.isActive {
+                        Button {
+                            deactivateCode(code)
+                        } label: {
+                            Label("Désactiver", systemImage: "pause.circle")
+                        }
+                        .tint(.orange)
+                    } else {
+                        Button {
+                            activateCode(code)
+                        } label: {
+                            Label("Activer", systemImage: "play.circle")
+                        }
+                        .tint(.green)
+                    }
                 }
             }
             
@@ -582,6 +621,54 @@ struct SettingsView: View {
         }
     }
     
+    private func deactivateCode(_ code: InvitationCode) {
+        Task {
+            do {
+                try await invitationService.deactivateCode(codeId: code.codeId)
+                await loadData()
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Erreur lors de la désactivation: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func activateCode(_ code: InvitationCode) {
+        Task {
+            do {
+                try await invitationService.activateCode(codeId: code.codeId)
+                await loadData()
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Erreur lors de l'activation: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func deleteCode(_ code: InvitationCode) {
+        Task {
+            do {
+                try await invitationService.deleteCode(codeId: code.codeId)
+                await loadData()
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Erreur lors de la suppression: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func roleDisplayName(_ role: User.UserRole) -> String {
+        switch role {
+        case .admin: return "Admin"
+        case .manager: return "Manager"
+        case .standardEmployee: return "Employé"
+        case .limitedEmployee: return "Employé limité"
+        }
+    }
+    
     private var initials: String {
         guard let name = currentUser?.displayName else { return "?" }
         let components = name.split(separator: " ")
@@ -627,8 +714,15 @@ struct GenerateInvitationView: View {
     
     @Environment(\.dismiss) var dismiss
     @State private var invitationService = InvitationService()
+    
+    // Nouvelles propriétés pour personnalisation
+    @State private var customName = ""
+    @State private var customCode = ""
+    @State private var useCustomCode = false
+    @State private var selectedRole: User.UserRole = .standardEmployee
     @State private var validityDays = 30
     @State private var maxUses = 10
+    
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var generatedCode: InvitationCode?
@@ -636,19 +730,106 @@ struct GenerateInvitationView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section {
+                Section("Informations") {
+                    TextField("Nom du code (optionnel)", text: $customName)
+                        .textInputAutocapitalization(.words)
+                    
+                    Text("Ex: 'Équipe Livraison', 'Nouveaux Stagiaires', etc.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Section("Code d'invitation") {
+                    Toggle("Personnaliser le code", isOn: $useCustomCode)
+                    
+                    if useCustomCode {
+                        TextField("Code personnalisé", text: $customCode)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .onChange(of: customCode) { _, newValue in
+                                // Formater en majuscules et enlever espaces
+                                customCode = newValue
+                                    .uppercased()
+                                    .replacingOccurrences(of: " ", with: "-")
+                            }
+                        
+                        Text("Ex: 'LIVRAISON-2025', 'TEAM-A', etc.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        if !customCode.isEmpty {
+                            HStack {
+                                Image(systemName: "info.circle")
+                                    .foregroundStyle(.blue)
+                                Text("Aperçu: \(customCode)")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .monospaced()
+                            }
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                                .foregroundStyle(.purple)
+                            Text("Code généré automatiquement")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                
+                Section("Paramètres du code") {
+                    // Sélection du rôle
+                    Picker("Rôle attribué", selection: $selectedRole) {
+                        Label("👤 Employé", systemImage: "person")
+                            .tag(User.UserRole.standardEmployee)
+                        Label("👥 Employé limité", systemImage: "person.crop.circle")
+                            .tag(User.UserRole.limitedEmployee)
+                        Label("👔 Manager", systemImage: "person.2")
+                            .tag(User.UserRole.manager)
+                        Label("⚙️ Admin", systemImage: "star")
+                            .tag(User.UserRole.admin)
+                    }
+                    .pickerStyle(.menu)
+                    
                     Stepper("Validité: \(validityDays) jours", value: $validityDays, in: 1...365)
                     Stepper("Utilisations max: \(maxUses)", value: $maxUses, in: 1...100)
-                } header: {
-                    Text("Paramètres")
+                }
+                
+                Section("Permissions du rôle") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Ce code donnera le rôle: **\(roleDisplayName(selectedRole))**")
+                            .font(.subheadline)
+                        
+                        Text("Permissions incluses:")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
+                        
+                        ForEach(rolePermissions(selectedRole), id: \.self) { permission in
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .font(.caption)
+                                Text(permissionDisplayName(permission))
+                                    .font(.caption)
+                            }
+                        }
+                    }
                 }
                 
                 if let code = generatedCode {
                     Section {
                         HStack {
-                            Text(code.code)
-                                .font(.system(.title3, design: .monospaced))
-                                .fontWeight(.bold)
+                            VStack(alignment: .leading, spacing: 4) {
+                                if let name = code.customName {
+                                    Text(name)
+                                        .font(.headline)
+                                }
+                                Text(code.code)
+                                    .font(.system(.title3, design: .monospaced))
+                                    .fontWeight(.bold)
+                            }
                             
                             Spacer()
                             
@@ -669,6 +850,18 @@ struct GenerateInvitationView: View {
                             .foregroundColor(.red)
                     }
                 }
+                
+                Section {
+                    if useCustomCode {
+                        Text("⚠️ Assurez-vous que le code personnalisé est unique et facile à partager.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Text("Le code expirera dans \(validityDays) jours et pourra être utilisé \(maxUses) fois maximum.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .navigationTitle("Nouveau code")
             .navigationBarTitleDisplayMode(.inline)
@@ -686,7 +879,7 @@ struct GenerateInvitationView: View {
                             await generateCode()
                         }
                     }
-                    .disabled(isGenerating || generatedCode != nil)
+                    .disabled(isGenerating || generatedCode != nil || (useCustomCode && customCode.isEmpty))
                 }
             }
         }
@@ -703,10 +896,15 @@ struct GenerateInvitationView: View {
         }
         
         do {
+            let finalCustomName = customName.isEmpty ? nil : customName
+            let finalCustomCode = (useCustomCode && !customCode.isEmpty) ? customCode : nil
+            
             let code = try await invitationService.generateInvitationCode(
                 companyId: companyId,
                 companyName: "",
-                role: .standardEmployee,
+                customCode: finalCustomCode,
+                customName: finalCustomName,
+                role: selectedRole,
                 createdBy: userId,
                 validityDays: validityDays,
                 maxUses: maxUses
@@ -715,6 +913,21 @@ struct GenerateInvitationView: View {
             await MainActor.run {
                 self.generatedCode = code
                 self.isGenerating = false
+                
+                // Copier le code dans le presse-papier
+                UIPasteboard.general.string = code.code
+                
+                // Fermer la page après un court délai
+                Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconde
+                    onDismiss()
+                    dismiss()
+                }
+            }
+        } catch let error as InvitationService.InvitationError {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+                self.isGenerating = false
             }
         } catch {
             await MainActor.run {
@@ -722,6 +935,33 @@ struct GenerateInvitationView: View {
                 self.isGenerating = false
             }
         }
+    }
+    
+    // Helper functions pour affichage
+    private func roleDisplayName(_ role: User.UserRole) -> String {
+        switch role {
+        case .admin: return "Administrateur"
+        case .manager: return "Manager"
+        case .standardEmployee: return "Employé"
+        case .limitedEmployee: return "Employé limité"
+        }
+    }
+    
+    private func rolePermissions(_ role: User.UserRole) -> [String] {
+        switch role {
+        case .admin:
+            return ["Gestion complète", "Accès à toutes les fonctionnalités", "Gestion des utilisateurs", "Codes d'invitation", "Paramètres entreprise"]
+        case .manager:
+            return ["Gestion d'équipe", "Création événements", "Gestion stock", "Rapports", "Validation commandes"]
+        case .standardEmployee:
+            return ["Consultation stock", "Scanner articles", "Création commandes", "Gestion événements limités"]
+        case .limitedEmployee:
+            return ["Consultation uniquement", "Scanner articles", "Accès lecture seule"]
+        }
+    }
+    
+    private func permissionDisplayName(_ permission: String) -> String {
+        return permission
     }
 }
 

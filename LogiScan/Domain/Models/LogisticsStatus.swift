@@ -48,7 +48,7 @@ enum LogisticsStatus: String, CaseIterable, Codable {
         case .onSite:
             return "location.fill"
         case .loadingFromEvent:
-            return "arrow.down.bin.fill"
+            return "arrow.down.circle.fill"
         case .inTransitToStock:
             return "truck.box.badge.clock.fill"
         case .returned:

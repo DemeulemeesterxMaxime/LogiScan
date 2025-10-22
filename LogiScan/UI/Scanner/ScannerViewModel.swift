@@ -41,6 +41,10 @@ class ScannerViewModel: ObservableObject {
     @Published var showDuplicateWarning = false
     @Published var lastScanTimestamp: Date?
     
+    // Throttling pour éviter les scans trop rapides
+    private var lastScanTime: Date?
+    private let minimumScanInterval: TimeInterval = 1.0 // 1 seconde entre chaque scan
+    
     private let assetRepository: AssetRepositoryProtocol
     private let movementRepository: MovementRepositoryProtocol
     
@@ -66,6 +70,19 @@ class ScannerViewModel: ObservableObject {
     }
     
     func handleScannedCode(_ code: String) {
+        // Vérifier le throttling (1 scan par seconde max)
+        let now = Date()
+        if let lastTime = lastScanTime {
+            let elapsed = now.timeIntervalSince(lastTime)
+            if elapsed < minimumScanInterval {
+                print("⏱️ Scan ignoré : trop rapide (\(String(format: "%.2f", elapsed))s)")
+                return
+            }
+        }
+        
+        // Mettre à jour le timestamp
+        lastScanTime = now
+        
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
@@ -181,18 +198,27 @@ class ScannerViewModel: ObservableObject {
     
     private func handleDirectSKUScan(_ sku: String) async {
         do {
-            print("🔍 [Scanner] Scan direct SKU: \(sku)")
+            print("🔍 [Scanner] Scan direct SKU: '\(sku)'")
+            print("   - Longueur: \(sku.count) caractères")
+            print("   - Mode actuel: \(currentMode)")
             
             // Rechercher tous les assets avec ce SKU
             let assets = try await assetRepository.searchAssets(sku)
             
+            print("📦 [Scanner] Trouvé \(assets.count) asset(s) avec SKU '\(sku)'")
+            
             guard !assets.isEmpty else {
-                await showErrorMessage("Aucun asset trouvé pour le SKU: \(sku)")
+                print("❌ [Scanner] Aucun asset trouvé pour SKU: '\(sku)'")
+                print("   💡 Vérifiez que:")
+                print("      1. Le SKU existe dans la base de données (Catalogue → Assets)")
+                print("      2. La casse est correcte (ex: 'SPK-12' != 'spk-12')")
+                print("      3. Il n'y a pas d'espaces avant/après le SKU")
+                await showErrorMessage("❌ Aucun asset trouvé pour le SKU: '\(sku)'\n\n💡 Vérifiez que le SKU existe dans votre catalogue")
                 playErrorSound()
                 return
             }
             
-            print("📦 [Scanner] Trouvé \(assets.count) asset(s) avec SKU \(sku)")
+            print("📦 [Scanner] Trouvé \(assets.count) asset(s) avec SKU '\(sku)'")
             
             // Si un seul asset, le traiter directement
             if assets.count == 1 {

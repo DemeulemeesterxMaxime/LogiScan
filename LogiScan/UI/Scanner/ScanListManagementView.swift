@@ -363,6 +363,7 @@ struct ScanListItemManagementRow: View {
     let scanList = ScanList(
         eventId: "test",
         eventName: "Festival Test",
+        scanDirection: .stockToTruck,
         totalItems: 100,
         scannedItems: 60,
         status: .inProgress

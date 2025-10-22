@@ -22,6 +22,8 @@ struct AdminView: View {
     @State private var company: Company?
     @State private var members: [User] = []
     @State private var invitationCodes: [InvitationCode] = []
+    @State private var archivedCodes: [InvitationCode] = []  // Nouveau
+    @State private var showArchivedCodes = false  // Nouveau
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var successMessage: String?
@@ -51,10 +53,13 @@ struct AdminView: View {
     @State private var logoImage: UIImage?
     @State private var isUploadingLogo = false
     
-    // Génération code
+        // Génération de code
     @State private var newCodeValidityDays = 30
     @State private var newCodeMaxUses = 10
     @State private var newCodeRole: User.UserRole = .standardEmployee
+    @State private var newCodeCustomName = ""
+    @State private var newCodeCustomCode = ""  // Nouveau : code personnalisé
+    @State private var useCustomCode = false  // Toggle pour activer la personnalisation
 
     
     var body: some View {
@@ -67,6 +72,11 @@ struct AdminView: View {
                         VStack(spacing: 24) {
                             // Section Entreprise
                             companySection(company)
+                            
+                            // Section Gestion des Tâches (Manager et Admin)
+                            if permissionService.checkPermission(.writeTasks) || permissionService.checkPermission(.manageTasks) {
+                                taskManagementSection
+                            }
                             
                             // Section Membres
                             membersSection
@@ -222,6 +232,137 @@ struct AdminView: View {
         }
     }
     
+    // MARK: - Task Management Section
+    
+    @ViewBuilder
+    private var taskManagementSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "checklist")
+                    .font(.title2)
+                    .foregroundStyle(.blue)
+                
+                Text("Gestion des Tâches")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+            }
+            
+            VStack(spacing: 12) {
+                // Créer une tâche
+                if permissionService.checkPermission(.writeTasks) {
+                    NavigationLink {
+                        CreateTaskView()
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.blue)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Créer une tâche")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                Text("Ajouter une nouvelle tâche à l'équipe")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.blue.opacity(0.1))
+                        )
+                    }
+                }
+                
+                // Gérer toutes les tâches
+                if permissionService.checkPermission(.manageTasks) {
+                    NavigationLink {
+                        // TODO: AdminTaskManagementView (Phase 4)
+                        Text("Gérer toutes les tâches - À IMPLÉMENTER")
+                            .navigationTitle("Gestion des tâches")
+                    } label: {
+                        HStack {
+                            Image(systemName: "list.bullet.clipboard.fill")
+                                .font(.title3)
+                                .foregroundStyle(.purple)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Gérer toutes les tâches")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                Text("Vue d'ensemble de toutes les tâches")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.purple.opacity(0.1))
+                        )
+                    }
+                }
+                
+                // Attribuer des tâches
+                if permissionService.checkPermission(.assignTasks) {
+                    NavigationLink {
+                        // TODO: TaskAssignmentView (Phase 4)
+                        Text("Attribuer des tâches - À IMPLÉMENTER")
+                            .navigationTitle("Attribution de tâches")
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.badge.plus.fill")
+                                .font(.title3)
+                                .foregroundStyle(.green)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Attribuer des tâches")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                Text("Assigner des tâches aux membres")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.green.opacity(0.1))
+                        )
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
+    }
+    
     // MARK: - Members Section
     
     @ViewBuilder
@@ -300,7 +441,7 @@ struct AdminView: View {
             
             if invitationCodes.isEmpty {
                 ContentUnavailableView(
-                    "Aucun code",
+                    "Aucun code actif",
                     systemImage: "ticket",
                     description: Text("Générez un code d'invitation pour inviter des employés")
                 )
@@ -316,6 +457,12 @@ struct AdminView: View {
                             },
                             onDelete: {
                                 deleteCode(code)
+                            },
+                            onArchive: {
+                                archiveCode(code)
+                            },
+                            onUnarchive: {
+                                unarchiveCode(code)
                             }
                         )
                     }
@@ -324,6 +471,48 @@ struct AdminView: View {
                 .background(Color(.systemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .shadow(color: .black.opacity(0.1), radius: 5, y: 2)
+            }
+            
+            // Section codes archivés
+            if !archivedCodes.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Button {
+                        withAnimation {
+                            showArchivedCodes.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: showArchivedCodes ? "chevron.down" : "chevron.right")
+                                .font(.caption)
+                            Text("Codes archivés (\(archivedCodes.count))")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Spacer()
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                    
+                    if showArchivedCodes {
+                        VStack(spacing: 8) {
+                            ForEach(archivedCodes) { code in
+                                InvitationCodeRow(
+                                    code: code,
+                                    onDeactivate: { },
+                                    onDelete: {
+                                        deleteCode(code)
+                                    },
+                                    onArchive: nil,
+                                    onUnarchive: {
+                                        unarchiveCode(code)
+                                    }
+                                )
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
             }
         }
     }
@@ -403,6 +592,62 @@ struct AdminView: View {
     private var generateInvitationCodeSheet: some View {
         NavigationStack {
             Form {
+                Section("Informations") {
+                    TextField("Nom du code (optionnel)", text: $newCodeCustomName)
+                        .textInputAutocapitalization(.words)
+                    
+                    Text("Ex: 'Équipe Livraison', 'Nouveaux Stagiaires', etc.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Section("Code d'invitation") {
+                    Toggle("Personnaliser le code", isOn: $useCustomCode)
+                    
+                    if useCustomCode {
+                        TextField("Code personnalisé", text: $newCodeCustomCode)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .onChange(of: newCodeCustomCode) { _, newValue in
+                                // Formater en majuscules et enlever espaces
+                                newCodeCustomCode = newValue
+                                    .uppercased()
+                                    .replacingOccurrences(of: " ", with: "-")
+                            }
+                        
+                        Text("Ex: 'LIVRAISON-2025', 'TEAM-A', etc.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        if !newCodeCustomCode.isEmpty {
+                            HStack {
+                                Image(systemName: "info.circle")
+                                    .foregroundStyle(.blue)
+                                Text("Aperçu: \(newCodeCustomCode)")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .monospaced()
+                            }
+                        }
+                    } else {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                                .foregroundStyle(.purple)
+                            Text("Code généré automatiquement")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        if let companyName = company?.name {
+                            Text("Format: \(generatePreviewCode(companyName: companyName))")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .monospaced()
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                
                 Section("Paramètres du code") {
                     // Sélection du rôle
                     Picker("Rôle attribué", selection: $newCodeRole) {
@@ -445,9 +690,11 @@ struct AdminView: View {
                 }
                 
                 Section {
-                    Text("Le code sera automatiquement généré au format: \(company?.name.uppercased() ?? "COMPANY")-2025-XXXX")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if useCustomCode {
+                        Text("⚠️ Assurez-vous que le code personnalisé est unique et facile à partager.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     
                     Text("Le code expirera dans \(newCodeValidityDays) jours et pourra être utilisé \(newCodeMaxUses) fois maximum.")
                         .font(.caption)
@@ -467,8 +714,18 @@ struct AdminView: View {
                     Button("Générer") {
                         generateInvitationCode()
                     }
+                    .disabled(useCustomCode && newCodeCustomCode.isEmpty)
                 }
             }
+        }
+        .onAppear {
+            // Reset form
+            newCodeCustomName = ""
+            newCodeCustomCode = ""
+            useCustomCode = false
+            newCodeRole = .standardEmployee
+            newCodeValidityDays = 30
+            newCodeMaxUses = 10
         }
     }
     
@@ -598,7 +855,8 @@ struct AdminView: View {
             
             // Charger les codes d'invitation (si Admin ou Manager)
             if permissionService.isManagerOrAbove() {
-                invitationCodes = try await invitationService.fetchInvitationCodes(companyId: companyId)
+                invitationCodes = try await invitationService.fetchInvitationCodes(companyId: companyId, includeArchived: false)
+                archivedCodes = try await invitationService.fetchArchivedCodes(companyId: companyId)
             }
             
         } catch {
@@ -664,17 +922,35 @@ struct AdminView: View {
         
         Task {
             do {
+                let customName = newCodeCustomName.isEmpty ? nil : newCodeCustomName
+                let customCode = (useCustomCode && !newCodeCustomCode.isEmpty) ? newCodeCustomCode : nil
+                
                 let code = try await invitationService.generateInvitationCode(
                     companyId: companyId,
                     companyName: company?.name ?? "COMPANY",
-                    role: newCodeRole,  // Utilise le rôle sélectionné
+                    customCode: customCode,  // Code personnalisé
+                    customName: customName,  // Nom personnalisé
+                    role: newCodeRole,
                     createdBy: createdBy,
                     validityDays: newCodeValidityDays,
                     maxUses: newCodeMaxUses
                 )
-                successMessage = "Code généré: \(code.code)"
+                
+                // Copier le code dans le presse-papier
+                await MainActor.run {
+                    UIPasteboard.general.string = code.code
+                }
+                
+                if let customName = customName {
+                    successMessage = "Code '\(customName)' généré et copié: \(code.code)"
+                } else {
+                    successMessage = "Code généré et copié: \(code.code)"
+                }
+                
                 showingGenerateCodeSheet = false
                 await loadData()
+            } catch let error as InvitationService.InvitationError {
+                errorMessage = error.localizedDescription
             } catch {
                 errorMessage = "Erreur: \(error.localizedDescription)"
             }
@@ -699,7 +975,31 @@ struct AdminView: View {
         Task {
             do {
                 try await invitationService.deleteCode(codeId: code.codeId)
-                successMessage = "Code \(code.code) supprimé"
+                successMessage = "Code \(code.displayName) supprimé"
+                await loadData()
+            } catch {
+                errorMessage = "Erreur: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func archiveCode(_ code: InvitationCode) {
+        Task {
+            do {
+                try await invitationService.archiveCode(codeId: code.codeId)
+                successMessage = "Code \(code.displayName) archivé"
+                await loadData()
+            } catch {
+                errorMessage = "Erreur: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func unarchiveCode(_ code: InvitationCode) {
+        Task {
+            do {
+                try await invitationService.unarchiveCode(codeId: code.codeId)
+                successMessage = "Code \(code.displayName) restauré"
                 await loadData()
             } catch {
                 errorMessage = "Erreur: \(error.localizedDescription)"
@@ -848,73 +1148,253 @@ struct InvitationCodeRow: View {
     let code: InvitationCode
     let onDeactivate: () -> Void
     let onDelete: () -> Void
+    let onArchive: (() -> Void)?
+    let onUnarchive: (() -> Void)?
     
     @State private var permissionService = PermissionService.shared
+    @State private var showingEditNameSheet = false
+    @State private var editedName = ""
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(code.code)
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .monospaced()
+        VStack(alignment: .leading, spacing: 12) {
+            // En-tête avec nom/code et statut
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let customName = code.customName, !customName.isEmpty {
+                        Text(customName)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                        Text(code.code)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .monospaced()
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(code.code)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .monospaced()
+                    }
+                    
+                    // Badge du rôle
+                    HStack(spacing: 4) {
+                        Image(systemName: roleIcon(code.role))
+                            .font(.caption2)
+                        Text(code.role.displayName)
+                            .font(.caption2)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.blue.opacity(0.1))
+                    .foregroundStyle(.blue)
+                    .clipShape(Capsule())
+                }
                 
                 Spacer()
                 
-                if code.isActive {
-                    if code.isValid {
-                        Label("Actif", systemImage: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.green)
-                    } else {
-                        Label("Expiré", systemImage: "exclamationmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
-                } else {
-                    Label("Inactif", systemImage: "xmark.circle.fill")
+                // Statut
+                statusBadge
+            }
+            
+            // Informations
+            VStack(spacing: 4) {
+                HStack {
+                    Image(systemName: "calendar")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("Expire: \(code.expiresAt.formatted(date: .abbreviated, time: .omitted))")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.secondary)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "person.2")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("\(code.usedCount)/\(code.maxUses)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    // Barre de progression
+                    ProgressView(value: Double(code.usedCount), total: Double(code.maxUses))
+                        .frame(width: 40)
+                        .tint(progressColor)
                 }
             }
             
-            HStack {
-                Text("Expire: \(code.expiresAt.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-                
-                Text("Utilisé: \(code.usedCount)/\(code.maxUses)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            
-            if code.isActive && permissionService.isAdmin() {
-                HStack {
-                    Button(role: .destructive) {
-                        onDeactivate()
-                    } label: {
-                        Label("Désactiver", systemImage: "xmark.circle")
-                            .font(.caption)
+            // Actions
+            if permissionService.isAdmin() {
+                HStack(spacing: 8) {
+                    if code.isArchived {
+                        // Code archivé - option de restauration
+                        if let onUnarchive = onUnarchive {
+                            Button {
+                                onUnarchive()
+                            } label: {
+                                Label("Restaurer", systemImage: "arrow.clockwise")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.blue)
+                        }
+                    } else if code.isActive {
+                        // Code actif - options complètes
+                        Button {
+                            editedName = code.customName ?? ""
+                            showingEditNameSheet = true
+                        } label: {
+                            Label("Renommer", systemImage: "pencil")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.blue)
+                        
+                        if let onArchive = onArchive {
+                            Button {
+                                onArchive()
+                            } label: {
+                                Label("Archiver", systemImage: "archivebox")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.orange)
+                        }
+                        
+                        Button(role: .destructive) {
+                            onDeactivate()
+                        } label: {
+                            Label("Désactiver", systemImage: "xmark.circle")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        // Code inactif - suppression
+                        Button(role: .destructive) {
+                            onDelete()
+                        } label: {
+                            Label("Supprimer", systemImage: "trash")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    .buttonStyle(.bordered)
                     
                     Spacer()
                 }
             }
-            
-            if !code.isActive && permissionService.isAdmin() {
-                Button(role: .destructive) {
-                    onDelete()
-                } label: {
-                    Label("Supprimer", systemImage: "trash")
+        }
+        .padding(12)
+        .background(code.isArchived ? Color(.systemGray6) : Color(.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .sheet(isPresented: $showingEditNameSheet) {
+            editNameSheet
+        }
+    }
+    
+    private var statusBadge: some View {
+        let status = code.status
+        return HStack(spacing: 4) {
+            Image(systemName: statusIcon(status))
+                .font(.caption2)
+            Text(status.rawValue)
+                .font(.caption2)
+                .fontWeight(.medium)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(statusColor(status).opacity(0.2))
+        .foregroundStyle(statusColor(status))
+        .clipShape(Capsule())
+    }
+    
+    private var progressColor: Color {
+        let ratio = Double(code.usedCount) / Double(code.maxUses)
+        if ratio >= 1.0 { return .red }
+        if ratio >= 0.75 { return .orange }
+        return .green
+    }
+    
+    private var borderColor: Color {
+        if code.isArchived { return Color.gray.opacity(0.3) }
+        if !code.isActive { return Color.red.opacity(0.3) }
+        if !code.isValid { return Color.orange.opacity(0.3) }
+        return Color.green.opacity(0.3)
+    }
+    
+    private func statusColor(_ status: InvitationCode.CodeStatus) -> Color {
+        switch status {
+        case .active: return .green
+        case .inactive: return .red
+        case .expired: return .orange
+        case .exhausted: return .gray
+        case .archived: return .gray
+        }
+    }
+    
+    private func statusIcon(_ status: InvitationCode.CodeStatus) -> String {
+        switch status {
+        case .active: return "checkmark.circle.fill"
+        case .inactive: return "xmark.circle.fill"
+        case .expired: return "clock.badge.exclamationmark"
+        case .exhausted: return "circle.slash"
+        case .archived: return "archivebox.fill"
+        }
+    }
+    
+    private func roleIcon(_ role: User.UserRole) -> String {
+        switch role {
+        case .admin: return "star.fill"
+        case .manager: return "person.2.fill"
+        case .standardEmployee: return "person.fill"
+        case .limitedEmployee: return "person.crop.circle"
+        }
+    }
+    
+    private var editNameSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Nom du code") {
+                    TextField("Nom personnalisé", text: $editedName)
+                        .textInputAutocapitalization(.words)
+                    
+                    Text("Laissez vide pour utiliser le code comme nom")
                         .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.bordered)
+                
+                Section {
+                    Text("Code: \(code.code)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Modifier le nom")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") {
+                        showingEditNameSheet = false
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Enregistrer") {
+                        Task {
+                            let service = InvitationService()
+                            try? await service.updateCodeName(
+                                codeId: code.codeId,
+                                newName: editedName.isEmpty ? nil : editedName
+                            )
+                            showingEditNameSheet = false
+                        }
+                    }
+                }
             }
         }
-        .padding(.vertical, 8)
+        .presentationDetents([.medium])
     }
 }
 
@@ -1011,6 +1491,16 @@ extension AdminView {
         case .limitedEmployee:
             return "Employé Limité"
         }
+    }
+    
+    private func generatePreviewCode(companyName: String) -> String {
+        let prefix = companyName
+            .uppercased()
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "[^A-Z0-9]", with: "", options: .regularExpression)
+            .prefix(8)
+        let year = Calendar.current.component(.year, from: Date())
+        return "\(prefix)-\(year)-XXXX"
     }
     
     private func rolePermissions(_ role: User.UserRole) -> [String] {

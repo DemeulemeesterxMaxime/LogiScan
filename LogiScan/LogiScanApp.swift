@@ -146,8 +146,10 @@ struct LogiScanApp: App {
                         .buttonStyle(.borderedProminent)
                         
                         Button("Se déconnecter") {
-                            authService.signOut()
-                            userSessionService.clearSession()
+                            Task {
+                                try? await authService.signOut()
+                                userSessionService.clearSession()
+                            }
                         }
                         .buttonStyle(.bordered)
                     }

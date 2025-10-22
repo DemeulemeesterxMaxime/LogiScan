@@ -11,6 +11,7 @@ import Foundation
 struct FirestoreInvitationCode: Codable {
     var codeId: String
     var code: String
+    var customName: String?  // Nom personnalisé
     var companyId: String
     var companyName: String
     var role: String  // "admin", "manager", "standardEmployee", "limitedEmployee"
@@ -20,6 +21,7 @@ struct FirestoreInvitationCode: Codable {
     var maxUses: Int
     var usedCount: Int
     var isActive: Bool
+    var isArchived: Bool  // Archivé quand maxUses atteint
     
     // Conversion vers SwiftData
     func toSwiftData() -> InvitationCode {
@@ -29,6 +31,7 @@ struct FirestoreInvitationCode: Codable {
             codeId: codeId,
             companyId: companyId,
             companyName: companyName,
+            customName: customName,
             role: roleEnum,
             createdBy: createdBy,
             validityDays: 7,
@@ -41,6 +44,7 @@ struct FirestoreInvitationCode: Codable {
         invitation.expiresAt = expiresAt.dateValue()
         invitation.usedCount = usedCount
         invitation.isActive = isActive
+        invitation.isArchived = isArchived
         
         return invitation
     }
@@ -52,6 +56,7 @@ extension InvitationCode {
         return FirestoreInvitationCode(
             codeId: codeId,
             code: code,
+            customName: customName,
             companyId: companyId,
             companyName: companyName,
             role: role.rawValue,
@@ -60,7 +65,8 @@ extension InvitationCode {
             expiresAt: Timestamp(date: expiresAt),
             maxUses: maxUses,
             usedCount: usedCount,
-            isActive: isActive
+            isActive: isActive,
+            isArchived: isArchived
         )
     }
 }

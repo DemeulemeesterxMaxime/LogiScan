@@ -12,7 +12,15 @@ import UIKit
 
 final class CompanyService {
     private let db = Firestore.firestore()
-    private let storage = Storage.storage()
+    private let storage: Storage
+    
+    // MARK: - Init
+    
+    init() {
+        // Initialiser Storage avec le bucket correct (nouveau format Firebase)
+        storage = Storage.storage(url: "gs://logiscan-cf3fa.firebasestorage.app")
+        print("✅ [CompanyService] Storage initialisé avec bucket: logiscan-cf3fa.firebasestorage.app")
+    }
     
     // MARK: - Company CRUD
     

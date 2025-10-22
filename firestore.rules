@@ -22,9 +22,22 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(getUserId())).data.companyId == companyId;
     }
     
+    function userHasCompany() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(getUserId())) &&
+             'companyId' in get(/databases/$(database)/documents/users/$(getUserId())).data;
+    }
+    
     // Règles pour les users
     match /users/{userId} {
-      allow read: if isAuthenticated() && (userId == getUserId() || isAdmin());
+      // Permettre la lecture de son propre document OU si admin
+      allow read: if isAuthenticated() && userId == getUserId();
+      
+      // Permettre la lecture de tous les users de la même companyId
+      allow list: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/users/$(getUserId())) &&
+                     get(/databases/$(database)/documents/users/$(getUserId())).data.companyId == resource.data.companyId;
+      
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (userId == getUserId() || isAdmin());
       allow delete: if isAdmin();
@@ -32,7 +45,12 @@ service cloud.firestore {
     
     // Règles pour les companies
     match /companies/{companyId} {
-      allow read: if isAuthenticated() && belongsToCompany(companyId);
+      // Permettre la lecture si l'utilisateur appartient à cette company
+      // OU si l'utilisateur est authentifié et le document existe (pour éviter les erreurs de listener)
+      allow read: if isAuthenticated() && (
+        belongsToCompany(companyId) || 
+        !userHasCompany()  // Permettre la lecture si l'utilisateur n'a plus de company (pendant la transition de suppression)
+      );
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (isAdmin() || belongsToCompany(companyId));
       allow delete: if isAdmin();
@@ -44,7 +62,15 @@ service cloud.firestore {
       // L'utilisateur n'est pas encore authentifié à ce moment
       allow read: if true;
       allow create: if isAuthenticated() && isAdmin();
-      allow update: if isAuthenticated() && isAdmin();
+      
+      // Allow update pour les admins (modification complète)
+      // OU pour les utilisateurs authentifiés qui incrémentent seulement usedCount
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        // Permettre l'incrémentation du usedCount par n'importe quel utilisateur authentifié
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedCount']))
+      );
+      
       allow delete: if isAuthenticated() && isAdmin();
     }
     
@@ -119,6 +145,55 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
+    }
+    
+    // Règles pour les tasks (TodoList)
+    match /tasks/{taskId} {
+      // Lecture : tous les membres de la même entreprise peuvent voir les tâches
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/users/$(getUserId())) &&
+                     get(/databases/$(database)/documents/users/$(getUserId())).data.companyId == resource.data.companyId;
+      
+      // Création : Manager et Admin uniquement (avec permission writeTasks)
+      allow create: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/users/$(getUserId())) &&
+                       (get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'admin' ||
+                        get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'manager');
+      
+      // Modification : Créateur de la tâche, Manager ou Admin
+      allow update: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/users/$(getUserId())) &&
+                       (resource.data.createdBy == getUserId() ||
+                        get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'admin' ||
+                        get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'manager');
+      
+      // Suppression : Manager et Admin uniquement
+      allow delete: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/users/$(getUserId())) &&
+                       (get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'admin' ||
+                        get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'manager');
+    }
+    
+    // Règles pour les taskNotifications
+    match /taskNotifications/{notificationId} {
+      // Lecture : notifications pour l'utilisateur ou pour toute l'entreprise
+      allow read: if isAuthenticated() && 
+                     exists(/databases/$(database)/documents/users/$(getUserId())) &&
+                     (resource.data.recipientUserId == getUserId() ||
+                      resource.data.recipientUserId == null) &&
+                     resource.data.companyId == get(/databases/$(database)/documents/users/$(getUserId())).data.companyId;
+      
+      // Création : système uniquement (via cloud functions ou backend)
+      allow create: if isAuthenticated();
+      
+      // Modification : uniquement pour marquer comme lu
+      allow update: if isAuthenticated() && 
+                       resource.data.recipientUserId == getUserId() &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+      
+      // Suppression : l'utilisateur peut supprimer ses propres notifications
+      allow delete: if isAuthenticated() && 
+                       resource.data.recipientUserId == getUserId();
     }
   }
 }

@@ -1,0 +1,66 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserId() {
+      return request.auth.uid;
+    }
+    
+    // Règles pour les logos d'entreprise
+    match /companies/{companyId}/logo.jpg {
+      // Lecture : tous les utilisateurs authentifiés peuvent voir les logos
+      allow read: if isAuthenticated();
+      
+      // Écriture : tous les utilisateurs authentifiés de l'entreprise peuvent uploader/modifier le logo
+      allow write: if isAuthenticated();
+      
+      // Suppression : tous les utilisateurs authentifiés peuvent supprimer
+      allow delete: if isAuthenticated();
+    }
+    
+    // Règles pour tous les autres fichiers dans companies/
+    match /companies/{companyId}/{allPaths=**} {
+      // Lecture : tous les utilisateurs authentifiés
+      allow read: if isAuthenticated();
+      
+      // Écriture : tous les utilisateurs authentifiés
+      allow write: if isAuthenticated();
+      
+      // Suppression : tous les utilisateurs authentifiés
+      allow delete: if isAuthenticated();
+    }
+    
+    // Règles pour les photos d'événements
+    match /events/{eventId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+    
+    // Règles pour les photos de profil
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+    
+    // Règles pour les documents/PDFs
+    match /documents/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+    
+    // Bloquer tout le reste par défaut
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

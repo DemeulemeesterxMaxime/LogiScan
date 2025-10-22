@@ -6,17 +6,49 @@
 //
 
 import SwiftUI
+import SwiftData
 import FirebaseAuth
 
 struct ProfileView: View {
-    @EnvironmentObject var authService: AuthService
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allTasks: [TodoTask]
     @State private var permissionService = PermissionService.shared
+    @State private var authService = AuthService()
+    @State private var showingCompanySheet = false
     @State private var showingLogoutConfirm = false
-    @State private var showingCompanySection = false
-    @State private var showingAdminSection = false
+    @State private var showingDeleteAccountConfirm = false
+    @State private var showingReauthSheet = false
+    @State private var showingNotifications = false
+    @State private var reauthEmail = ""
+    @State private var reauthPassword = ""
+    @State private var deleteAccountError: String?
     
     var currentUser: User? {
         permissionService.currentUser
+    }
+    
+    // Tâches assignées à l'utilisateur (non complétées/annulées)
+    private var myTasks: [TodoTask] {
+        guard let userId = currentUser?.userId, let companyId = currentUser?.companyId else {
+            return []
+        }
+        return allTasks.filter { task in
+            task.companyId == companyId &&
+            task.assignedToUserId == userId &&
+            task.status != .completed &&
+            task.status != .cancelled
+        }
+    }
+    
+    // Tâches en libre-service (non attribuées)
+    private var unassignedTasks: [TodoTask] {
+        guard let companyId = currentUser?.companyId else { return [] }
+        return allTasks.filter { task in
+            task.companyId == companyId &&
+            task.assignedToUserId == nil &&
+            task.status != .completed &&
+            task.status != .cancelled
+        }
     }
     
     var body: some View {
@@ -32,6 +64,101 @@ struct ProfileView: View {
                     }
                 } header: {
                     Text("Mon Profil")
+                }
+                
+                // Section Mes Tâches (visible pour tous les employés)
+                if currentUser?.companyId != nil {
+                    Section {
+                        NavigationLink {
+                            TodoListView(defaultFilter: .myTasks)
+                                .navigationTitle("Mes tâches")
+                        } label: {
+                            HStack {
+                                Label("Mes tâches du jour", systemImage: "checklist")
+                                
+                                Spacer()
+                                
+                                // Badge avec nombre de tâches
+                                if myTasks.count > 0 {
+                                    Text("\(myTasks.count)")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.blue)
+                                        )
+                                }
+                            }
+                        }
+                        
+                        NavigationLink {
+                            TodoListView(defaultFilter: .unassigned)
+                                .navigationTitle("Tâches disponibles")
+                        } label: {
+                            HStack {
+                                Label("Tâches disponibles", systemImage: "tray.2")
+                                
+                                Spacer()
+                                
+                                // Badge avec nombre de tâches
+                                if unassignedTasks.count > 0 {
+                                    Text("\(unassignedTasks.count)")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.orange)
+                                        )
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("Mes Tâches")
+                    } footer: {
+                        Text("Gérez vos tâches personnelles et prenez des tâches en libre-service.")
+                            .font(.caption)
+                    }
+                }
+                
+                // Section Gestion des Tâches (visible pour Manager et Admin)
+                if permissionService.checkPermission(.writeTasks) || permissionService.checkPermission(.assignTasks) {
+                    Section {
+                        if permissionService.checkPermission(.writeTasks) {
+                            NavigationLink {
+                                CreateTaskView()
+                            } label: {
+                                Label("Créer une tâche", systemImage: "plus.circle")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        
+                        if permissionService.checkPermission(.manageTasks) {
+                            NavigationLink {
+                                AdminTaskManagementView()
+                            } label: {
+                                Label("Gérer toutes les tâches", systemImage: "list.bullet.clipboard")
+                            }
+                        }
+                        
+                        if permissionService.checkPermission(.assignTasks) {
+                            NavigationLink {
+                                AdminTaskManagementView()
+                            } label: {
+                                Label("Attribuer des tâches", systemImage: "person.badge.plus")
+                            }
+                        }
+                    } header: {
+                        Text("Gestion des Tâches")
+                    } footer: {
+                        Text("Créez et attribuez des tâches aux membres de votre équipe.")
+                            .font(.caption)
+                    }
                 }
                 
                 // Section Entreprise (visible si membre d'une entreprise)
@@ -65,15 +192,49 @@ struct ProfileView: View {
                     Button(action: { showingLogoutConfirm = true }) {
                         HStack {
                             Label("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right")
+                                .foregroundColor(.orange)
+                            Spacer()
+                        }
+                    }
+                    
+                    Button(action: { showingDeleteAccountConfirm = true }) {
+                        HStack {
+                            Label("Supprimer mon compte", systemImage: "trash.circle")
                                 .foregroundColor(.red)
                             Spacer()
                         }
                     }
                 } header: {
-                    Text("Actions")
+                    Text("Paramètres du compte")
+                } footer: {
+                    Text("La suppression du compte est irréversible et supprimera définitivement toutes vos données.")
+                        .font(.caption)
                 }
             }
             .navigationTitle("Profil")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showingNotifications = true
+                    } label: {
+                        Image(systemName: "bell.fill")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingNotifications) {
+                NotificationCenterView()
+            }
+            .sheet(isPresented: $showingReauthSheet) {
+                ReauthenticationSheet(
+                    email: $reauthEmail,
+                    password: $reauthPassword,
+                    onAuthenticate: {
+                        Task {
+                            await reauthenticateAndDelete()
+                        }
+                    }
+                )
+            }
             .alert("Déconnexion", isPresented: $showingLogoutConfirm) {
                 Button("Annuler", role: .cancel) {}
                 Button("Se déconnecter", role: .destructive) {
@@ -81,6 +242,24 @@ struct ProfileView: View {
                 }
             } message: {
                 Text("Voulez-vous vraiment vous déconnecter ?")
+            }
+            .alert("Supprimer mon compte", isPresented: $showingDeleteAccountConfirm) {
+                Button("Annuler", role: .cancel) {}
+                Button("Supprimer définitivement", role: .destructive) {
+                    // Préremplir l'email
+                    reauthEmail = currentUser?.email ?? ""
+                    reauthPassword = ""
+                    showingReauthSheet = true
+                }
+            } message: {
+                Text("⚠️ ATTENTION : Cette action est irréversible !\n\nVotre compte, toutes vos données et votre accès à l'application seront définitivement supprimés.\n\nPour des raisons de sécurité, vous devez vous reconnecter.")
+            }
+            .alert("Erreur", isPresented: .constant(deleteAccountError != nil)) {
+                Button("OK", role: .cancel) {
+                    deleteAccountError = nil
+                }
+            } message: {
+                Text(deleteAccountError ?? "")
             }
         }
     }
@@ -177,8 +356,91 @@ struct ProfileView: View {
     
     private func logout() {
         Task {
-            try? await authService.signOut()
-            permissionService.clearCurrentUser()
+            do {
+                try await authService.signOut()
+                permissionService.clearCurrentUser()
+            } catch {
+                print("❌ Erreur lors de la déconnexion : \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func reauthenticateAndDelete() async {
+        guard !reauthEmail.isEmpty, !reauthPassword.isEmpty else {
+            await MainActor.run {
+                deleteAccountError = "Veuillez saisir votre email et mot de passe"
+            }
+            return
+        }
+        
+        do {
+            // 1. Réauthentifier
+            try await authService.reauthenticate(email: reauthEmail, password: reauthPassword)
+            
+            // 2. Supprimer le compte Firebase
+            try await authService.deleteAccount()
+            
+            // 3. Nettoyer les données locales
+            await MainActor.run {
+                permissionService.clearCurrentUser()
+                // Le modelContext sera nettoyé automatiquement
+            }
+            
+            print("✅ Compte supprimé avec succès")
+            
+        } catch {
+            await MainActor.run {
+                deleteAccountError = error.localizedDescription
+                showingReauthSheet = false
+            }
+            print("❌ Erreur lors de la suppression du compte : \(error.localizedDescription)")
+        }
+    }
+}
+
+// MARK: - Reauthentication Sheet
+
+struct ReauthenticationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var email: String
+    @Binding var password: String
+    let onAuthenticate: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Email", text: $email)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                        .autocorrectionDisabled()
+                    
+                    SecureField("Mot de passe", text: $password)
+                } header: {
+                    Text("Confirmation d'identité")
+                } footer: {
+                    Text("Pour des raisons de sécurité, veuillez confirmer votre identité en saisissant votre mot de passe.")
+                        .font(.caption)
+                }
+            }
+            .navigationTitle("Réauthentification")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annuler") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Confirmer") {
+                        onAuthenticate()
+                        dismiss()
+                    }
+                    .disabled(email.isEmpty || password.isEmpty)
+                    .foregroundColor(.red)
+                }
+            }
         }
     }
 }

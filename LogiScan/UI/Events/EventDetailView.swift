@@ -421,36 +421,39 @@ struct EventDetailView: View {
     
     private var actionsSection: some View {
         VStack(spacing: 12) {
-            // Bouton Créer/Continuer/Revoir le devis (3 scénarios)
+            // Bouton Créer/Continuer/Voir le devis (3 scénarios)
             if event.quoteStatus == .finalized || event.quoteStatus == .sent {
-                // Scénario 3 : Devis finalisé - 2 boutons côte à côte
-                HStack(spacing: 12) {
-                    // Bouton gauche : Modifier les articles
-                    Button(action: {
-                        isShowingQuoteBuilder = true
-                    }) {
-                        HStack {
-                            Image(systemName: "square.and.pencil")
-                            Text("Modifier")
-                            Spacer()
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.orange)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
+                // Scénario 3 : Devis finalisé - Badge + Bouton unique pour voir
+                VStack(spacing: 12) {
+                    // Badge de statut
+                    HStack {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundColor(.green)
+                        Text("Devis terminé")
+                            .font(.headline)
+                            .foregroundColor(.green)
+                        Spacer()
+                        Text(event.updatedAt.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(12)
                     
-                    // Bouton droite : Consulter le PDF
+                    // Bouton pour voir le devis (le bouton Revoir sera dans le PDF)
                     Button(action: { showingQuotePDF = true }) {
                         HStack {
                             Image(systemName: "doc.text.magnifyingglass")
-                            Text("PDF")
+                            Text("Voir le devis")
                             Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.green)
+                        .background(Color.blue)
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }

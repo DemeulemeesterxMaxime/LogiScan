@@ -14,6 +14,7 @@ struct SimpleScannerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var scannedCode: String? = nil
     @State private var isScanning = false
+    @State private var isTorchOn = false
     @State private var showResult = false
     @State private var showError = false
     @State private var errorMessage: String?
@@ -84,6 +85,7 @@ struct SimpleScannerView: View {
                 QRScannerView(
                     scannedCode: $scannedCode,
                     isScanning: $isScanning,
+                    isTorchOn: $isTorchOn,
                     onCodeScanned: handleScannedCode
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12))

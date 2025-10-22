@@ -130,6 +130,24 @@ struct EventRow: View {
                     .lineLimit(1)
 
                 Spacer()
+                
+                // Badge statut du devis (si finalisé)
+                if event.quoteStatus == .finalized || event.quoteStatus == .sent {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.text.fill")
+                            .font(.caption2)
+                        Text("Devis")
+                            .font(.caption2)
+                    }
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.green.opacity(0.2))
+                    )
+                    .foregroundColor(.green)
+                }
 
                 statusBadge(event.status)
             }

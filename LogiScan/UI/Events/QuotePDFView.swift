@@ -18,6 +18,7 @@ struct QuotePDFView: View {
     @State private var pdfDocument: PDFDocument?
     @State private var showShareSheet = false
     @State private var pdfURL: URL?
+    @State private var showingQuoteBuilder = false
     
     var body: some View {
         NavigationView {
@@ -39,19 +40,36 @@ struct QuotePDFView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        if pdfURL != nil {
-                            showShareSheet = true
+                    HStack(spacing: 16) {
+                        // Bouton Revoir (uniquement si devis finalisé)
+                        if event.quoteStatus == .finalized || event.quoteStatus == .sent {
+                            Button(action: {
+                                showingQuoteBuilder = true
+                            }) {
+                                Label("Revoir", systemImage: "square.and.pencil")
+                            }
                         }
-                    }) {
-                        Label("Partager", systemImage: "square.and.arrow.up")
+                        
+                        // Bouton Partager
+                        Button(action: {
+                            if pdfURL != nil {
+                                showShareSheet = true
+                            }
+                        }) {
+                            Label("Partager", systemImage: "square.and.arrow.up")
+                        }
+                        .disabled(pdfURL == nil)
                     }
-                    .disabled(pdfURL == nil)
                 }
             }
             .sheet(isPresented: $showShareSheet) {
                 if let url = pdfURL {
                     ShareSheet(items: [url])
+                }
+            }
+            .sheet(isPresented: $showingQuoteBuilder) {
+                NavigationStack {
+                    QuoteBuilderView(event: event)
                 }
             }
         }

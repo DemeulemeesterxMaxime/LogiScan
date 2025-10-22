@@ -537,10 +537,39 @@ struct SignUpView: View {
                     company: company
                 )
                 
-                // 5. Charger l'utilisateur et le définir dans le PermissionService
-                let user = try await firebaseService.fetchUser(userId: userId)
+                print("✅ [SignUpView] Utilisateur admin créé, attente de la propagation...")
+                
+                // 5. Attendre que Firestore propage les données
+                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 secondes
+                
+                // 6. Charger l'utilisateur avec retry
+                var user: User?
+                var retryCount = 0
+                let maxRetries = 5
+                
+                while user == nil && retryCount < maxRetries {
+                    do {
+                        user = try await firebaseService.fetchUser(userId: userId)
+                        print("✅ [SignUpView] Utilisateur admin chargé avec succès")
+                    } catch {
+                        retryCount += 1
+                        if retryCount < maxRetries {
+                            print("⚠️ [SignUpView] Tentative \(retryCount)/\(maxRetries) échouée, retry dans 2s...")
+                            try await Task.sleep(nanoseconds: 2_000_000_000)
+                        } else {
+                            print("❌ [SignUpView] Échec après \(maxRetries) tentatives")
+                            throw error
+                        }
+                    }
+                }
+                
+                guard let loadedUser = user else {
+                    throw SignUpError.userIdNotFound
+                }
+                
+                // 7. Définir l'utilisateur et fermer la vue
                 await MainActor.run {
-                    PermissionService.shared.setCurrentUser(user)
+                    PermissionService.shared.setCurrentUser(loadedUser)
                     dismiss()
                 }
             } catch {
@@ -583,13 +612,50 @@ struct SignUpView: View {
                     role: invitation.role
                 )
                 
-                // 5. Marquer le code comme utilisé
-                try await invitationService.useInvitationCode(codeId: invitation.codeId)
+                print("✅ [SignUpView] Utilisateur créé, maintenant on incrémente le code...")
                 
-                // 6. Charger l'utilisateur et le définir dans le PermissionService
-                let user = try await firebaseService.fetchUser(userId: userId)
+                // 5. Marquer le code comme utilisé (IMPORTANT: ne pas oublier !)
+                do {
+                    try await invitationService.useInvitationCode(codeId: invitation.codeId)
+                    print("✅ [SignUpView] Code d'invitation incrémenté avec succès")
+                } catch {
+                    print("❌ [SignUpView] ERREUR lors de l'incrémentation du code: \(error)")
+                    // On ne bloque pas l'inscription même si l'incrémentation échoue
+                    // mais on log l'erreur
+                }
+                
+                // 6. Attendre que Firestore propage les données (petit délai)
+                print("⏳ [SignUpView] Attente de la propagation Firestore...")
+                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 secondes
+                
+                // 7. Charger l'utilisateur avec retry (au cas où)
+                var user: User?
+                var retryCount = 0
+                let maxRetries = 5
+                
+                while user == nil && retryCount < maxRetries {
+                    do {
+                        user = try await firebaseService.fetchUser(userId: userId)
+                        print("✅ [SignUpView] Utilisateur chargé avec succès")
+                    } catch {
+                        retryCount += 1
+                        if retryCount < maxRetries {
+                            print("⚠️ [SignUpView] Tentative \(retryCount)/\(maxRetries) échouée, retry dans 2s...")
+                            try await Task.sleep(nanoseconds: 2_000_000_000)
+                        } else {
+                            print("❌ [SignUpView] Échec après \(maxRetries) tentatives")
+                            throw error
+                        }
+                    }
+                }
+                
+                guard let loadedUser = user else {
+                    throw SignUpError.userIdNotFound
+                }
+                
+                // 8. Définir l'utilisateur et fermer la vue
                 await MainActor.run {
-                    PermissionService.shared.setCurrentUser(user)
+                    PermissionService.shared.setCurrentUser(loadedUser)
                     dismiss()
                 }
             } catch {

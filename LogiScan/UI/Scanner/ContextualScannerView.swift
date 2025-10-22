@@ -16,6 +16,7 @@ struct ContextualScannerView: View {
     
     @State private var isScanning = true
     @State private var scannedCode: String? = nil
+    @State private var isTorchOn = false
     @State private var showError = false
     @State private var errorMessage = ""
     
@@ -32,6 +33,7 @@ struct ContextualScannerView: View {
                     QRScannerView(
                         scannedCode: $scannedCode,
                         isScanning: $isScanning,
+                        isTorchOn: $isTorchOn,
                         onCodeScanned: { code in
                             handleScan(code)
                         }
@@ -201,6 +203,7 @@ struct ScannedAssetResult {
             scanList: ScanList(
                 eventId: "1",
                 eventName: "Concert Test",
+                scanDirection: .stockToTruck,
                 totalItems: 10,
                 scannedItems: 3
             ),

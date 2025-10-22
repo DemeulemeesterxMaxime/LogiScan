@@ -69,12 +69,13 @@ class AuthService: ObservableObject {
     }
 
     /// Déconnexion
-    func signOut() {
+    func signOut() async throws {
         do {
             try Auth.auth().signOut()
             print("✅ Déconnexion réussie")
         } catch {
             errorMessage = "Erreur de déconnexion : \(error.localizedDescription)"
+            throw error
         }
     }
 
@@ -85,6 +86,63 @@ class AuthService: ObservableObject {
             print("✅ Email de réinitialisation envoyé à \(email)")
         } catch {
             errorMessage = "Erreur : \(error.localizedDescription)"
+            throw error
+        }
+    }
+    
+    /// Supprimer le compte utilisateur
+    /// ⚠️ ATTENTION : Cette action est irréversible et supprime définitivement le compte Firebase
+    func deleteAccount() async throws {
+        guard let user = currentUser else {
+            throw NSError(
+                domain: "AuthService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Aucun utilisateur connecté"]
+            )
+        }
+        
+        do {
+            // Supprimer le compte Firebase (email + auth)
+            try await user.delete()
+            print("✅ Compte Firebase supprimé : \(user.email ?? "")")
+            
+            // Note : Les données Firestore associées (User, Company, etc.) doivent être
+            // supprimées par les Cloud Functions côté serveur via onDelete trigger
+            // ou manuellement avant d'appeler cette fonction
+            
+        } catch let error as NSError {
+            // Si l'erreur est liée à une réauthentification nécessaire
+            if error.code == AuthErrorCode.requiresRecentLogin.rawValue {
+                errorMessage = "Pour des raisons de sécurité, veuillez vous reconnecter avant de supprimer votre compte."
+                throw NSError(
+                    domain: "AuthService",
+                    code: AuthErrorCode.requiresRecentLogin.rawValue,
+                    userInfo: [NSLocalizedDescriptionKey: "Reconnexion requise pour supprimer le compte"]
+                )
+            }
+            
+            errorMessage = "Erreur lors de la suppression du compte : \(error.localizedDescription)"
+            throw error
+        }
+    }
+    
+    /// Réauthentifier l'utilisateur (nécessaire avant suppression de compte)
+    func reauthenticate(email: String, password: String) async throws {
+        guard let user = currentUser else {
+            throw NSError(
+                domain: "AuthService",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Aucun utilisateur connecté"]
+            )
+        }
+        
+        let credential = EmailAuthProvider.credential(withEmail: email, password: password)
+        
+        do {
+            try await user.reauthenticate(with: credential)
+            print("✅ Réauthentification réussie")
+        } catch {
+            errorMessage = "Erreur de réauthentification : \(error.localizedDescription)"
             throw error
         }
     }

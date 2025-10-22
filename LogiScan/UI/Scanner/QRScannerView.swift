@@ -11,6 +11,7 @@ import AVFoundation
 struct QRScannerView: UIViewControllerRepresentable {
     @Binding var scannedCode: String?
     @Binding var isScanning: Bool
+    @Binding var isTorchOn: Bool
     let onCodeScanned: (String) -> Void
     
     func makeUIViewController(context: Context) -> QRScannerViewController {
@@ -24,6 +25,11 @@ struct QRScannerView: UIViewControllerRepresentable {
             uiViewController.startScanning()
         } else {
             uiViewController.stopScanning()
+        }
+        
+        // Synchroniser l'état de la torche
+        if isTorchOn != uiViewController.isTorchOn {
+            uiViewController.toggleTorch()
         }
     }
     
@@ -61,7 +67,9 @@ class QRScannerViewController: UIViewController {
     
     private var captureSession: AVCaptureSession!
     private var previewLayer: AVCaptureVideoPreviewLayer!
+    private var videoCaptureDevice: AVCaptureDevice?
     private var isSessionRunning = false
+    var isTorchOn = false  // Public pour SwiftUI
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -81,15 +89,17 @@ class QRScannerViewController: UIViewController {
     private func setupCamera() {
         captureSession = AVCaptureSession()
         
-        guard let videoCaptureDevice = AVCaptureDevice.default(for: .video) else {
+        guard let device = AVCaptureDevice.default(for: .video) else {
             delegate?.didFailWithError(QRScannerError.noCameraAvailable)
             return
         }
         
+        videoCaptureDevice = device
+        
         let videoInput: AVCaptureDeviceInput
         
         do {
-            videoInput = try AVCaptureDeviceInput(device: videoCaptureDevice)
+            videoInput = try AVCaptureDeviceInput(device: device)
         } catch {
             delegate?.didFailWithError(error)
             return
@@ -186,11 +196,42 @@ class QRScannerViewController: UIViewController {
     func stopScanning() {
         guard isSessionRunning else { return }
         
+        // Éteindre la torche avant d'arrêter
+        if isTorchOn {
+            toggleTorch()
+        }
+        
         DispatchQueue.global(qos: .background).async {
             self.captureSession.stopRunning()
             DispatchQueue.main.async {
                 self.isSessionRunning = false
             }
+        }
+    }
+    
+    func toggleTorch() {
+        guard let device = videoCaptureDevice,
+              device.hasTorch else {
+            print("⚠️ Torche non disponible")
+            return
+        }
+        
+        do {
+            try device.lockForConfiguration()
+            
+            if isTorchOn {
+                device.torchMode = .off
+                isTorchOn = false
+                print("💡 Torche désactivée")
+            } else {
+                try device.setTorchModeOn(level: 1.0)
+                isTorchOn = true
+                print("💡 Torche activée")
+            }
+            
+            device.unlockForConfiguration()
+        } catch {
+            print("❌ Erreur torche: \(error)")
         }
     }
 }

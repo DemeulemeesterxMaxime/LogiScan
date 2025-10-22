@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import SwiftUI
 
 @Model
 final class User {
@@ -94,6 +95,15 @@ extension User {
             }
         }
         
+        var color: Color {
+            switch self {
+            case .admin: return .purple
+            case .manager: return .blue
+            case .standardEmployee: return .green
+            case .limitedEmployee: return .orange
+            }
+        }
+        
         var permissions: [Permission] {
             switch self {
             case .admin:
@@ -101,12 +111,13 @@ extension User {
             case .manager:
                 return [.readEvents, .writeEvents, .readStock, .writeStock,
                         .readQuotes, .writeQuotes, .manageTrucks, .scanQR,
-                        .updateAssetStatus]
+                        .updateAssetStatus, .readTasks, .writeTasks, .assignTasks,
+                        .manageTasks]
             case .standardEmployee:
                 return [.readEvents, .readStock, .readQuotes, .scanQR,
-                        .updateAssetStatus]
+                        .updateAssetStatus, .readTasks]
             case .limitedEmployee:
-                return [.scanQR, .readStock]
+                return [.scanQR, .readStock, .readTasks]
             }
         }
     }
@@ -127,6 +138,10 @@ extension User {
         case editCompany
         case scanQR
         case updateAssetStatus
+        case readTasks
+        case writeTasks
+        case assignTasks
+        case manageTasks
         
         var displayName: String {
             switch self {
@@ -141,6 +156,10 @@ extension User {
             case .editCompany: return "Modifier l'entreprise"
             case .scanQR: return "Scanner les QR codes"
             case .updateAssetStatus: return "Mettre à jour le matériel"
+            case .readTasks: return "Consulter les tâches"
+            case .writeTasks: return "Créer des tâches"
+            case .assignTasks: return "Attribuer des tâches"
+            case .manageTasks: return "Gérer toutes les tâches"
             }
         }
     }

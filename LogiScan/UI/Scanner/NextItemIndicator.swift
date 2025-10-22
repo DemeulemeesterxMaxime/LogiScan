@@ -257,6 +257,7 @@ struct NextItemIndicator: View {
             scanListId: "test-1",
             eventId: "event-1",
             eventName: "Festival LBR",
+            scanDirection: .stockToTruck,
             totalItems: 2,
             scannedItems: 0,
             status: .inProgress

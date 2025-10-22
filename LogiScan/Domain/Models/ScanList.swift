@@ -13,6 +13,7 @@ final class ScanList {
     @Attribute(.unique) var scanListId: String
     var eventId: String
     var eventName: String
+    var scanDirection: ScanDirection  // Direction du scan (NON OPTIONAL pour SwiftData)
     var totalItems: Int
     var scannedItems: Int
     var status: ScanListStatus
@@ -28,6 +29,7 @@ final class ScanList {
         scanListId: String = UUID().uuidString,
         eventId: String,
         eventName: String,
+        scanDirection: ScanDirection,
         totalItems: Int = 0,
         scannedItems: Int = 0,
         status: ScanListStatus = .pending,
@@ -38,6 +40,7 @@ final class ScanList {
         self.scanListId = scanListId
         self.eventId = eventId
         self.eventName = eventName
+        self.scanDirection = scanDirection
         self.totalItems = totalItems
         self.scannedItems = scannedItems
         self.status = status
@@ -66,6 +69,11 @@ final class ScanList {
     var isComplete: Bool {
         scannedItems >= totalItems && totalItems > 0
     }
+    
+    /// Nom descriptif de la liste basé sur la direction
+    var displayName: String {
+        return scanDirection.listName
+    }
 }
 
 enum ScanListStatus: String, Codable {
@@ -89,6 +97,49 @@ enum ScanListStatus: String, Codable {
         case .inProgress: return "play.circle.fill"
         case .completed: return "checkmark.circle.fill"
         case .cancelled: return "xmark.circle.fill"
+        }
+    }
+}
+
+enum ScanDirection: String, Codable {
+    case stockToTruck = "stock_to_truck"       // Stock → Camion
+    case truckToEvent = "truck_to_event"       // Camion → Event
+    case eventToTruck = "event_to_truck"       // Event → Camion
+    case truckToStock = "truck_to_stock"       // Camion → Stock
+    
+    var displayName: String {
+        switch self {
+        case .stockToTruck: return "Stock → Camion"
+        case .truckToEvent: return "Camion → Événement"
+        case .eventToTruck: return "Événement → Camion"
+        case .truckToStock: return "Camion → Stock"
+        }
+    }
+    
+    var listName: String {
+        switch self {
+        case .stockToTruck: return "Stock → Camion"
+        case .truckToEvent: return "Camion → Lieu livraison"
+        case .eventToTruck: return "Event → Camion"
+        case .truckToStock: return "Camion → Stock"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .stockToTruck: return "arrow.up.bin"
+        case .truckToEvent: return "arrow.forward.circle"
+        case .eventToTruck: return "arrow.backward.circle"
+        case .truckToStock: return "arrow.down.circle"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .stockToTruck: return "Préparer et charger le matériel dans le camion au stock"
+        case .truckToEvent: return "Décharger le matériel du camion sur le site de l'événement"
+        case .eventToTruck: return "Recharger le matériel dans le camion après l'événement"
+        case .truckToStock: return "Décharger le matériel du camion et le ranger au stock"
         }
     }
 }

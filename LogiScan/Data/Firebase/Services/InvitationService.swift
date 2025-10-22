@@ -17,14 +17,33 @@ final class InvitationService {
     func generateInvitationCode(
         companyId: String,
         companyName: String,
+        customCode: String? = nil,  // Code personnalisé optionnel
+        customName: String? = nil,  // Nom personnalisé optionnel
         role: User.UserRole,
         createdBy: String,
         validityDays: Int = 7,
         maxUses: Int = 10
     ) async throws -> InvitationCode {
+        // Vérifier que le code personnalisé n'existe pas déjà
+        if let customCode = customCode {
+            let normalizedCode = customCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            
+            // Vérifier l'unicité
+            let existingCodes = try await db.collection("invitationCodes")
+                .whereField("code", isEqualTo: normalizedCode)
+                .limit(to: 1)
+                .getDocuments()
+            
+            if !existingCodes.documents.isEmpty {
+                throw InvitationError.codeAlreadyExists
+            }
+        }
+        
         let code = InvitationCode(
             companyId: companyId,
             companyName: companyName,
+            customCode: customCode,
+            customName: customName,
             role: role,
             createdBy: createdBy,
             validityDays: validityDays,
@@ -37,7 +56,18 @@ final class InvitationService {
             .document(code.codeId)
             .setData(from: firestoreCode)
         
-        print("✅ [InvitationService] Code généré: \(code.code)")
+        if let customName = customName {
+            print("✅ [InvitationService] Code généré: \(code.code) (\(customName))")
+        } else {
+            print("✅ [InvitationService] Code généré: \(code.code)")
+        }
+        
+        if customCode != nil {
+            print("   🎨 Code personnalisé utilisé")
+        } else {
+            print("   🤖 Code généré automatiquement")
+        }
+        
         return code
     }
     
@@ -91,6 +121,7 @@ final class InvitationService {
         print("   👤 Rôle: \(code.role.rawValue)")
         print("   📅 Expire le: \(code.expiresAt.formatted())")
         print("   📊 Utilisations: \(code.usedCount)/\(code.maxUses)")
+        print("   🆔 Code ID: \(code.codeId)")
         
         // Vérifier la validité
         guard code.isValid else {
@@ -109,24 +140,54 @@ final class InvitationService {
         return code
     }
     
-    /// Utiliser un code d'invitation (incrémenter usedCount)
+    /// Utiliser un code d'invitation (incrémenter usedCount + archiver si maxUses atteint)
     func useInvitationCode(codeId: String) async throws {
+        print("🔄 [InvitationService] Début utilisation code: \(codeId)")
+        
         let ref = db.collection("invitationCodes").document(codeId)
         
+        // Récupérer l'état actuel avant l'update
+        let snapshot = try await ref.getDocument()
+        let currentUsedCount = snapshot.data()?["usedCount"] as? Int ?? 0
+        let maxUses = snapshot.data()?["maxUses"] as? Int ?? 1
+        
+        print("   📊 UsedCount actuel: \(currentUsedCount)")
+        print("   📊 MaxUses: \(maxUses)")
+        
+        // Incrémenter le compteur
         try await ref.updateData([
             "usedCount": FieldValue.increment(Int64(1))
         ])
         
-        print("✅ [InvitationService] Code utilisé: \(codeId)")
+        // Vérifier que l'update a bien fonctionné
+        let updatedSnapshot = try await ref.getDocument()
+        if let newUsedCount = updatedSnapshot.data()?["usedCount"] as? Int {
+            print("✅ [InvitationService] Code utilisé: \(codeId)")
+            print("   📊 Nouveau usedCount: \(newUsedCount)")
+            
+            // Si maxUses atteint, archiver automatiquement le code
+            if newUsedCount >= maxUses {
+                print("📦 [InvitationService] MaxUses atteint (\(newUsedCount)/\(maxUses)), archivage automatique...")
+                try await archiveCode(codeId: codeId)
+            }
+        } else {
+            print("⚠️ [InvitationService] Impossible de vérifier le nouveau usedCount")
+        }
     }
     
     // MARK: - Code Management
     
     /// Récupérer tous les codes d'une entreprise
-    func fetchInvitationCodes(companyId: String) async throws -> [InvitationCode] {
-        let snapshot = try await db.collection("invitationCodes")
+    func fetchInvitationCodes(companyId: String, includeArchived: Bool = false) async throws -> [InvitationCode] {
+        var query = db.collection("invitationCodes")
             .whereField("companyId", isEqualTo: companyId)
-            .getDocuments()
+        
+        // Exclure les codes archivés par défaut
+        if !includeArchived {
+            query = query.whereField("isArchived", isEqualTo: false)
+        }
+        
+        let snapshot = try await query.getDocuments()
         
         var codes = snapshot.documents.compactMap { document -> InvitationCode? in
             guard let firestoreCode = try? document.data(as: FirestoreInvitationCode.self) else {
@@ -138,8 +199,94 @@ final class InvitationService {
         // Trier en mémoire au lieu de dans Firestore
         codes.sort { $0.createdAt > $1.createdAt }
         
-        print("✅ [InvitationService] \(codes.count) codes récupérés")
+        print("✅ [InvitationService] \(codes.count) codes récupérés (includeArchived: \(includeArchived))")
         return codes
+    }
+    
+    /// Récupérer uniquement les codes archivés
+    func fetchArchivedCodes(companyId: String) async throws -> [InvitationCode] {
+        let snapshot = try await db.collection("invitationCodes")
+            .whereField("companyId", isEqualTo: companyId)
+            .whereField("isArchived", isEqualTo: true)
+            .getDocuments()
+        
+        var codes = snapshot.documents.compactMap { document -> InvitationCode? in
+            guard let firestoreCode = try? document.data(as: FirestoreInvitationCode.self) else {
+                return nil
+            }
+            return firestoreCode.toSwiftData()
+        }
+        
+        codes.sort { $0.createdAt > $1.createdAt }
+        
+        print("✅ [InvitationService] \(codes.count) codes archivés récupérés")
+        return codes
+    }
+    
+    /// Archiver un code (quand maxUses atteint ou manuellement)
+    func archiveCode(codeId: String) async throws {
+        try await db.collection("invitationCodes")
+            .document(codeId)
+            .updateData([
+                "isArchived": true,
+                "isActive": false  // Désactiver aussi pour sécurité
+            ])
+        
+        print("📦 [InvitationService] Code archivé: \(codeId)")
+    }
+    
+    /// Restaurer un code archivé
+    func unarchiveCode(codeId: String) async throws {
+        // Vérifier d'abord si le code n'est pas épuisé ou expiré
+        let document = try await db.collection("invitationCodes")
+            .document(codeId)
+            .getDocument()
+        
+        guard let firestoreCode = try? document.data(as: FirestoreInvitationCode.self) else {
+            throw InvitationError.invalidCode
+        }
+        
+        let code = firestoreCode.toSwiftData()
+        
+        // Ne pas restaurer si maxUses atteint
+        guard code.usedCount < code.maxUses else {
+            throw InvitationError.maxUsesReached
+        }
+        
+        // Ne pas restaurer si expiré
+        guard code.expiresAt > Date() else {
+            throw InvitationError.expiredCode
+        }
+        
+        try await db.collection("invitationCodes")
+            .document(codeId)
+            .updateData([
+                "isArchived": false,
+                "isActive": true
+            ])
+        
+        print("♻️ [InvitationService] Code restauré: \(codeId)")
+    }
+    
+    /// Modifier le nom personnalisé d'un code
+    func updateCodeName(codeId: String, newName: String?) async throws {
+        var updateData: [String: Any] = [:]
+        
+        if let newName = newName, !newName.isEmpty {
+            updateData["customName"] = newName
+        } else {
+            updateData["customName"] = FieldValue.delete()
+        }
+        
+        try await db.collection("invitationCodes")
+            .document(codeId)
+            .updateData(updateData)
+        
+        if let newName = newName {
+            print("✏️ [InvitationService] Nom du code modifié: \(codeId) → '\(newName)'")
+        } else {
+            print("✏️ [InvitationService] Nom personnalisé supprimé: \(codeId)")
+        }
     }
     
     /// Désactiver un code
@@ -151,6 +298,15 @@ final class InvitationService {
         print("✅ [InvitationService] Code désactivé: \(codeId)")
     }
     
+    /// Activer un code
+    func activateCode(codeId: String) async throws {
+        try await db.collection("invitationCodes")
+            .document(codeId)
+            .updateData(["isActive": true])
+        
+        print("✅ [InvitationService] Code activé: \(codeId)")
+    }
+    
     /// Supprimer un code
     func deleteCode(codeId: String) async throws {
         try await db.collection("invitationCodes")
@@ -160,6 +316,30 @@ final class InvitationService {
         print("✅ [InvitationService] Code supprimé: \(codeId)")
     }
     
+    // MARK: - Diagnostics
+    
+    /// Récupérer l'état actuel d'un code (pour debug)
+    func checkCodeStatus(codeId: String) async throws -> InvitationCode {
+        let document = try await db.collection("invitationCodes")
+            .document(codeId)
+            .getDocument()
+        
+        guard let firestoreCode = try? document.data(as: FirestoreInvitationCode.self) else {
+            throw InvitationError.invalidCode
+        }
+        
+        let code = firestoreCode.toSwiftData()
+        
+        print("📊 [InvitationService] État du code \(codeId):")
+        print("   Code: \(code.code)")
+        print("   UsedCount: \(code.usedCount)")
+        print("   MaxUses: \(code.maxUses)")
+        print("   IsActive: \(code.isActive)")
+        print("   IsValid: \(code.isValid)")
+        
+        return code
+    }
+    
     // MARK: - Errors
     
     enum InvitationError: Error, LocalizedError {
@@ -167,6 +347,7 @@ final class InvitationService {
         case expiredCode
         case maxUsesReached
         case inactiveCode
+        case codeAlreadyExists  // Nouveau
         
         var errorDescription: String? {
             switch self {
@@ -178,6 +359,8 @@ final class InvitationService {
                 return "Ce code a atteint son nombre maximum d'utilisations"
             case .inactiveCode:
                 return "Ce code d'invitation n'est plus actif"
+            case .codeAlreadyExists:
+                return "Ce code existe déjà, veuillez en choisir un autre"
             }
         }
     }

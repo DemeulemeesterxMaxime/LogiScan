@@ -22,6 +22,7 @@ struct QuoteBuilderView: View {
     @Query private var allAssets: [Asset]
     @Query private var allReservations: [AssetReservation]
     @Query private var allScanLists: [ScanList]
+    @Query private var users: [User]
     
     @StateObject private var firebaseService = FirebaseService()
     @StateObject private var syncManager = SyncManager()
@@ -1285,18 +1286,21 @@ struct QuoteBuilderView: View {
             )
             print("✅ Sauvegarde complète réussie (local + Firebase)")
             
-            // Si finalisation, créer automatiquement la ScanList
+            // Si finalisation, créer automatiquement les 4 ScanLists
             if finalize {
-                print("📋 Création automatique de la liste de scan...")
+                print("📋 Création automatique des listes de scan...")
                 do {
-                    let scanList = try scanListService.generateScanList(
+                    let scanLists = try scanListService.generateAllScanLists(
                         from: event,
                         quoteItems: quoteItems,
                         modelContext: modelContext
                     )
-                    print("✅ ScanList créée automatiquement: \(scanList.totalItems) articles")
+                    print("✅ \(scanLists.count) ScanLists créées automatiquement")
+                    
+                    // Créer les tâches automatiquement
+                    try await createTasksForEvent()
                 } catch {
-                    print("⚠️ Erreur création ScanList (non bloquant): \(error)")
+                    print("⚠️ Erreur création ScanLists/Tâches (non bloquant): \(error)")
                     // Ne pas bloquer la finalisation si la liste échoue
                 }
             }
@@ -1434,23 +1438,26 @@ struct QuoteBuilderView: View {
                 // 1. Sauvegarder et finaliser le devis
                 await saveQuote(finalize: true)
                 
-                // 2. Générer la liste de scan
-                print("📋 Génération de la liste de préparation...")
-                let scanList = try scanListService.generateScanList(
+                // 2. Générer les 4 listes de scan + créer les tâches
+                print("📋 Génération des listes de préparation complètes...")
+                let scanLists = try scanListService.generateAllScanLists(
                     from: event,
                     quoteItems: quoteItems,
                     modelContext: modelContext
                 )
                 
-                generatedScanList = scanList
+                generatedScanList = scanLists.first
                 
-                // 3. Afficher un message de succès
+                // 3. Créer les tâches automatiquement
+                try await createTasksForEvent()
+                
+                // 4. Afficher un message de succès
                 await MainActor.run {
                     isSaving = false
-                    alertMessage = "✅ Devis finalisé et liste de préparation créée (\(scanList.totalItems) articles)"
+                    alertMessage = "✅ Devis finalisé : \(scanLists.count) listes de scan et tâches créées !"
                     showAlert = true
                     
-                    // 4. Proposer d'ouvrir la liste de scan
+                    // 5. Proposer d'ouvrir la liste de scan
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         showingScanList = true
                     }
@@ -1470,6 +1477,58 @@ struct QuoteBuilderView: View {
                 }
             }
         }
+    }
+    
+    private func createTasksForEvent() async throws {
+        print("🔄 [QuoteBuilder] Début création des tâches...")
+        
+        // Récupérer l'utilisateur connecté depuis UserDefaults
+        let userId = UserDefaults.standard.string(forKey: "currentUserId")
+        print("👤 [QuoteBuilder] UserId depuis UserDefaults: \(userId ?? "nil")")
+        
+        guard let userId = userId else {
+            print("❌ [QuoteBuilder] Pas d'userId dans UserDefaults")
+            return
+        }
+        
+        // Récupérer le companyId depuis PermissionService (qui a déjà l'utilisateur chargé)
+        guard let currentUser = PermissionService.shared.currentUser else {
+            print("❌ [QuoteBuilder] Pas d'utilisateur dans PermissionService")
+            return
+        }
+        
+        print("✅ [QuoteBuilder] Utilisateur trouvé: \(currentUser.displayName)")
+        
+        guard let companyId = currentUser.companyId else {
+            print("❌ [QuoteBuilder] Pas de companyId pour l'utilisateur")
+            return
+        }
+        
+        print("✅ [QuoteBuilder] CompanyId: \(companyId)")
+        
+        // Générer les tâches suggérées
+        print("🔄 [QuoteBuilder] Génération des tâches suggérées...")
+        var allTasks = try TaskService.shared.generateSuggestedTasks(
+            for: event,
+            companyId: companyId,
+            createdBy: userId,
+            modelContext: modelContext
+        )
+        
+        print("✅ [QuoteBuilder] \(allTasks.count) tâches générées")
+        
+        // Retirer la tâche "Créer liste de scan" car elles sont déjà créées automatiquement
+        allTasks.removeAll { $0.type == .createScanList }
+        
+        print("✅ [QuoteBuilder] \(allTasks.count) tâches à créer (après filtrage)")
+        
+        // Créer toutes les tâches
+        for (index, task) in allTasks.enumerated() {
+            print("📝 [QuoteBuilder] Création tâche \(index + 1)/\(allTasks.count): \(task.type.displayName)")
+            _ = try await TaskService.shared.createTask(task, modelContext: modelContext)
+        }
+        
+        print("✅ [QuoteBuilder] \(allTasks.count) tâches créées automatiquement")
     }
 }
 

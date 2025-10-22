@@ -11,6 +11,7 @@ import SwiftUI
 struct QuoteFinalizationView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var authService = AuthService()
     
     let event: Event
     @Binding var quoteItems: [QuoteItem]
@@ -21,6 +22,8 @@ struct QuoteFinalizationView: View {
     @State private var tvaRate: String = "20.0"
     
     @State private var showingPDF = false
+    @State private var showingTaskSuggestion = false
+    @State private var suggestedTasks: [TodoTask] = []
     @State private var showAlert = false
     @State private var alertMessage = ""
     
@@ -179,6 +182,15 @@ struct QuoteFinalizationView: View {
             .sheet(isPresented: $showingPDF) {
                 QuotePDFView(event: event, quoteItems: quoteItems)
             }
+            .sheet(isPresented: $showingTaskSuggestion) {
+                TaskSuggestionView(
+                    event: event,
+                    suggestedTasks: suggestedTasks,
+                    onValidate: { validatedTasks in
+                        createTasks(validatedTasks)
+                    }
+                )
+            }
             .alert("Information", isPresented: $showAlert) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -212,6 +224,23 @@ struct QuoteFinalizationView: View {
         
         do {
             try modelContext.save()
+            print("✅ [QuoteFinalization] Sauvegarde locale réussie")
+            
+            // Créer automatiquement la ScanList
+            createScanList()
+            
+            // Synchroniser avec Firebase
+            Task {
+                do {
+                    try await syncToFirebase()
+                    print("✅ [QuoteFinalization] Synchronisation Firebase réussie")
+                } catch {
+                    print("❌ [QuoteFinalization] Erreur Firebase: \(error.localizedDescription)")
+                }
+            }
+            
+            // Générer les tâches suggérées
+            generateTaskSuggestions()
             
             // Petite pause avant d'afficher le PDF
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -220,6 +249,117 @@ struct QuoteFinalizationView: View {
         } catch {
             alertMessage = "Erreur lors de la finalisation : \(error.localizedDescription)"
             showAlert = true
+        }
+    }
+    
+    private func syncToFirebase() async throws {
+        let firebaseService = FirebaseService()
+        let firestoreEvent = event.toFirestoreEvent()
+        try await firebaseService.updateEvent(firestoreEvent)
+    }
+    
+    private func createScanList() {
+        do {
+            let scanListService = ScanListService()
+            let scanLists = try scanListService.generateAllScanLists(
+                from: event,
+                quoteItems: quoteItems,
+                modelContext: modelContext
+            )
+            print("✅ [QuoteFinalization] \(scanLists.count) ScanLists créées automatiquement pour toutes les directions")
+        } catch {
+            print("⚠️ [QuoteFinalization] Erreur création ScanLists: \(error.localizedDescription)")
+            // Ne pas bloquer la finalisation si la création des ScanLists échoue
+        }
+    }
+    
+    private func generateTaskSuggestions() {
+        guard let userId = authService.currentUserId else {
+            print("⚠️ [QuoteFinalization] Utilisateur non connecté")
+            return
+        }
+        
+        print("👤 [QuoteFinalization] UserId: \(userId)")
+        
+        // Récupérer le companyId depuis PermissionService (qui a déjà l'utilisateur chargé)
+        guard let currentUser = PermissionService.shared.currentUser else {
+            print("❌ [QuoteFinalization] Pas d'utilisateur dans PermissionService")
+            return
+        }
+        
+        print("✅ [QuoteFinalization] Utilisateur trouvé: \(currentUser.displayName)")
+        
+        guard let companyId = currentUser.companyId else {
+            print("⚠️ [QuoteFinalization] Impossible de récupérer le companyId")
+            return
+        }
+        
+        print("✅ [QuoteFinalization] CompanyId: \(companyId)")
+        
+        // Générer les tâches suggérées
+        do {
+            var allTasks = try TaskService.shared.generateSuggestedTasks(
+                for: event,
+                companyId: companyId,
+                createdBy: userId,
+                modelContext: modelContext
+            )
+            
+            print("✅ [QuoteFinalization] \(allTasks.count) tâches générées")
+            
+            // Retirer la tâche "Créer liste de scan" car elles sont déjà créées automatiquement
+            allTasks.removeAll { $0.type == .createScanList }
+            
+            print("✅ [QuoteFinalization] \(allTasks.count) tâches à créer (après filtrage)")
+            
+            suggestedTasks = allTasks
+            
+            // Créer automatiquement TOUTES les tâches (car les listes sont déjà créées)
+            createAllTasksAutomatically(tasks: allTasks)
+            
+            // Ne plus afficher la modal de suggestion
+            // DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            //     showingTaskSuggestion = true
+            // }
+        } catch {
+            print("❌ Erreur génération tâches: \(error)")
+        }
+    }
+    
+    private func createAllTasksAutomatically(tasks: [TodoTask]) {
+        Task {
+            do {
+                print("📝 [QuoteFinalization] Création automatique de \(tasks.count) tâches...")
+                for (index, task) in tasks.enumerated() {
+                    print("📝 [QuoteFinalization] Création tâche \(index + 1)/\(tasks.count): \(task.type.displayName)")
+                    _ = try await TaskService.shared.createTask(task, modelContext: modelContext)
+                }
+                print("✅ [QuoteFinalization] \(tasks.count) tâches créées automatiquement")
+            } catch {
+                print("❌ [QuoteFinalization] Erreur création tâches: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func createTasks(_ tasks: [TodoTask]) {
+        Task {
+            do {
+                for task in tasks {
+                    // Créer chaque tâche avec TaskService
+                    _ = try await TaskService.shared.createTask(task, modelContext: modelContext)
+                }
+                
+                alertMessage = "✅ \(tasks.count) tâches créées avec succès !"
+                showAlert = true
+                
+                // Fermer la vue après un court délai
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    dismiss()
+                }
+            } catch {
+                alertMessage = "❌ Erreur création tâches: \(error.localizedDescription)"
+                showAlert = true
+            }
         }
     }
 }

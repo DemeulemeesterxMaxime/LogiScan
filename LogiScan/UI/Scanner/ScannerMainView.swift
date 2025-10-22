@@ -20,6 +20,7 @@ struct ScannerMainView: View {
     @State private var isScanReady = false  // Pour activer le scan après un tap
     @State private var showTapInstruction = true  // Afficher l'instruction au début
     @State private var hasScannedOnce = false  // Pour ne plus afficher l'instruction après le 1er scan
+    @State private var isTorchOn = false  // État de la torche/flash
     
     // NOUVEAU : Bandeau de sélection de mode
     @State private var selectedMode: ScannerMode = .free
@@ -55,9 +56,7 @@ struct ScannerMainView: View {
             scanResultSheet
         }
         .sheet(isPresented: $showListManagement) {
-            if let scanList = selectedScanList {
-                ScanListManagementView(scanList: scanList)
-            }
+            ScanListBrowserView()
         }
         .alert("Erreur", isPresented: $viewModel.showError) {
             Button("OK") { }
@@ -211,6 +210,7 @@ struct ScannerMainView: View {
                     QRScannerView(
                         scannedCode: $viewModel.scannedCode,
                         isScanning: $viewModel.isScanning,
+                        isTorchOn: $isTorchOn,
                         onCodeScanned: viewModel.handleScannedCode
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 0))
@@ -435,13 +435,13 @@ struct ScannerMainView: View {
                 
                 // Bouton Flash (droite)
                 Button(action: {
-                    // TODO: Toggle torch
+                    isTorchOn.toggle()
                 }) {
-                    Image(systemName: "flashlight.off.fill")
+                    Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                         .font(.title2)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isTorchOn ? .yellow : .white)
                         .frame(width: 56, height: 56)
-                        .background(Circle().fill(Color.white.opacity(0.2)))
+                        .background(Circle().fill(isTorchOn ? Color.yellow.opacity(0.3) : Color.white.opacity(0.2)))
                         .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
                 }
             }
@@ -741,16 +741,16 @@ struct ScannerMainView: View {
                 
                 // Torche
                 Button(action: {
-                    // TODO: Toggle torch
+                    isTorchOn.toggle()
                 }) {
                     VStack(spacing: 6) {
                         Circle()
-                            .fill(Color.white.opacity(0.2))
+                            .fill(isTorchOn ? Color.yellow.opacity(0.3) : Color.white.opacity(0.2))
                             .frame(width: 56, height: 56)
                             .overlay(
-                                Image(systemName: "flashlight.off.fill")
+                                Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
                                     .font(.title2)
-                                    .foregroundColor(.white)
+                                    .foregroundColor(isTorchOn ? .yellow : .white)
                             )
                         
                         Text("Flash")
