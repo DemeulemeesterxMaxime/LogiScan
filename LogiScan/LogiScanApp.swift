@@ -112,7 +112,7 @@ struct LogiScanApp: App {
                 if userSessionService.isLoading {
                     // Écran de chargement pendant la récupération du profil
                     LoadingView()
-                } else if let user = userSessionService.currentUser {
+                } else if userSessionService.currentUser != nil {
                     // Utilisateur chargé avec succès
                     MainTabView()
                         .environmentObject(authService)

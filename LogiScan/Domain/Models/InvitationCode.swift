@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class InvitationCode {
+final class InvitationCode: @unchecked Sendable {
     @Attribute(.unique) var codeId: String
     var code: String  // Format: COMPANY-2025-X7K9
     var customName: String?  // Nom personnalisé optionnel (ex: "Code Équipe Livraison")

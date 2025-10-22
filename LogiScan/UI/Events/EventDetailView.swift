@@ -91,22 +91,15 @@ struct EventDetailView: View {
             }
             .padding(.vertical)
         }
-        .background(
-            // ✅ NavigationLink ISOLÉ au niveau du body, hors de la hiérarchie réactive
-            NavigationLink(
-                destination: QuoteBuilderView(event: event),
-                isActive: Binding(
-                    get: { isShowingQuoteBuilder },
-                    set: { isShowingQuoteBuilder = $0 }
-                )
-            ) {
-                EmptyView()
-            }
-            .hidden()
-        )
         .navigationTitle(event.name)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isEditing)
+        .navigationDestination(isPresented: Binding(
+            get: { isShowingQuoteBuilder },
+            set: { isShowingQuoteBuilder = $0 }
+        )) {
+            QuoteBuilderView(event: event)
+        }
         .toolbar {
             if isEditing {
                 ToolbarItem(placement: .cancellationAction) {

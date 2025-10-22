@@ -675,11 +675,11 @@ struct EventCardForWizard: View {
                 }
                 
                 let scanListService = ScanListService()
-                let newList = try scanListService.generateScanList(
+                let newList = try scanListService.generateAllScanLists(
                     from: event,
                     quoteItems: quoteItems,
                     modelContext: modelContext
-                )
+                ).first!
                 
                 print("✅ Liste créée avec succès : \(newList.totalItems) articles")
                 onSelect(newList)

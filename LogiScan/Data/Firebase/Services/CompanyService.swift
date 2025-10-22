@@ -28,7 +28,7 @@ final class CompanyService {
     func createCompany(_ company: Company) async throws {
         let firestoreCompany = company.toFirestoreCompany()
         
-        try await db.collection("companies")
+        try db.collection("companies")
             .document(company.companyId)
             .setData(from: firestoreCompany)
         
@@ -52,7 +52,7 @@ final class CompanyService {
     func updateCompany(_ company: Company) async throws {
         let firestoreCompany = company.toFirestoreCompany()
         
-        try await db.collection("companies")
+        try db.collection("companies")
             .document(company.companyId)
             .setData(from: firestoreCompany, merge: true)
         

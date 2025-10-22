@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class Company {
+final class Company: @unchecked Sendable {
     @Attribute(.unique) var companyId: String
     var name: String
     var logoURL: String?

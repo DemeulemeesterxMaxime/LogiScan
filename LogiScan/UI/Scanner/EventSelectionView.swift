@@ -283,11 +283,11 @@ struct EventCard: View {
                 // Créer la liste
                 print("🔨 DEBUG: Appel generateScanList...")
                 let scanListService = ScanListService()
-                let newList = try scanListService.generateScanList(
+                let newList = try scanListService.generateAllScanLists(
                     from: event,
                     quoteItems: quoteItems,
                     modelContext: modelContext
-                )
+                ).first!
                 
                 print("✅ DEBUG: ScanList créée avec succès!")
                 print("   - ID: \(newList.scanListId)")

@@ -519,8 +519,8 @@ struct CreateTaskView: View {
     
     private func createSingleTask(_ task: TodoTask) async {
         do {
-            try await TaskService.shared.createTask(task, modelContext: modelContext)
-            print("✅ Tâche créée et synchronisée avec Firebase: \(task.title)")
+            _ = try await TaskService.shared.createTask(task, modelContext: modelContext)
+            print("✅ Tâche créée et synchronisée avec Firebase: \(task.title ?? task.type.displayName)")
         } catch {
             await MainActor.run {
                 errorMessage = "Erreur lors de la création: \(error.localizedDescription)"

@@ -189,7 +189,7 @@ extension TaskNotificationService {
     /// Notifier lors de l'attribution d'une tâche
     func notifyTaskAssigned(task: TodoTask, modelContext: ModelContext) throws {
         guard let assignedToUserId = task.assignedToUserId,
-              let assignedToUserName = task.assignedToUserName else {
+              let _ = task.assignedToUserName else {
             return
         }
         

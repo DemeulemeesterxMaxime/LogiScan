@@ -52,7 +52,7 @@ final class InvitationService {
         
         let firestoreCode = code.toFirestoreInvitationCode()
         
-        try await db.collection("invitationCodes")
+        try db.collection("invitationCodes")
             .document(code.codeId)
             .setData(from: firestoreCode)
         

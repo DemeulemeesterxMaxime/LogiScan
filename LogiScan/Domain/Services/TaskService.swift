@@ -532,7 +532,7 @@ class TaskService {
               let priorityRaw = data["priority"] as? String,
               let createdBy = data["createdBy"] as? String,
               let companyId = data["companyId"] as? String,
-              let createdAtTimestamp = data["createdAt"] as? Timestamp,
+              let _ = data["createdAt"] as? Timestamp,
               let type = TodoTask.TaskType(rawValue: typeRaw),
               let status = TodoTask.TaskStatus(rawValue: statusRaw),
               let priority = TodoTask.TaskPriority(rawValue: priorityRaw) else {

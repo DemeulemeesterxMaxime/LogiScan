@@ -103,7 +103,7 @@ struct TaskSuggestionView: View {
                 
                 Spacer()
                 
-                if let truckId = event.assignedTruckId {
+                if event.assignedTruckId != nil {
                     Label("Camion assigné", systemImage: "truck.box.fill")
                         .font(.caption)
                         .foregroundStyle(.green)

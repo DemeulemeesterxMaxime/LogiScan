@@ -637,7 +637,7 @@ class FirebaseService: ObservableObject {
         
         let firestoreUser = user.toFirestoreUser()
         
-        try await db.collection("users")
+        try db.collection("users")
             .document(userId)
             .setData(from: firestoreUser)
         
@@ -663,7 +663,7 @@ class FirebaseService: ObservableObject {
         
         let firestoreUser = user.toFirestoreUser()
         
-        try await db.collection("users")
+        try db.collection("users")
             .document(userId)
             .setData(from: firestoreUser)
         
@@ -687,7 +687,7 @@ class FirebaseService: ObservableObject {
     func updateUser(_ user: User) async throws {
         let firestoreUser = user.toFirestoreUser()
         
-        try await db.collection("users")
+        try db.collection("users")
             .document(user.userId)
             .setData(from: firestoreUser, merge: true)
         
@@ -700,7 +700,7 @@ class FirebaseService: ObservableObject {
             .whereField("companyId", isEqualTo: companyId)
             .getDocuments()
         
-        let users = try snapshot.documents.compactMap { document -> User? in
+        let users = snapshot.documents.compactMap { document -> User? in
             guard let firestoreUser = try? document.data(as: FirestoreUser.self) else {
                 return nil
             }
@@ -729,7 +729,7 @@ class FirebaseService: ObservableObject {
         toUserId: String,
         companyId: String
     ) async throws {
-        try await db.runTransaction { transaction, errorPointer in
+        _ = try await db.runTransaction { transaction, errorPointer in
             // Rétrograder l'ancien admin en manager
             let oldAdminRef = self.db.collection("users").document(fromUserId)
             transaction.updateData([

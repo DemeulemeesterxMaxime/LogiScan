@@ -471,7 +471,7 @@ struct ScannerMainView: View {
             
         case .event:
             // Mode événement : utiliser la liste sélectionnée
-            if let event = selectedEvent, let scanList = selectedScanList {
+            if let event = selectedEvent, let _ = selectedScanList {
                 // Utiliser un mode approprié selon le LogisticsStatus de l'événement
                 let scanMode = determineScanMode(for: event)
                 // Note: on ne passe pas expectedAssets car la logique de scan utilise maintenant selectedScanList
