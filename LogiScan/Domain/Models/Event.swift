@@ -49,6 +49,9 @@ final class Event {
     var assemblyFee: Double  // Frais de montage
     var disassemblyFee: Double  // Frais de démontage
     var tvaRate: Double  // Taux de TVA (ex: 20.0 pour 20%)
+    
+    // Listes de scan sélectionnées (stockées en raw values)
+    var selectedScanDirections: [String]  // Ex: ["stock_to_truck", "truck_to_event"]
 
     var createdAt: Date
     var updatedAt: Date
@@ -76,7 +79,8 @@ final class Event {
         deliveryFee: Double = 0.0,
         assemblyFee: Double = 0.0,
         disassemblyFee: Double = 0.0,
-        tvaRate: Double = 20.0
+        tvaRate: Double = 20.0,
+        selectedScanDirections: [String] = []
     ) {
         self.eventId = eventId
         self.name = name
@@ -102,6 +106,7 @@ final class Event {
         self.assemblyFee = assemblyFee
         self.disassemblyFee = disassemblyFee
         self.tvaRate = tvaRate
+        self.selectedScanDirections = selectedScanDirections
         self.createdAt = Date()
         self.updatedAt = Date()
     }

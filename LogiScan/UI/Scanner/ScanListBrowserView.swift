@@ -404,7 +404,7 @@ struct ScanListMiniCard: View {
                 // Infos liste
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text("Liste du \(scanList.createdAt, style: .date)")
+                        Text(scanList.displayName)
                             .font(.subheadline)
                             .fontWeight(.medium)
                         

@@ -30,12 +30,32 @@ struct MainTabView: View {
     }
     
     init() {
-        // Configuration de la TabBar pour qu'elle s'adapte au mode clair/sombre
+        // Configuration de la TabBar pour iOS 18+ - Fix de visibilité
         let appearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()  // Fond translucide adaptatif
+        appearance.configureWithDefaultBackground()
         
+        // iOS 18: Forcer les couleurs pour une meilleure visibilité
+        // Couleur des icônes non sélectionnées (gris visible)
+        appearance.stackedLayoutAppearance.normal.iconColor = UIColor.systemGray
+        appearance.stackedLayoutAppearance.normal.titleTextAttributes = [
+            .foregroundColor: UIColor.systemGray
+        ]
+        
+        // Couleur des icônes sélectionnées (bleu accent)
+        appearance.stackedLayoutAppearance.selected.iconColor = UIColor.systemBlue
+        appearance.stackedLayoutAppearance.selected.titleTextAttributes = [
+            .foregroundColor: UIColor.systemBlue
+        ]
+        
+        // Appliquer l'apparence
         UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
+        if #available(iOS 15.0, *) {
+            UITabBar.appearance().scrollEdgeAppearance = appearance
+        }
+        
+        // iOS 18: S'assurer que la TabBar n'est pas transparente
+        UITabBar.appearance().isTranslucent = true
+        UITabBar.appearance().backgroundColor = UIColor.systemBackground
     }
     
     var body: some View {

@@ -585,7 +585,7 @@ struct EventCardForWizard: View {
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("Liste du \(list.createdAt, style: .date)")
+                                    Text(list.displayName)
                                         .font(.subheadline)
                                         .foregroundStyle(.primary)
                                     

@@ -34,6 +34,13 @@ struct CreateEventView: View {
     @State private var selectedTruckId: String? = nil
     @State private var selectedStatus: EventStatus = .planning
     
+    // Génération automatique de tâches
+    @State private var autoGenerateTasks: Bool = false
+    @State private var selectedTaskTypes: Set<TodoTask.TaskType> = []
+    
+    // Sélection des listes de scan
+    @State private var selectedScanDirections: Set<ScanDirection> = []
+    
     // Alerts
     @State private var showAlert = false
     @State private var alertMessage = ""
@@ -353,6 +360,106 @@ struct CreateEventView: View {
             .padding()
             .background(Color(UIColor.secondarySystemBackground))
             .cornerRadius(12)
+            
+            // NOUVELLE SECTION : Génération automatique de tâches
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Label("Génération automatique de tâches", systemImage: "checklist")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: $autoGenerateTasks)
+                        .labelsHidden()
+                }
+                
+                Text("Créez automatiquement des tâches prédéfinies pour cet événement")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                if autoGenerateTasks {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Sélectionnez les tâches à créer :")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 4)
+                        
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 8) {
+                            ForEach(availableTaskTypes, id: \.self) { taskType in
+                                TaskTypeButton(
+                                    taskType: taskType,
+                                    isSelected: selectedTaskTypes.contains(taskType)
+                                ) {
+                                    toggleTaskType(taskType)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+            }
+            .padding()
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(12)
+            
+            // NOUVELLE SECTION : Sélection des listes de scan
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Listes de scan", systemImage: "qrcode.viewfinder")
+                    .font(.headline)
+                    .foregroundColor(.blue)
+                
+                Text("Sélectionnez les listes de scan à générer pour cet événement")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                VStack(spacing: 8) {
+                    ForEach(ScanDirection.allCases, id: \.self) { direction in
+                        ScanDirectionRow(
+                            direction: direction,
+                            isSelected: selectedScanDirections.contains(direction)
+                        ) {
+                            toggleScanDirection(direction)
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(12)
+        }
+    }
+    
+    // MARK: - Available Task Types for Events
+    
+    private var availableTaskTypes: [TodoTask.TaskType] {
+        [
+            .loadTruckFromStock,
+            .unloadTruckAtEvent,
+            .loadTruckAtEvent,
+            .unloadTruckAtStock,
+            .transportToEvent,
+            .transportReturn,
+            .eventSetup,
+            .eventTeardown,
+            .prepareItems,
+            .returnItemsToPlace
+        ]
+    }
+    
+    private func toggleTaskType(_ taskType: TodoTask.TaskType) {
+        if selectedTaskTypes.contains(taskType) {
+            selectedTaskTypes.remove(taskType)
+        } else {
+            selectedTaskTypes.insert(taskType)
+        }
+    }
+    
+    private func toggleScanDirection(_ direction: ScanDirection) {
+        if selectedScanDirections.contains(direction) {
+            selectedScanDirections.remove(direction)
+        } else {
+            selectedScanDirections.insert(direction)
         }
     }
     
@@ -416,6 +523,12 @@ struct CreateEventView: View {
     // MARK: - Create Event
     
     private func createEvent() {
+        guard let currentUser = PermissionService.shared.currentUser else {
+            alertMessage = "Impossible de créer l'événement : utilisateur non connecté"
+            showAlert = true
+            return
+        }
+        
         let newEvent = Event(
             eventId: UUID().uuidString,
             name: eventName.trimmingCharacters(in: .whitespaces),
@@ -429,10 +542,21 @@ struct CreateEventView: View {
             endDate: endDate,
             status: selectedStatus,
             notes: notes,
-            assignedTruckId: selectedTruckId
+            assignedTruckId: selectedTruckId,
+            selectedScanDirections: Array(selectedScanDirections).map { $0.rawValue }
         )
         
         modelContext.insert(newEvent)
+        
+        // Générer les tâches si activé
+        if autoGenerateTasks && !selectedTaskTypes.isEmpty {
+            generateTasksForEvent(newEvent, userId: currentUser.userId, companyId: currentUser.companyId ?? "")
+        }
+        
+        // Générer les listes de scan si sélectionnées
+        if !selectedScanDirections.isEmpty {
+            generateScanListsForEvent(newEvent)
+        }
         
         Task {
             do {
@@ -451,6 +575,77 @@ struct CreateEventView: View {
                     showAlert = true
                 }
             }
+        }
+    }
+    
+    // MARK: - Generate Tasks
+    
+    private func generateTasksForEvent(_ event: Event, userId: String, companyId: String) {
+        for taskType in selectedTaskTypes {
+            let task = TodoTask(
+                title: nil, // Utilise le nom par défaut du type
+                taskDescription: "Tâche générée automatiquement pour l'événement \(event.name)",
+                type: taskType,
+                status: .pending,
+                priority: .medium,
+                eventId: event.eventId,
+                createdBy: userId,
+                companyId: companyId,
+                triggerNotification: true,
+                dueDate: determineDueDate(for: taskType, event: event),
+                estimatedDuration: estimatedDuration(for: taskType),
+                location: taskType.suggestedLocation
+            )
+            modelContext.insert(task)
+        }
+    }
+    
+    private func determineDueDate(for taskType: TodoTask.TaskType, event: Event) -> Date? {
+        switch taskType {
+        case .prepareItems, .loadTruckFromStock:
+            // Avant le début du montage
+            return Calendar.current.date(byAdding: .hour, value: -2, to: event.setupStartTime)
+        case .transportToEvent:
+            // Pendant le transport vers l'événement
+            return event.setupStartTime
+        case .unloadTruckAtEvent, .eventSetup:
+            // Pendant le montage
+            return event.setupStartTime
+        case .eventTeardown, .loadTruckAtEvent:
+            // À la fin de l'événement
+            return event.endDate
+        case .transportReturn, .unloadTruckAtStock, .returnItemsToPlace:
+            // Après l'événement
+            return Calendar.current.date(byAdding: .hour, value: 2, to: event.endDate)
+        default:
+            return nil
+        }
+    }
+    
+    private func estimatedDuration(for taskType: TodoTask.TaskType) -> Int? {
+        switch taskType {
+        case .prepareItems: return 60
+        case .loadTruckFromStock, .loadTruckAtEvent: return 90
+        case .unloadTruckAtEvent, .unloadTruckAtStock: return 90
+        case .transportToEvent, .transportReturn: return 120
+        case .eventSetup: return 180
+        case .eventTeardown: return 120
+        case .returnItemsToPlace: return 60
+        default: return nil
+        }
+    }
+    
+    // MARK: - Generate Scan Lists
+    
+    private func generateScanListsForEvent(_ event: Event) {
+        for direction in selectedScanDirections {
+            let scanList = ScanList(
+                eventId: event.eventId,
+                eventName: event.name,
+                scanDirection: direction,
+                status: .pending
+            )
+            modelContext.insert(scanList)
         }
     }
 }
@@ -501,6 +696,93 @@ struct DatePickerRow: View {
                 .background(Color(UIColor.systemBackground))
                 .cornerRadius(8)
         }
+    }
+}
+
+// MARK: - Task Type Button Component
+
+struct TaskTypeButton: View {
+    let taskType: TodoTask.TaskType
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: taskType.icon)
+                    .font(.caption)
+                
+                Text(taskType.displayName)
+                    .font(.caption)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.blue)
+                        .font(.caption)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(isSelected ? Color.blue.opacity(0.1) : Color(UIColor.systemBackground))
+            .foregroundColor(isSelected ? .blue : .primary)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.blue : Color.gray.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Scan Direction Row Component
+
+struct ScanDirectionRow: View {
+    let direction: ScanDirection
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: direction.icon)
+                    .font(.title3)
+                    .foregroundColor(isSelected ? .blue : .secondary)
+                    .frame(width: 30)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(direction.displayName)
+                        .font(.subheadline)
+                        .fontWeight(isSelected ? .semibold : .regular)
+                        .foregroundColor(.primary)
+                    
+                    Text(direction.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+                
+                Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.blue)
+                        .font(.title3)
+                }
+            }
+            .padding(12)
+            .background(isSelected ? Color.blue.opacity(0.1) : Color(UIColor.systemBackground))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color.blue : Color.gray.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

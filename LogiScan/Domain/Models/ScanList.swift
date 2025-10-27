@@ -101,7 +101,7 @@ enum ScanListStatus: String, Codable {
     }
 }
 
-enum ScanDirection: String, Codable {
+enum ScanDirection: String, Codable, CaseIterable {
     case stockToTruck = "stock_to_truck"       // Stock → Camion
     case truckToEvent = "truck_to_event"       // Camion → Event
     case eventToTruck = "event_to_truck"       // Event → Camion

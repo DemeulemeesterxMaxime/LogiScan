@@ -11,7 +11,58 @@ import SwiftData
 @MainActor
 class ScanListService: ObservableObject {
     
-    /// Génère les 4 listes de scan complètes pour un événement finalisé
+    /// Génère les listes de scan selon les directions sélectionnées dans l'événement
+    func generateSelectedScanLists(
+        from event: Event,
+        quoteItems: [QuoteItem],
+        modelContext: ModelContext
+    ) throws -> [ScanList] {
+        print("📋 [ScanListService] Génération des listes de scan pour l'événement: \(event.name)")
+        
+        // Vérifier que l'événement est finalisé
+        guard event.quoteStatus == .finalized else {
+            throw ScanListError.eventNotFinalized
+        }
+        
+        // Vérifier qu'il y a des items
+        guard !quoteItems.isEmpty else {
+            throw ScanListError.noItemsInQuote
+        }
+        
+        // Récupérer les directions sélectionnées
+        let selectedDirections: [ScanDirection]
+        if !event.selectedScanDirections.isEmpty {
+            // Utiliser les directions sélectionnées lors de la création
+            selectedDirections = event.selectedScanDirections.compactMap { ScanDirection(rawValue: $0) }
+            print("✅ [ScanListService] Utilisation des directions sélectionnées: \(selectedDirections.map { $0.rawValue })")
+        } else {
+            // Si aucune sélection, générer toutes les listes (comportement par défaut)
+            selectedDirections = [.stockToTruck, .truckToEvent, .eventToTruck, .truckToStock]
+            print("⚠️ [ScanListService] Aucune sélection trouvée, génération de toutes les listes")
+        }
+        
+        // Supprimer les anciennes listes de scan pour cet événement
+        try deleteExistingScanLists(for: event.eventId, modelContext: modelContext)
+        
+        var createdLists: [ScanList] = []
+        
+        // Créer une liste pour chaque direction sélectionnée
+        for direction in selectedDirections {
+            let scanList = try createScanList(
+                from: event,
+                quoteItems: quoteItems,
+                direction: direction,
+                modelContext: modelContext
+            )
+            createdLists.append(scanList)
+        }
+        
+        print("✅ [ScanListService] \(createdLists.count) listes de scan créées")
+        
+        return createdLists
+    }
+    
+    /// Génère les 4 listes de scan complètes pour un événement finalisé (pour compatibilité)
     func generateAllScanLists(
         from event: Event,
         quoteItems: [QuoteItem],
@@ -19,6 +70,12 @@ class ScanListService: ObservableObject {
     ) throws -> [ScanList] {
         print("📋 [ScanListService] Génération des 4 listes de scan pour l'événement: \(event.name)")
         
+        // Si des directions sont sélectionnées, les utiliser
+        if !event.selectedScanDirections.isEmpty {
+            return try generateSelectedScanLists(from: event, quoteItems: quoteItems, modelContext: modelContext)
+        }
+        
+        // Sinon, comportement par défaut : toutes les listes
         // Vérifier que l'événement est finalisé
         guard event.quoteStatus == .finalized else {
             throw ScanListError.eventNotFinalized

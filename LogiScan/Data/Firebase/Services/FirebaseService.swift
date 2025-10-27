@@ -376,6 +376,7 @@ class FirebaseService: ObservableObject {
                 "status": event.status.rawValue,
                 "assignedTruckId": event.assignedTruckId as Any,
                 "notes": event.notes,
+                "selectedScanDirections": event.selectedScanDirections,
                 "createdAt": Timestamp(date: event.createdAt),
                 "updatedAt": Timestamp(date: event.updatedAt),
             ]
@@ -402,6 +403,7 @@ class FirebaseService: ObservableObject {
                 "status": event.status.rawValue,
                 "assignedTruckId": event.assignedTruckId as Any,
                 "notes": event.notes,
+                "selectedScanDirections": event.selectedScanDirections,
                 "updatedAt": Timestamp(date: event.updatedAt),
             ]
             try await eventsRef.document(event.eventId).setData(data, merge: true)

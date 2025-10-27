@@ -98,7 +98,7 @@ struct ScanListManagementView: View {
                     Text(scanList.eventName)
                         .font(.headline)
                     
-                    Text("Liste du \(scanList.createdAt, style: .date)")
+                    Text(scanList.displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

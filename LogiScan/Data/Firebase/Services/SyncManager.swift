@@ -570,7 +570,8 @@ class SyncManager: ObservableObject {
             endDate: (data["endDate"] as? Date) ?? Date(),
             status: EventStatus(rawValue: data["status"] as? String ?? "PLANIFICATION") ?? .planning,
             notes: data["notes"] as? String ?? "",
-            assignedTruckId: data["assignedTruckId"] as? String
+            assignedTruckId: data["assignedTruckId"] as? String,
+            selectedScanDirections: data["selectedScanDirections"] as? [String] ?? []
         )
         
         return event
