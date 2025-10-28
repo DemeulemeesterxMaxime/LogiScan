@@ -321,6 +321,12 @@ struct AssignedAssetRow: View {
             case .inUse:
                 Image(systemName: "arrow.right.circle.fill")
                     .foregroundColor(.blue)
+            case .inTransitToEvent:
+                Image(systemName: "shippingbox.fill")
+                    .foregroundColor(.cyan)
+            case .inTransitToStock:
+                Image(systemName: "shippingbox.and.arrow.backward.fill")
+                    .foregroundColor(.teal)
             case .damaged:
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.red)

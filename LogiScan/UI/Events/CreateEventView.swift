@@ -562,6 +562,11 @@ struct CreateEventView: View {
             do {
                 try modelContext.save()
                 
+                // 🆕 Mettre à jour le statut du camion si assigné
+                if newEvent.assignedTruckId != nil {
+                    try? TruckStatusService.handleEventChange(event: newEvent, modelContext: modelContext)
+                }
+                
                 // Synchroniser avec Firebase
                 let firebaseService = FirebaseService()
                 await firebaseService.saveEvent(newEvent)

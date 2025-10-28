@@ -14,6 +14,7 @@ struct MainTabView: View {
     @State private var permissionService = PermissionService.shared
     @State private var authService = AuthService()
     @State private var userListener: ListenerRegistration?
+    @StateObject private var quoteStatusSync = QuoteStatusSyncService()
     
     // Query pour les notifications non lues
     @Query(filter: #Predicate<TaskNotification> { !$0.isRead })
@@ -111,6 +112,14 @@ struct MainTabView: View {
         .accentColor(.blue)
         .onAppear {
             startUserMonitoring()
+            
+            // Synchroniser les statuts des devis au démarrage
+            Task {
+                await quoteStatusSync.syncAllEvents(modelContext: modelContext)
+                
+                // 🆕 Mettre à jour les statuts des camions en fonction des événements
+                try? TruckStatusService.updateAllTruckStatuses(modelContext: modelContext)
+            }
         }
         .onDisappear {
             stopUserMonitoring()

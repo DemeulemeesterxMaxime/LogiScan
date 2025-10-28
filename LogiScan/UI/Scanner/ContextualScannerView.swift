@@ -11,7 +11,7 @@ import AVFoundation
 struct ContextualScannerView: View {
     @Environment(\.dismiss) private var dismiss
     
-    let scanList: ScanList
+    @Bindable var scanList: ScanList  // 🆕 Utiliser @Bindable pour observer les changements
     let onScanComplete: (ScannedAssetResult) -> Void
     
     @State private var isScanning = true

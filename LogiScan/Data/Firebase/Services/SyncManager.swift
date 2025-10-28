@@ -161,6 +161,7 @@ class SyncManager: ObservableObject {
             group.addTask { await self.syncStockItemsFromFirebase(modelContext: modelContext) }
             group.addTask { await self.syncEventsFromFirebase(modelContext: modelContext) }
             group.addTask { await self.syncTrucksFromFirebase(modelContext: modelContext) }
+            group.addTask { await self.syncScanListsFromFirebase(modelContext: modelContext) }
         }
         
         lastSyncDate = Date()
@@ -714,4 +715,39 @@ class SyncManager: ObservableObject {
         print("🔄 [SyncManager] Camion local mis à jour : \(truck.displayName)")
         return true
     }
+    
+    // MARK: - Sync ScanLists
+    
+    private func syncScanListsFromFirebase(modelContext: ModelContext) async {
+        do {
+            print("🔄 [SyncManager] Synchronisation des ScanLists...")
+            
+            // Récupérer tous les événements finalisés pour synchroniser leurs ScanLists
+            // On ne peut pas utiliser de prédicat avec enum, donc on récupère tous les événements
+            let eventsDescriptor = FetchDescriptor<Event>()
+            
+            let allEvents = try modelContext.fetch(eventsDescriptor)
+            let finalizedEvents = allEvents.filter { $0.quoteStatus == .finalized }
+            print("📋 [SyncManager] \(finalizedEvents.count) événements finalisés trouvés")
+            
+            let scanListService = ScanListService()
+            
+            for event in finalizedEvents {
+                do {
+                    let scanLists = try await scanListService.fetchScanListsFromFirebase(
+                        forEvent: event.eventId,
+                        modelContext: modelContext
+                    )
+                    print("✅ [SyncManager] \(scanLists.count) ScanLists synchronisées pour événement: \(event.name)")
+                } catch {
+                    print("⚠️ [SyncManager] Erreur sync ScanLists pour \(event.name): \(error)")
+                }
+            }
+            
+            print("✅ [SyncManager] Synchronisation ScanLists terminée")
+        } catch {
+            print("❌ [SyncManager] Erreur synchronisation ScanLists: \(error)")
+        }
+    }
 }
+

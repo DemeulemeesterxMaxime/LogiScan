@@ -10,6 +10,7 @@ import SwiftData
 
 @MainActor
 class ScanListService: ObservableObject {
+    private let firebaseService = FirebaseService()
     
     /// Génère les listes de scan selon les directions sélectionnées dans l'événement
     func generateSelectedScanLists(
@@ -59,6 +60,15 @@ class ScanListService: ObservableObject {
         
         print("✅ [ScanListService] \(createdLists.count) listes de scan créées")
         
+        // 🆕 Synchroniser avec Firebase
+        Task {
+            do {
+                try await syncScanListsToFirebase(createdLists, forEvent: event.eventId)
+            } catch {
+                print("⚠️ [ScanListService] Erreur sync Firebase (non bloquant): \(error)")
+            }
+        }
+        
         return createdLists
     }
     
@@ -104,6 +114,15 @@ class ScanListService: ObservableObject {
         }
         
         print("✅ [ScanListService] \(createdLists.count) listes de scan créées pour toutes les directions")
+        
+        // 🆕 Synchroniser avec Firebase
+        Task {
+            do {
+                try await syncScanListsToFirebase(createdLists, forEvent: event.eventId)
+            } catch {
+                print("⚠️ [ScanListService] Erreur sync Firebase (non bloquant): \(error)")
+            }
+        }
         
         return createdLists
     }
@@ -267,6 +286,9 @@ class ScanListService: ObservableObject {
         // Ajouter le scan
         scanListItem.addScannedAsset(assetId)
         
+        // 🆕 Mettre à jour le statut de l'asset en fonction de la direction du scan
+        updateAssetStatus(asset: asset, scanDirection: scanList.scanDirection)
+        
         // Mettre à jour la ScanList
         scanList.scannedItems = scanList.items.reduce(0) { $0 + $1.quantityScanned }
         scanList.updatedAt = Date()
@@ -283,7 +305,43 @@ class ScanListService: ObservableObject {
         // Sauvegarder
         try modelContext.save()
         
+        // 🆕 Synchroniser avec Firebase après chaque scan
+        Task {
+            do {
+                try await syncScanListToFirebase(scanList)
+            } catch {
+                print("⚠️ [ScanListService] Erreur sync Firebase: \(error.localizedDescription)")
+                // Ne pas bloquer le scan si la sync échoue
+            }
+        }
+        
         print("✅ [ScanListService] Scan enregistré: \(scanListItem.name) (\(scanListItem.quantityScanned)/\(scanListItem.quantityRequired))")
+        print("📦 [ScanListService] Statut asset mis à jour: \(asset.status.displayName)")
+    }
+    
+    /// Met à jour le statut d'un asset en fonction de la direction du scan
+    private func updateAssetStatus(asset: Asset, scanDirection: ScanDirection) {
+        switch scanDirection {
+        case .stockToTruck:
+            // Stock → Camion : article en transport vers l'événement
+            asset.status = .inTransitToEvent
+            print("🚚 Asset \(asset.assetId) → Transport vers événement")
+            
+        case .truckToEvent:
+            // Camion → Événement : article en utilisation
+            asset.status = .inUse
+            print("🎪 Asset \(asset.assetId) → En utilisation")
+            
+        case .eventToTruck:
+            // Événement → Camion : article en transport vers le stock
+            asset.status = .inTransitToStock
+            print("🔙 Asset \(asset.assetId) → Transport vers stock")
+            
+        case .truckToStock:
+            // Camion → Stock : article disponible
+            asset.status = .available
+            print("✅ Asset \(asset.assetId) → Disponible")
+        }
     }
     
     /// Annule un scan d'asset
@@ -420,3 +478,71 @@ Cet article n'est pas dans la liste de préparation actuelle.
         }
     }
 }
+
+// MARK: - Firebase Synchronization
+
+extension ScanListService {
+    /// Synchronise une seule ScanList avec Firebase (utilisé après chaque scan)
+    private func syncScanListToFirebase(_ scanList: ScanList) async throws {
+        print("☁️ [ScanListService] Synchronisation ScanList \(scanList.scanListId) vers Firebase...")
+        
+        let firestoreScanList = scanList.toFirestoreScanList()
+        try await firebaseService.updateScanList(firestoreScanList, forEvent: scanList.eventId)
+        
+        print("✅ [ScanListService] ScanList synchronisée avec Firebase (status: \(scanList.status.displayName))")
+    }
+    
+    /// Synchronise les listes de scan avec Firebase
+    private func syncScanListsToFirebase(_ scanLists: [ScanList], forEvent eventId: String) async throws {
+        print("☁️ [ScanListService] Synchronisation de \(scanLists.count) ScanLists vers Firebase...")
+        
+        // Supprimer les anciennes listes dans Firebase
+        try await firebaseService.deleteAllScanLists(forEvent: eventId)
+        
+        // Créer les nouvelles listes
+        for scanList in scanLists {
+            let firestoreScanList = scanList.toFirestoreScanList()
+            try await firebaseService.createScanList(firestoreScanList, forEvent: eventId)
+        }
+        
+        print("✅ [ScanListService] \(scanLists.count) ScanLists synchronisées avec Firebase")
+    }
+    
+    /// Récupère les listes de scan depuis Firebase et les synchronise localement
+    func fetchScanListsFromFirebase(forEvent eventId: String, modelContext: ModelContext) async throws -> [ScanList] {
+        print("📥 [ScanListService] Récupération des ScanLists depuis Firebase...")
+        
+        let firestoreScanLists = try await firebaseService.fetchScanLists(forEvent: eventId)
+        
+        // Supprimer les listes locales existantes
+        try deleteExistingScanLists(for: eventId, modelContext: modelContext)
+        
+        // Créer les listes locales depuis Firebase
+        var localScanLists: [ScanList] = []
+        for firestoreScanList in firestoreScanLists {
+            if let scanList = firestoreScanList.toScanList() {
+                modelContext.insert(scanList)
+                localScanLists.append(scanList)
+            }
+        }
+        
+        try modelContext.save()
+        
+        print("✅ [ScanListService] \(localScanLists.count) ScanLists synchronisées depuis Firebase")
+        return localScanLists
+    }
+    
+    /// Met à jour une ScanList locale et la synchronise avec Firebase
+    func updateScanListWithSync(_ scanList: ScanList, forEvent eventId: String, modelContext: ModelContext) async throws {
+        // Sauvegarder localement
+        scanList.updatedAt = Date()
+        try modelContext.save()
+        
+        // Synchroniser avec Firebase
+        let firestoreScanList = scanList.toFirestoreScanList()
+        try await firebaseService.updateScanList(firestoreScanList, forEvent: eventId)
+        
+        print("✅ [ScanListService] ScanList mise à jour et synchronisée: \(scanList.displayName)")
+    }
+}
+

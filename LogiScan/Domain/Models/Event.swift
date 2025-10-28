@@ -51,7 +51,7 @@ final class Event {
     var tvaRate: Double  // Taux de TVA (ex: 20.0 pour 20%)
     
     // Listes de scan sélectionnées (stockées en raw values)
-    var selectedScanDirections: [String]  // Ex: ["stock_to_truck", "truck_to_event"]
+    var selectedScanDirections: [String] = []  // Ex: ["stock_to_truck", "truck_to_event"]
 
     var createdAt: Date
     var updatedAt: Date

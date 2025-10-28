@@ -772,6 +772,55 @@ class FirebaseService: ObservableObject {
         print("✅ [FirebaseService] Utilisateur retiré de l'entreprise: \(userId)")
     }
     
+    // MARK: - ScanLists
+    
+    private func scanListsRef(eventId: String) -> CollectionReference {
+        eventsRef.document(eventId).collection("scanLists")
+    }
+    
+    /// Créer une nouvelle ScanList dans Firebase
+    func createScanList(_ scanList: FirestoreScanList, forEvent eventId: String) async throws {
+        try scanListsRef(eventId: eventId).document(scanList.scanListId).setData(from: scanList)
+        print("✅ [FirebaseService] ScanList créée: \(scanList.scanListId)")
+    }
+    
+    /// Mettre à jour une ScanList existante
+    func updateScanList(_ scanList: FirestoreScanList, forEvent eventId: String) async throws {
+        try scanListsRef(eventId: eventId).document(scanList.scanListId).setData(from: scanList, merge: true)
+        print("✅ [FirebaseService] ScanList mise à jour: \(scanList.scanListId)")
+    }
+    
+    /// Récupérer toutes les ScanLists d'un événement
+    func fetchScanLists(forEvent eventId: String) async throws -> [FirestoreScanList] {
+        let snapshot = try await scanListsRef(eventId: eventId)
+            .order(by: "createdAt")
+            .getDocuments()
+        
+        let scanLists = snapshot.documents.compactMap { doc in
+            try? doc.data(as: FirestoreScanList.self)
+        }
+        
+        print("📥 [FirebaseService] \(scanLists.count) ScanLists récupérées pour événement: \(eventId)")
+        return scanLists
+    }
+    
+    /// Supprimer une ScanList
+    func deleteScanList(scanListId: String, forEvent eventId: String) async throws {
+        try await scanListsRef(eventId: eventId).document(scanListId).delete()
+        print("🗑️ [FirebaseService] ScanList supprimée: \(scanListId)")
+    }
+    
+    /// Supprimer toutes les ScanLists d'un événement
+    func deleteAllScanLists(forEvent eventId: String) async throws {
+        let snapshot = try await scanListsRef(eventId: eventId).getDocuments()
+        
+        for document in snapshot.documents {
+            try await document.reference.delete()
+        }
+        
+        print("🗑️ [FirebaseService] Toutes les ScanLists supprimées pour événement: \(eventId)")
+    }
+    
     // MARK: - Errors Extension
     
     enum FirebaseServiceError: Error, LocalizedError {

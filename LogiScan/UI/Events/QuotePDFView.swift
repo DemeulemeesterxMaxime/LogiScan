@@ -19,6 +19,7 @@ struct QuotePDFView: View {
     @State private var showShareSheet = false
     @State private var pdfURL: URL?
     @State private var showingQuoteBuilder = false
+    @State private var showingVersionHistory = false
     
     var body: some View {
         NavigationView {
@@ -41,6 +42,15 @@ struct QuotePDFView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
+                        // Bouton Historique (si devis finalisé)
+                        if event.quoteStatus == .finalized || event.quoteStatus == .sent {
+                            Button(action: {
+                                showingVersionHistory = true
+                            }) {
+                                Label("Historique", systemImage: "clock.arrow.circlepath")
+                            }
+                        }
+                        
                         // Bouton Revoir (uniquement si devis finalisé)
                         if event.quoteStatus == .finalized || event.quoteStatus == .sent {
                             Button(action: {
@@ -71,6 +81,9 @@ struct QuotePDFView: View {
                 NavigationStack {
                     QuoteBuilderView(event: event)
                 }
+            }
+            .sheet(isPresented: $showingVersionHistory) {
+                QuoteVersionHistoryView(event: event, quoteItems: quoteItems)
             }
         }
         .onAppear {

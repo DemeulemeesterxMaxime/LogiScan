@@ -60,14 +60,18 @@ struct LogiScanApp: App {
                 OrderTimestamp.self,  // Historique des commandes
                 Location.self,  // Gestion des emplacements
                 QuoteItem.self,  // Articles du devis
+                QuoteVersion.self,  // Versions des devis (nouveau)
                 AssetReservation.self,  // Réservations d'assets
                 ScanList.self,  // Listes de préparation (nouveau)
                 PreparationListItem.self,  // Items des listes de préparation (nouveau)
+                TodoTask.self,  // Tâches (nouveau)
+                TaskNotification.self,  // Notifications de tâches (nouveau)
+                User.self,  // Utilisateurs (nouveau)
                 configurations: configuration
             )
 
             print("✅ ModelContainer créé avec succès (persistence activée)")
-            print("   - 13 modèles configurés")
+            print("   - 18 modèles configurés")
             print("   - Données sauvegardées sur disque")
 
         } catch {
@@ -89,9 +93,13 @@ struct LogiScanApp: App {
                     OrderTimestamp.self,
                     Location.self,
                     QuoteItem.self,
+                    QuoteVersion.self,
                     AssetReservation.self,
                     ScanList.self,
                     PreparationListItem.self,
+                    TodoTask.self,
+                    TaskNotification.self,
+                    User.self,
                     configurations: fallbackConfig
                 )
                 print("⚠️ Mode dégradé activé : persistence en mémoire uniquement")

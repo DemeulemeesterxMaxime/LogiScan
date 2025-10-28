@@ -15,7 +15,7 @@ struct EventScanListView: View {
     @Query private var allAssets: [Asset]
     @StateObject private var scanListService = ScanListService()
     
-    let scanList: ScanList
+    @Bindable var scanList: ScanList  // 🆕 Utiliser @Bindable pour observer les changements
     
     @State private var showingScanner = false
     @State private var showAlert = false

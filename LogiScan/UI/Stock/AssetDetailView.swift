@@ -702,6 +702,10 @@ struct StatusPickerView: View {
             return "Réservé pour une commande ou un événement"
         case .inUse:
             return "Actuellement en utilisation"
+        case .inTransitToEvent:
+            return "En cours de transport vers l'événement"
+        case .inTransitToStock:
+            return "En cours de retour vers le stock"
         case .damaged:
             return "Endommagé, nécessite une réparation"
         case .maintenance:

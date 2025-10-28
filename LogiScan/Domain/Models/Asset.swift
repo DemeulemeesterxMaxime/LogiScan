@@ -84,6 +84,8 @@ enum AssetStatus: String, CaseIterable, Codable {
     case available = "DISPONIBLE"
     case reserved = "RESERVE"
     case inUse = "EN_UTILISATION"
+    case inTransitToEvent = "TRANSPORT_VERS_EVENT"
+    case inTransitToStock = "TRANSPORT_VERS_STOCK"
     case damaged = "ENDOMMAGE"
     case maintenance = "MAINTENANCE"
     case lost = "PERDU"
@@ -93,6 +95,8 @@ enum AssetStatus: String, CaseIterable, Codable {
         case .available: return "Disponible"
         case .reserved: return "Réservé"
         case .inUse: return "En utilisation"
+        case .inTransitToEvent: return "Transport vers événement"
+        case .inTransitToStock: return "Transport vers stock"
         case .damaged: return "Endommagé"
         case .maintenance: return "En maintenance"
         case .lost: return "Perdu"
@@ -105,6 +109,8 @@ enum AssetStatus: String, CaseIterable, Codable {
         case .available: return "Disponible"
         case .reserved: return "Réservé"
         case .inUse: return "En utilisation"
+        case .inTransitToEvent: return "Vers événement"
+        case .inTransitToStock: return "Vers stock"
         case .damaged: return "Endommagé"
         case .maintenance: return "Maintenance"  // Plus court
         case .lost: return "Perdu"
@@ -116,6 +122,8 @@ enum AssetStatus: String, CaseIterable, Codable {
         case .available: return "green"
         case .reserved: return "blue"
         case .inUse: return "purple"
+        case .inTransitToEvent: return "cyan"
+        case .inTransitToStock: return "teal"
         case .damaged: return "red"
         case .maintenance: return "orange"
         case .lost: return "gray"
@@ -128,6 +136,8 @@ enum AssetStatus: String, CaseIterable, Codable {
         case .available: return .green
         case .reserved: return .blue
         case .inUse: return .purple
+        case .inTransitToEvent: return .cyan
+        case .inTransitToStock: return .teal
         case .damaged: return .red
         case .maintenance: return .orange
         case .lost: return .gray
@@ -139,6 +149,8 @@ enum AssetStatus: String, CaseIterable, Codable {
         case .available: return "checkmark.circle.fill"
         case .reserved: return "calendar.badge.clock"
         case .inUse: return "arrow.right.circle.fill"
+        case .inTransitToEvent: return "shippingbox.fill"
+        case .inTransitToStock: return "shippingbox.and.arrow.backward.fill"
         case .damaged: return "exclamationmark.triangle.fill"
         case .maintenance: return "wrench.and.screwdriver.fill"
         case .lost: return "questionmark.circle.fill"

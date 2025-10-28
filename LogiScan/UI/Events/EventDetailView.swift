@@ -567,10 +567,26 @@ struct EventDetailView: View {
                 event.endDate = editedEndDate
                 event.status = editedStatus
                 event.notes = editedNotes
+                
+                // 🆕 Détecter le changement de camion
+                let oldTruckId = event.assignedTruckId
                 event.assignedTruckId = editedAssignedTruckId
                 event.updatedAt = Date()
                 
                 try modelContext.save()
+                
+                // 🆕 Mettre à jour le statut des camions affectés
+                if oldTruckId != editedAssignedTruckId {
+                    try? TruckStatusService.handleTruckAssignmentChange(
+                        event: event,
+                        oldTruckId: oldTruckId,
+                        newTruckId: editedAssignedTruckId,
+                        modelContext: modelContext
+                    )
+                } else if editedAssignedTruckId != nil {
+                    // Dates ou statut changés, mettre à jour le camion assigné
+                    try? TruckStatusService.handleEventChange(event: event, modelContext: modelContext)
+                }
                 
                 // Synchroniser avec Firebase
                 let firebaseService = FirebaseService()
@@ -593,6 +609,9 @@ struct EventDetailView: View {
     private func deleteEvent() {
         Task {
             do {
+                // 🆕 Sauvegarder le truckId avant suppression
+                let truckId = event.assignedTruckId
+                
                 // Supprimer de Firebase
                 let firebaseService = FirebaseService()
                 await firebaseService.deleteEvent(event.eventId)
@@ -600,6 +619,11 @@ struct EventDetailView: View {
                 // Supprimer de SwiftData
                 modelContext.delete(event)
                 try modelContext.save()
+                
+                // 🆕 Mettre à jour le statut du camion (maintenant disponible)
+                if let truckId = truckId {
+                    try? TruckStatusService.updateTruckStatusById(truckId: truckId, modelContext: modelContext)
+                }
                 
                 await MainActor.run {
                     dismiss()

@@ -83,6 +83,14 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow write: if isAuthenticated();
       }
+      
+      // Règles pour les scanLists des events
+      match /scanLists/{scanListId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated();
+        allow delete: if isAuthenticated();
+      }
     }
     
     // Règles pour les trucks
@@ -194,6 +202,24 @@ service cloud.firestore {
       // Suppression : l'utilisateur peut supprimer ses propres notifications
       allow delete: if isAuthenticated() && 
                        resource.data.recipientUserId == getUserId();
+    }
+    
+    // Règles pour les versions de devis PDF
+    match /events/{eventId}/quoteVersions/{versionId} {
+      // Lecture : tous les utilisateurs authentifiés
+      allow read: if isAuthenticated();
+      
+      // Création : tous les utilisateurs authentifiés
+      allow create: if isAuthenticated();
+      
+      // Modification : interdit (une version est immuable)
+      allow update: if false;
+      
+      // Suppression : Manager et Admin uniquement
+      allow delete: if isAuthenticated() && 
+                       exists(/databases/$(database)/documents/users/$(getUserId())) &&
+                       (get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'admin' ||
+                        get(/databases/$(database)/documents/users/$(getUserId())).data.role == 'manager');
     }
   }
 }

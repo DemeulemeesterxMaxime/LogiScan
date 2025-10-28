@@ -154,6 +154,12 @@ final class StockItem {
                 reserved += 1
             case .inUse:
                 inUse += 1
+            case .inTransitToEvent:
+                // Considéré comme réservé/en cours d'utilisation
+                reserved += 1
+            case .inTransitToStock:
+                // En retour, considéré comme en cours
+                inUse += 1
             case .damaged:
                 damaged += 1
             case .maintenance:

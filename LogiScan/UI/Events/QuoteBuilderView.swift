@@ -30,6 +30,7 @@ struct QuoteBuilderView: View {
     @StateObject private var availabilityService = AvailabilityService()
     @StateObject private var reservationService = ReservationService()
     @StateObject private var scanListService = ScanListService()
+    @StateObject private var versionService = QuoteVersionService()
 
     let event: Event
 
@@ -1299,6 +1300,34 @@ struct QuoteBuilderView: View {
                     
                     // Créer les tâches automatiquement
                     try await createTasksForEvent()
+                    
+                    // 🆕 CRÉER LA VERSION PDF
+                    print("📄 Génération de la version PDF...")
+                    if let currentUser = PermissionService.shared.currentUser {
+                        do {
+                            // Générer le PDF
+                            let pdfData = generatePDFData()
+                            print("✅ PDF généré (\(pdfData.count) bytes)")
+                            
+                            // Créer la version avec upload du PDF
+                            let version = try await versionService.createVersion(
+                                event: event,
+                                quoteItems: quoteItems,
+                                pdfData: pdfData,
+                                createdBy: currentUser.userId,
+                                createdByName: currentUser.displayName,
+                                modelContext: modelContext
+                            )
+                            
+                            print("✅ Version \(version.versionNumber) créée et uploadée dans Firebase Storage")
+                        } catch {
+                            print("⚠️ Erreur création version PDF (non bloquant): \(error)")
+                            // Ne pas bloquer la finalisation si le PDF échoue
+                        }
+                    } else {
+                        print("⚠️ Utilisateur non connecté - version PDF non créée")
+                    }
+                    
                 } catch {
                     print("⚠️ Erreur création ScanLists/Tâches (non bloquant): \(error)")
                     // Ne pas bloquer la finalisation si la liste échoue
@@ -2114,12 +2143,306 @@ struct PriceEditRow: View {
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
-        .padding(8)
-        .background(Color(UIColor.tertiarySystemBackground))
-        .cornerRadius(8)
         .onAppear {
-            editedPrice = String(format: "%.0f", currentPrice)
+            editedPrice = String(format: "%.2f", currentPrice)
         }
+    }
+}
+
+// MARK: - PDF Generation
+
+extension QuoteBuilderView {
+    // Propriétés calculées spécifiques pour le PDF (les autres existent déjà dans la vue principale)
+    private var pdfSubtotal: Double {
+        quoteItems.reduce(0) { $0 + $1.totalPrice }
+    }
+    
+    private var pdfDeliveryAmount: Double {
+        event.deliveryFee
+    }
+    
+    private var pdfAssemblyAmount: Double {
+        event.assemblyFee
+    }
+    
+    private var pdfDisassemblyAmount: Double {
+        event.disassemblyFee
+    }
+    
+    private var pdfTotalBeforeTVA: Double {
+        pdfSubtotal + pdfDeliveryAmount + pdfAssemblyAmount + pdfDisassemblyAmount
+    }
+    
+    private var pdfTvaAmount: Double {
+        pdfTotalBeforeTVA * (event.tvaRate / 100)
+    }
+    
+    private var pdfTotalWithTVA: Double {
+        pdfTotalBeforeTVA + pdfTvaAmount
+    }
+    
+    func generatePDFData() -> Data {
+        let format = UIGraphicsPDFRendererFormat()
+        let pageRect = CGRect(x: 0, y: 0, width: 595, height: 842) // A4 size in points
+        
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        
+        return renderer.pdfData { context in
+            context.beginPage()
+            
+            var yPosition: CGFloat = 50
+            
+            // En-tête
+            yPosition = drawHeader(in: pageRect, startY: yPosition)
+            
+            // Informations événement
+            yPosition = drawEventInfo(in: pageRect, startY: yPosition + 20)
+            
+            // Informations client
+            yPosition = drawClientInfo(in: pageRect, startY: yPosition + 15)
+            
+            // Ligne de séparation
+            yPosition += 20
+            drawLine(in: pageRect, y: yPosition)
+            
+            // Tableau des articles
+            yPosition = drawItemsTable(in: pageRect, startY: yPosition + 20, context: context)
+            
+            // Ligne de séparation
+            yPosition += 20
+            drawLine(in: pageRect, y: yPosition)
+            
+            // Récapitulatif des prix
+            yPosition = drawPricingSummary(in: pageRect, startY: yPosition + 20)
+            
+            // Pied de page
+            drawFooter(in: pageRect)
+        }
+    }
+    
+    private func drawHeader(in rect: CGRect, startY: CGFloat) -> CGFloat {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: 24),
+            .foregroundColor: UIColor.systemBlue
+        ]
+        
+        let title = "DEVIS"
+        title.draw(at: CGPoint(x: 50, y: startY), withAttributes: attributes)
+        
+        let dateAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12),
+            .foregroundColor: UIColor.gray
+        ]
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        let dateText = "Date : \(dateFormatter.string(from: event.createdAt))"
+        let dateSize = dateText.size(withAttributes: dateAttributes)
+        dateText.draw(at: CGPoint(x: rect.width - dateSize.width - 50, y: startY + 5), withAttributes: dateAttributes)
+        
+        return startY + 30
+    }
+    
+    private func drawEventInfo(in rect: CGRect, startY: CGFloat) -> CGFloat {
+        let boldAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: 14),
+            .foregroundColor: UIColor.black
+        ]
+        
+        let regularAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12),
+            .foregroundColor: UIColor.darkGray
+        ]
+        
+        var y = startY
+        
+        "Événement".draw(at: CGPoint(x: 50, y: y), withAttributes: boldAttributes)
+        y += 20
+        
+        event.name.draw(at: CGPoint(x: 50, y: y), withAttributes: regularAttributes)
+        y += 18
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        "Du \(dateFormatter.string(from: event.startDate)) au \(dateFormatter.string(from: event.endDate))".draw(
+            at: CGPoint(x: 50, y: y),
+            withAttributes: regularAttributes
+        )
+        y += 18
+        
+        if !event.eventAddress.isEmpty {
+            event.eventAddress.draw(at: CGPoint(x: 50, y: y), withAttributes: regularAttributes)
+        }
+        
+        return y
+    }
+    
+    private func drawClientInfo(in rect: CGRect, startY: CGFloat) -> CGFloat {
+        let boldAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: 14),
+            .foregroundColor: UIColor.black
+        ]
+        
+        let regularAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12),
+            .foregroundColor: UIColor.darkGray
+        ]
+        
+        var y = startY
+        
+        if !event.clientName.isEmpty {
+            "Client".draw(at: CGPoint(x: 50, y: y), withAttributes: boldAttributes)
+            y += 20
+            
+            event.clientName.draw(at: CGPoint(x: 50, y: y), withAttributes: regularAttributes)
+            y += 18
+            
+            if !event.clientPhone.isEmpty {
+                event.clientPhone.draw(at: CGPoint(x: 50, y: y), withAttributes: regularAttributes)
+                y += 18
+            }
+            
+            if !event.clientEmail.isEmpty {
+                event.clientEmail.draw(at: CGPoint(x: 50, y: y), withAttributes: regularAttributes)
+                y += 18
+            }
+            
+            if !event.clientAddress.isEmpty {
+                event.clientAddress.draw(at: CGPoint(x: 50, y: y), withAttributes: regularAttributes)
+            }
+        }
+        
+        return y
+    }
+    
+    private func drawLine(in rect: CGRect, y: CGFloat) {
+        let path = UIBezierPath()
+        path.move(to: CGPoint(x: 50, y: y))
+        path.addLine(to: CGPoint(x: rect.width - 50, y: y))
+        UIColor.lightGray.setStroke()
+        path.lineWidth = 0.5
+        path.stroke()
+    }
+    
+    private func drawItemsTable(in rect: CGRect, startY: CGFloat, context: UIGraphicsPDFRendererContext) -> CGFloat {
+        let boldAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: 12),
+            .foregroundColor: UIColor.black
+        ]
+        
+        let regularAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 11),
+            .foregroundColor: UIColor.darkGray
+        ]
+        
+        var y = startY
+        
+        // En-tête du tableau
+        "Article".draw(at: CGPoint(x: 50, y: y), withAttributes: boldAttributes)
+        "Qté".draw(at: CGPoint(x: 350, y: y), withAttributes: boldAttributes)
+        "P.U.".draw(at: CGPoint(x: 410, y: y), withAttributes: boldAttributes)
+        "Total".draw(at: CGPoint(x: 480, y: y), withAttributes: boldAttributes)
+        
+        y += 20
+        drawLine(in: rect, y: y)
+        y += 10
+        
+        // Articles
+        for item in quoteItems {
+            // Vérifier si on a besoin d'une nouvelle page
+            if y > rect.height - 150 {
+                context.beginPage()
+                y = 50
+            }
+            
+            item.name.draw(at: CGPoint(x: 50, y: y), withAttributes: regularAttributes)
+            "\(item.quantity)".draw(at: CGPoint(x: 350, y: y), withAttributes: regularAttributes)
+            String(format: "%.2f €", item.unitPrice).draw(at: CGPoint(x: 410, y: y), withAttributes: regularAttributes)
+            String(format: "%.2f €", item.totalPrice).draw(at: CGPoint(x: 480, y: y), withAttributes: regularAttributes)
+            
+            y += 20
+        }
+        
+        return y
+    }
+    
+    private func drawPricingSummary(in rect: CGRect, startY: CGFloat) -> CGFloat {
+        let regularAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 12),
+            .foregroundColor: UIColor.darkGray
+        ]
+        
+        let boldAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: 14),
+            .foregroundColor: UIColor.black
+        ]
+        
+        var y = startY
+        let leftX: CGFloat = 350
+        let rightX: CGFloat = 480
+        
+        // Sous-total
+        "Sous-total articles".draw(at: CGPoint(x: leftX, y: y), withAttributes: regularAttributes)
+        String(format: "%.2f €", pdfSubtotal).draw(at: CGPoint(x: rightX, y: y), withAttributes: regularAttributes)
+        y += 20
+        
+        // Frais supplémentaires
+        if pdfDeliveryAmount > 0 {
+            "Frais de déplacement".draw(at: CGPoint(x: leftX, y: y), withAttributes: regularAttributes)
+            String(format: "%.2f €", pdfDeliveryAmount).draw(at: CGPoint(x: rightX, y: y), withAttributes: regularAttributes)
+            y += 20
+        }
+        
+        if pdfAssemblyAmount > 0 {
+            "Frais de montage".draw(at: CGPoint(x: leftX, y: y), withAttributes: regularAttributes)
+            String(format: "%.2f €", pdfAssemblyAmount).draw(at: CGPoint(x: rightX, y: y), withAttributes: regularAttributes)
+            y += 20
+        }
+        
+        if pdfDisassemblyAmount > 0 {
+            "Frais de démontage".draw(at: CGPoint(x: leftX, y: y), withAttributes: regularAttributes)
+            String(format: "%.2f €", pdfDisassemblyAmount).draw(at: CGPoint(x: rightX, y: y), withAttributes: regularAttributes)
+            y += 20
+        }
+        
+        // Total HT
+        drawLine(in: rect, y: y)
+        y += 10
+        
+        "Total HT".draw(at: CGPoint(x: leftX, y: y), withAttributes: boldAttributes)
+        String(format: "%.2f €", pdfTotalBeforeTVA).draw(at: CGPoint(x: rightX, y: y), withAttributes: boldAttributes)
+        y += 20
+        
+        // TVA
+        let tvaRateValue = event.tvaRate
+        "TVA (\(String(format: "%.1f", tvaRateValue))%)".draw(at: CGPoint(x: leftX, y: y), withAttributes: regularAttributes)
+        String(format: "%.2f €", pdfTvaAmount).draw(at: CGPoint(x: rightX, y: y), withAttributes: regularAttributes)
+        y += 20
+        
+        // Total TTC
+        drawLine(in: rect, y: y)
+        y += 10
+        
+        let totalAttributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.boldSystemFont(ofSize: 16),
+            .foregroundColor: UIColor.systemBlue
+        ]
+        
+        "TOTAL TTC".draw(at: CGPoint(x: leftX, y: y), withAttributes: totalAttributes)
+        String(format: "%.2f €", pdfTotalWithTVA).draw(at: CGPoint(x: rightX, y: y), withAttributes: totalAttributes)
+        
+        return y + 30
+    }
+    
+    private func drawFooter(in rect: CGRect) {
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: UIFont.systemFont(ofSize: 10),
+            .foregroundColor: UIColor.gray
+        ]
+        
+        let footerText = "Ce devis est valable 30 jours à compter de sa date d'émission."
+        let y = rect.height - 50
+        footerText.draw(at: CGPoint(x: 50, y: y), withAttributes: attributes)
     }
 }
 
