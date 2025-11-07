@@ -16,6 +16,8 @@ struct ScanListBrowserView: View {
     @Query(sort: \Event.startDate, order: .reverse) private var allEvents: [Event]
     @Query(sort: \ScanList.createdAt, order: .reverse) private var allScanLists: [ScanList]
     
+    @StateObject private var scanListService = ScanListService()
+    
     @State private var searchText = ""
     @State private var selectedFilter: ScanListStatus? = nil
     @State private var expandedEventIds: Set<String> = []
@@ -89,6 +91,12 @@ struct ScanListBrowserView: View {
                         dismiss()
                     }
                 }
+            }
+            .onAppear {
+                refreshAllScanListStatuses()
+            }
+            .refreshable {
+                await refreshAllScanListStatusesAsync()
             }
         }
     }
@@ -198,6 +206,65 @@ struct ScanListBrowserView: View {
             } else {
                 expandedEventIds.insert(eventId)
             }
+        }
+    }
+    
+    // MARK: - Refresh All Scan List Statuses
+    
+    private func refreshAllScanListStatuses() {
+        Task {
+            await fetchAndRefreshAllScanLists()
+        }
+    }
+    
+    private func refreshAllScanListStatusesAsync() async {
+        await fetchAndRefreshAllScanLists()
+    }
+    
+    /// Fetch les ScanLists depuis Firebase pour tous les événements puis rafraîchit les statuts
+    private func fetchAndRefreshAllScanLists() async {
+        print("📥 [ScanListBrowserView] Synchronisation des listes depuis Firebase...")
+        
+        // Récupérer tous les événements qui ont des listes
+        let eventsWithLists = Set(allScanLists.map { $0.eventId })
+        
+        // Fetch depuis Firebase pour chaque événement
+        for eventId in eventsWithLists {
+            // Trouver l'Event complet pour accéder aux QuoteItems
+            guard let event = allEvents.first(where: { $0.eventId == eventId }) else {
+                print("⚠️ [ScanListBrowserView] Event non trouvé: \(eventId)")
+                continue
+            }
+            
+            do {
+                // Récupérer les QuoteItems depuis SwiftData
+                let currentEventId = eventId  // Capture locale pour le prédicat
+                let quoteItemsDescriptor = FetchDescriptor<QuoteItem>(
+                    predicate: #Predicate { $0.eventId == currentEventId }
+                )
+                let quoteItems = try modelContext.fetch(quoteItemsDescriptor)
+                
+                let _ = try await scanListService.fetchScanListsFromFirebase(
+                    forEvent: event,
+                    quoteItems: quoteItems,
+                    modelContext: modelContext
+                )
+                print("✅ [ScanListBrowserView] Listes synchronisées pour événement: \(event.name)")
+            } catch {
+                print("⚠️ [ScanListBrowserView] Erreur sync Firebase pour \(event.name): \(error.localizedDescription)")
+            }
+        }
+        
+        // Rafraîchir les statuts localement après le fetch
+        await MainActor.run {
+            for scanList in allScanLists {
+                do {
+                    try scanListService.refreshScanListStatus(scanList, modelContext: modelContext)
+                } catch {
+                    print("⚠️ [ScanListBrowserView] Erreur refresh \(scanList.scanListId): \(error.localizedDescription)")
+                }
+            }
+            print("✅ [ScanListBrowserView] \(allScanLists.count) listes rafraîchies")
         }
     }
 }

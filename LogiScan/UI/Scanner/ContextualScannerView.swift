@@ -34,6 +34,7 @@ struct ContextualScannerView: View {
                         scannedCode: $scannedCode,
                         isScanning: $isScanning,
                         isTorchOn: $isTorchOn,
+                        requiresTapToScan: true, // 🆕 Nécessite un tap
                         onCodeScanned: { code in
                             handleScan(code)
                         }

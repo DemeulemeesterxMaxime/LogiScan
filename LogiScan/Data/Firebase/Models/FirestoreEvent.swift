@@ -27,11 +27,11 @@ struct FirestoreEvent: Codable {
     var discountPercent: Double
     var finalAmount: Double
     var quoteStatus: String
-    var paymentStatus: String
-    var deliveryFee: Double
-    var assemblyFee: Double
-    var disassemblyFee: Double
-    var tvaRate: Double
+    var paymentStatus: String?  // 🆕 Optionnel pour compatibilité
+    var deliveryFee: Double?  // 🆕 Optionnel pour compatibilité
+    var assemblyFee: Double?  // 🆕 Optionnel pour compatibilité
+    var disassemblyFee: Double?  // 🆕 Optionnel pour compatibilité
+    var tvaRate: Double?  // 🆕 Optionnel pour compatibilité
     var createdAt: Date
     var updatedAt: Date
     
@@ -120,11 +120,11 @@ extension FirestoreEvent {
             totalAmount: totalAmount,
             discountPercent: discountPercent,
             quoteStatus: QuoteStatus(rawValue: quoteStatus) ?? .draft,
-            paymentStatus: PaymentStatus(rawValue: paymentStatus) ?? .pending,
-            deliveryFee: deliveryFee,
-            assemblyFee: assemblyFee,
-            disassemblyFee: disassemblyFee,
-            tvaRate: tvaRate
+            paymentStatus: paymentStatus.flatMap { PaymentStatus(rawValue: $0) } ?? .pending,  // 🆕 Utiliser flatMap pour gérer nil
+            deliveryFee: deliveryFee ?? 0.0,  // 🆕 Valeur par défaut si manquant
+            assemblyFee: assemblyFee ?? 0.0,  // 🆕 Valeur par défaut si manquant
+            disassemblyFee: disassemblyFee ?? 0.0,  // 🆕 Valeur par défaut si manquant
+            tvaRate: tvaRate ?? 21.0  // 🆕 Valeur par défaut si manquant (21% TVA BE)
         )
     }
 }

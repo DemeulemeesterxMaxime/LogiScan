@@ -1247,6 +1247,7 @@ struct QuoteBuilderView: View {
         showingCartSummary = false
     }
     
+    @MainActor
     private func saveQuote(finalize: Bool = false) async {
         print("💾 DEBUG - Sauvegarde du devis (finalize: \(finalize))")
         print("🔍 Nombre d'items dans le panier: \(quoteItems.count)")
@@ -1369,6 +1370,7 @@ struct QuoteBuilderView: View {
         }
     }
     
+    @MainActor
     private func syncToFirebase() async throws {
         print("🔄 Synchronisation Firebase - Événement: \(event.eventId)")
         
@@ -1405,6 +1407,7 @@ struct QuoteBuilderView: View {
         }
     }
     
+    @MainActor
     private func autoSave() {
         print("💾 Sauvegarde automatique...")
         
@@ -1508,6 +1511,7 @@ struct QuoteBuilderView: View {
         }
     }
     
+    @MainActor
     private func createTasksForEvent() async throws {
         print("🔄 [QuoteBuilder] Début création des tâches...")
         

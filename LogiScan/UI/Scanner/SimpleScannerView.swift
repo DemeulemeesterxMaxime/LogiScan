@@ -86,6 +86,7 @@ struct SimpleScannerView: View {
                     scannedCode: $scannedCode,
                     isScanning: $isScanning,
                     isTorchOn: $isTorchOn,
+                    requiresTapToScan: true, // 🆕 Nécessite un tap
                     onCodeScanned: handleScannedCode
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12))

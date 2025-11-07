@@ -321,6 +321,8 @@ class ScanListService: ObservableObject {
     
     /// Met à jour le statut d'un asset en fonction de la direction du scan
     private func updateAssetStatus(asset: Asset, scanDirection: ScanDirection) {
+        let oldStatus = asset.status
+        
         switch scanDirection {
         case .stockToTruck:
             // Stock → Camion : article en transport vers l'événement
@@ -341,6 +343,23 @@ class ScanListService: ObservableObject {
             // Camion → Stock : article disponible
             asset.status = .available
             print("✅ Asset \(asset.assetId) → Disponible")
+        }
+        
+        // 🔥 Synchroniser le statut avec Firebase
+        if oldStatus != asset.status {
+            Task {
+                do {
+                    try await firebaseService.updateAssetStatus(
+                        assetId: asset.assetId,
+                        stockSku: asset.sku,
+                        newStatus: asset.status.rawValue,
+                        location: asset.currentLocationId
+                    )
+                    print("✅ [ScanListService] Statut de l'asset synchronisé avec Firebase")
+                } catch {
+                    print("⚠️ [ScanListService] Erreur sync statut asset Firebase: \(error.localizedDescription)")
+                }
+            }
         }
     }
     
@@ -381,6 +400,78 @@ class ScanListService: ObservableObject {
         try modelContext.save()
         
         print("✅ [ScanListService] Scan annulé: \(scanListItem.name) (\(scanListItem.quantityScanned)/\(scanListItem.quantityRequired))")
+    }
+    
+    /// Recalcule et met à jour le statut d'une ScanList en fonction de ses items
+    func refreshScanListStatus(
+        _ scanList: ScanList,
+        modelContext: ModelContext
+    ) throws {
+        print("🔄 [ScanListService] Rafraîchissement du statut de la ScanList")
+        
+        // 🐛 FIX: Si les items sont vides mais totalItems > 0, c'est une erreur de sync
+        if scanList.items.isEmpty && scanList.totalItems > 0 {
+            print("⚠️ [ScanListService] Incohérence détectée : totalItems = \(scanList.totalItems) mais items est vide!")
+            print("   → Impossible de recalculer le statut sans les items. Marquage comme 'En attente'.")
+            
+            // Réinitialiser les compteurs
+            scanList.scannedItems = 0
+            scanList.totalItems = 0  // Forcer à 0 pour éviter l'affichage erroné
+            scanList.status = .pending
+            scanList.updatedAt = Date()
+            
+            try modelContext.save()
+            print("📊 [ScanListService] Statut: En attente - Liste vide (sync incomplète)")
+            return
+        }
+        
+        // Recalculer le total scanné
+        let totalScanned = scanList.items.reduce(0) { $0 + $1.quantityScanned }
+        scanList.scannedItems = totalScanned
+        
+        let oldStatus = scanList.status
+        
+        // Mettre à jour le statut basé sur la progression
+        if scanList.isComplete {
+            // Liste complète
+            if scanList.status != .completed {
+                scanList.status = .completed
+                scanList.completedAt = Date()
+                print("✅ [ScanListService] Liste marquée comme complétée!")
+            }
+        } else if totalScanned > 0 {
+            // Progression partielle
+            if scanList.status == .pending {
+                scanList.status = .inProgress
+                print("▶️ [ScanListService] Liste marquée comme en cours")
+            }
+        } else {
+            // Aucune progression
+            if scanList.status != .pending && scanList.status != .cancelled {
+                scanList.status = .pending
+                print("⏸️ [ScanListService] Liste marquée comme en attente")
+            }
+        }
+        
+        scanList.updatedAt = Date()
+        
+        // Sauvegarder
+        try modelContext.save()
+        
+        print("📊 [ScanListService] Statut: \(scanList.status.displayName) - Progression: \(scanList.scannedItems)/\(scanList.totalItems)")
+        
+        // 🆕 Mettre à jour le statut du camion si le statut a changé
+        if oldStatus != scanList.status {
+            do {
+                try TruckStatusService.handleScanListChange(
+                    scanList: scanList,
+                    modelContext: modelContext
+                )
+            } catch {
+                print("⚠️ [ScanListService] Erreur mise à jour statut camion: \(error)")
+                // Non bloquant
+            }
+        }
     }
     
     /// Réinitialise une ScanList
@@ -509,19 +600,48 @@ extension ScanListService {
     }
     
     /// Récupère les listes de scan depuis Firebase et les synchronise localement
-    func fetchScanListsFromFirebase(forEvent eventId: String, modelContext: ModelContext) async throws -> [ScanList] {
+    /// ⚠️ IMPORTANT: Cette fonction doit régénérer les items depuis les QuoteItems de l'Event
+    func fetchScanListsFromFirebase(
+        forEvent event: Event,
+        quoteItems: [QuoteItem],
+        modelContext: ModelContext
+    ) async throws -> [ScanList] {
         print("📥 [ScanListService] Récupération des ScanLists depuis Firebase...")
         
-        let firestoreScanLists = try await firebaseService.fetchScanLists(forEvent: eventId)
+        let firestoreScanLists = try await firebaseService.fetchScanLists(forEvent: event.eventId)
         
         // Supprimer les listes locales existantes
-        try deleteExistingScanLists(for: eventId, modelContext: modelContext)
+        try deleteExistingScanLists(for: event.eventId, modelContext: modelContext)
         
-        // Créer les listes locales depuis Firebase
+        // Créer les listes locales depuis Firebase AVEC leurs items depuis les QuoteItems
         var localScanLists: [ScanList] = []
         for firestoreScanList in firestoreScanLists {
             if let scanList = firestoreScanList.toScanList() {
                 modelContext.insert(scanList)
+                
+                // � FIX MAJEUR: Régénérer les PreparationListItems depuis les QuoteItems
+                print("🔄 [ScanListService] Régénération des items pour \(scanList.displayName)...")
+                for quoteItem in quoteItems {
+                    let scanListItem = PreparationListItem(
+                        scanListId: scanList.scanListId,
+                        sku: quoteItem.sku,
+                        name: quoteItem.name,
+                        category: quoteItem.category,
+                        quantityRequired: quoteItem.quantity,
+                        quantityScanned: 0,  // Reset à 0, sera recalculé par refreshStatus
+                        scannedAssets: [],
+                        status: .pending
+                    )
+                    scanListItem.scanList = scanList
+                    scanList.items.append(scanListItem)
+                    modelContext.insert(scanListItem)
+                }
+                
+                print("✅ [ScanListService] \(scanList.items.count) items régénérés depuis QuoteItems")
+                
+                // Recalculer le statut basé sur les items fraîchement créés
+                try refreshScanListStatus(scanList, modelContext: modelContext)
+                
                 localScanLists.append(scanList)
             }
         }

@@ -12,6 +12,7 @@ import SwiftData
 @MainActor
 class SyncManager: ObservableObject {
     private let firebaseService: FirebaseService
+    private let scanListService: ScanListService
 
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
@@ -19,6 +20,7 @@ class SyncManager: ObservableObject {
 
     init() {
         self.firebaseService = FirebaseService()
+        self.scanListService = ScanListService()
     }
 
     // MARK: - Stock Items Synchronization
@@ -734,8 +736,16 @@ class SyncManager: ObservableObject {
             
             for event in finalizedEvents {
                 do {
+                    // Récupérer les QuoteItems de l'Event depuis SwiftData
+                    let currentEventId = event.eventId  // Capture locale pour le prédicat
+                    let quoteItemsDescriptor = FetchDescriptor<QuoteItem>(
+                        predicate: #Predicate { $0.eventId == currentEventId }
+                    )
+                    let quoteItems = try modelContext.fetch(quoteItemsDescriptor)
+                    
                     let scanLists = try await scanListService.fetchScanListsFromFirebase(
-                        forEvent: event.eventId,
+                        forEvent: event,
+                        quoteItems: quoteItems,
                         modelContext: modelContext
                     )
                     print("✅ [SyncManager] \(scanLists.count) ScanLists synchronisées pour événement: \(event.name)")

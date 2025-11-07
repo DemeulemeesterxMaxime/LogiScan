@@ -165,6 +165,10 @@ struct LoginView: View {
             do {
                 try await authService.signIn(email: email, password: password)
                 
+                // 🆕 Attendre 2 secondes pour que Firebase synchronise toutes les données
+                print("⏳ [LoginView] Attente de 2 secondes pour la synchronisation Firebase...")
+                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 secondes
+                
                 // Charger l'utilisateur et le définir dans le PermissionService
                 guard let userId = authService.currentUserId else {
                     throw LoginError.userIdNotFound

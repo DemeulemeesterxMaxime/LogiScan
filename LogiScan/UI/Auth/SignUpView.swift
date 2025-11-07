@@ -539,8 +539,9 @@ struct SignUpView: View {
                 
                 print("✅ [SignUpView] Utilisateur admin créé, attente de la propagation...")
                 
-                // 5. Attendre que Firestore propage les données
-                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 secondes
+                // 5. 🆕 Attendre 5 secondes pour que Firebase propage toutes les permissions
+                print("⏳ [SignUpView] Attente de 5 secondes pour la propagation des permissions...")
+                try await Task.sleep(nanoseconds: 5_000_000_000) // 5 secondes
                 
                 // 6. Charger l'utilisateur avec retry
                 var user: User?
@@ -567,7 +568,11 @@ struct SignUpView: View {
                     throw SignUpError.userIdNotFound
                 }
                 
-                // 7. Définir l'utilisateur et fermer la vue
+                // 7. 🆕 Attendre 2 secondes supplémentaires avant de fermer la vue
+                print("⏳ [SignUpView] Attente de 2 secondes supplémentaires avant fermeture...")
+                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 secondes
+                
+                // 8. Définir l'utilisateur et fermer la vue
                 await MainActor.run {
                     PermissionService.shared.setCurrentUser(loadedUser)
                     dismiss()
@@ -624,9 +629,9 @@ struct SignUpView: View {
                     // mais on log l'erreur
                 }
                 
-                // 6. Attendre que Firestore propage les données (petit délai)
-                print("⏳ [SignUpView] Attente de la propagation Firestore...")
-                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 secondes
+                // 6. 🆕 Attendre 5 secondes pour que Firestore propage les données
+                print("⏳ [SignUpView] Attente de 5 secondes pour la propagation Firestore...")
+                try await Task.sleep(nanoseconds: 5_000_000_000) // 5 secondes
                 
                 // 7. Charger l'utilisateur avec retry (au cas où)
                 var user: User?
@@ -653,7 +658,11 @@ struct SignUpView: View {
                     throw SignUpError.userIdNotFound
                 }
                 
-                // 8. Définir l'utilisateur et fermer la vue
+                // 8. 🆕 Attendre 2 secondes supplémentaires avant de fermer la vue
+                print("⏳ [SignUpView] Attente de 2 secondes supplémentaires avant fermeture...")
+                try await Task.sleep(nanoseconds: 2_000_000_000) // 2 secondes
+                
+                // 9. Définir l'utilisateur et fermer la vue
                 await MainActor.run {
                     PermissionService.shared.setCurrentUser(loadedUser)
                     dismiss()

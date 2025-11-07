@@ -8,80 +8,148 @@
 import Foundation
 import SwiftData
 
-/// Service pour gérer automatiquement le statut des camions en fonction des événements
+/// Service pour gérer automatiquement le statut des camions en fonction des listes de scan actives
 class TruckStatusService {
     
-    /// Met à jour le statut d'un camion en fonction des événements auxquels il est assigné
+    /// Met à jour le statut d'un camion en fonction des listes de scan actives
+    /// 
+    /// Logique:
+    /// - Stock → Camion en cours : CHARGEMENT
+    /// - Stock → Camion terminé + Camion → Event non commencé : EN_ROUTE
+    /// - Camion → Event en cours : DÉCHARGEMENT (même statut que CHARGEMENT pour les opérations)
+    /// - Camion → Event terminé + Event → Camion non commencé : SUR_SITE (événement en cours)
+    /// - Event → Camion en cours : CHARGEMENT
+    /// - Event → Camion terminé + Camion → Stock non commencé : EN_ROUTE
+    /// - Camion → Stock en cours : DÉCHARGEMENT
+    /// - Tous terminés ou aucun actif : DISPONIBLE
     static func updateTruckStatus(
         truck: Truck,
         events: [Event],
+        scanLists: [ScanList],
         modelContext: ModelContext
     ) throws {
-        let now = Date()
+        // Éviter de modifier le statut maintenance
+        if truck.status == .maintenance {
+            print("🔧 [TruckStatusService] Camion \(truck.displayName) en maintenance - statut non modifié")
+            return
+        }
         
-        // Trouver tous les événements actifs utilisant ce camion
+        // Trouver tous les événements actifs pour ce camion
         let activeEvents = events.filter { event in
             event.assignedTruckId == truck.truckId &&
             event.status != .cancelled &&
             event.status != .completed &&
-            isEventActive(event, at: now)
+            event.quoteStatus == .finalized
         }
         
-        // Déterminer le statut approprié
-        if activeEvents.isEmpty {
-            // Aucun événement actif : disponible (sauf si en maintenance)
-            if truck.status != .maintenance {
-                truck.status = .available
-            }
-        } else {
-            // Au moins un événement actif : déterminer le statut selon les dates
-            let earliestEvent = activeEvents.min(by: { $0.setupStartTime < $1.setupStartTime })!
-            
-            if now < earliestEvent.setupStartTime {
-                // Avant le montage : chargement
-                truck.status = .loading
-            } else if now >= earliestEvent.setupStartTime && now < earliestEvent.startDate {
-                // Entre montage et début : en route vers le site
-                truck.status = .enRoute
-            } else if now >= earliestEvent.startDate && now <= earliestEvent.endDate {
-                // Pendant l'événement : sur site
-                truck.status = .atSite
-            } else if now > earliestEvent.endDate {
-                // Après l'événement : en retour
-                truck.status = .returning
-            }
+        // Si aucun événement actif, camion disponible
+        guard !activeEvents.isEmpty else {
+            truck.status = .available
+            truck.updatedAt = Date()
+            try modelContext.save()
+            print("🚚 [TruckStatusService] Camion \(truck.displayName) → DISPONIBLE (aucun événement)")
+            return
         }
         
-        truck.updatedAt = Date()
-        try modelContext.save()
+        // Récupérer toutes les ScanLists pour les événements actifs
+        let relevantScanLists = scanLists.filter { scanList in
+            activeEvents.contains(where: { $0.eventId == scanList.eventId }) &&
+            scanList.status != .cancelled
+        }
         
-        print("🚚 [TruckStatusService] Camion \(truck.displayName) → \(truck.status.displayName)")
+        // Déterminer le statut basé sur les listes de scan actives
+        let newStatus = determineTruckStatus(from: relevantScanLists)
+        
+        if truck.status != newStatus {
+            truck.status = newStatus
+            truck.updatedAt = Date()
+            try modelContext.save()
+            print("🚚 [TruckStatusService] Camion \(truck.displayName) → \(newStatus.displayName)")
+        }
     }
     
-    /// Vérifie si un événement est considéré comme actif (non terminé et dans une période proche)
-    private static func isEventActive(_ event: Event, at date: Date) -> Bool {
-        // Un événement est actif s'il est dans une fenêtre de 7 jours avant le montage jusqu'à 1 jour après la fin
-        let calendar = Calendar.current
-        let sevenDaysBefore = calendar.date(byAdding: .day, value: -7, to: event.setupStartTime) ?? event.setupStartTime
-        let oneDayAfter = calendar.date(byAdding: .day, value: 1, to: event.endDate) ?? event.endDate
+    /// Détermine le statut du camion en fonction des listes de scan
+    private static func determineTruckStatus(from scanLists: [ScanList]) -> TruckStatus {
+        // Trouver les listes par direction
+        let stockToTruck = scanLists.filter { $0.scanDirection == .stockToTruck }
+        let truckToEvent = scanLists.filter { $0.scanDirection == .truckToEvent }
+        let eventToTruck = scanLists.filter { $0.scanDirection == .eventToTruck }
+        let truckToStock = scanLists.filter { $0.scanDirection == .truckToStock }
         
-        return date >= sevenDaysBefore && date <= oneDayAfter
+        // Vérifier les statuts
+        let stockToTruckInProgress = stockToTruck.contains { $0.status == .inProgress }
+        let stockToTruckCompleted = stockToTruck.contains { $0.status == .completed }
+        
+        let truckToEventInProgress = truckToEvent.contains { $0.status == .inProgress }
+        let truckToEventCompleted = truckToEvent.contains { $0.status == .completed }
+        
+        let eventToTruckInProgress = eventToTruck.contains { $0.status == .inProgress }
+        let eventToTruckCompleted = eventToTruck.contains { $0.status == .completed }
+        
+        let truckToStockInProgress = truckToStock.contains { $0.status == .inProgress }
+        
+        // 🚛 LOGIQUE DU STATUT
+        
+        // 1. Stock → Camion en cours : CHARGEMENT
+        if stockToTruckInProgress {
+            return .loading
+        }
+        
+        // 2. Camion → Event en cours : CHARGEMENT (déchargement au site)
+        if truckToEventInProgress {
+            return .loading // Utilise le même statut pour chargement/déchargement
+        }
+        
+        // 3. Event → Camion en cours : CHARGEMENT (chargement retour)
+        if eventToTruckInProgress {
+            return .loading
+        }
+        
+        // 4. Camion → Stock en cours : CHARGEMENT (déchargement au dépôt)
+        if truckToStockInProgress {
+            return .loading
+        }
+        
+        // 5. Stock → Camion terminé + Camion → Event non commencé : EN_ROUTE
+        if stockToTruckCompleted && !truckToEventInProgress && !truckToEventCompleted {
+            return .enRoute
+        }
+        
+        // 6. Event → Camion terminé + Camion → Stock non commencé : EN_ROUTE (retour)
+        if eventToTruckCompleted && !truckToStockInProgress {
+            return .returning
+        }
+        
+        // 7. Camion → Event terminé + Event → Camion non commencé : SUR_SITE
+        if truckToEventCompleted && !eventToTruckInProgress && !eventToTruckCompleted {
+            return .atSite
+        }
+        
+        // Par défaut : disponible
+        return .available
     }
     
-    /// Met à jour tous les camions en fonction de tous les événements
+    /// Met à jour tous les camions en fonction de tous les événements et scan lists
     static func updateAllTruckStatuses(
         modelContext: ModelContext
     ) throws {
         let trucksDescriptor = FetchDescriptor<Truck>()
         let eventsDescriptor = FetchDescriptor<Event>()
+        let scanListsDescriptor = FetchDescriptor<ScanList>()
         
         let allTrucks = try modelContext.fetch(trucksDescriptor)
         let allEvents = try modelContext.fetch(eventsDescriptor)
+        let allScanLists = try modelContext.fetch(scanListsDescriptor)
         
         print("🔄 [TruckStatusService] Mise à jour de \(allTrucks.count) camions...")
         
         for truck in allTrucks {
-            try updateTruckStatus(truck: truck, events: allEvents, modelContext: modelContext)
+            try updateTruckStatus(
+                truck: truck,
+                events: allEvents,
+                scanLists: allScanLists,
+                modelContext: modelContext
+            )
         }
         
         print("✅ [TruckStatusService] Tous les camions mis à jour")
@@ -94,16 +162,45 @@ class TruckStatusService {
     ) throws {
         let trucksDescriptor = FetchDescriptor<Truck>()
         let eventsDescriptor = FetchDescriptor<Event>()
+        let scanListsDescriptor = FetchDescriptor<ScanList>()
         
         let allTrucks = try modelContext.fetch(trucksDescriptor)
         let allEvents = try modelContext.fetch(eventsDescriptor)
+        let allScanLists = try modelContext.fetch(scanListsDescriptor)
         
         guard let truck = allTrucks.first(where: { $0.truckId == truckId }) else {
             print("⚠️ [TruckStatusService] Camion \(truckId) introuvable")
             return
         }
         
-        try updateTruckStatus(truck: truck, events: allEvents, modelContext: modelContext)
+        try updateTruckStatus(
+            truck: truck,
+            events: allEvents,
+            scanLists: allScanLists,
+            modelContext: modelContext
+        )
+    }
+    
+    /// Appelé quand une ScanList change de statut
+    static func handleScanListChange(
+        scanList: ScanList,
+        modelContext: ModelContext
+    ) throws {
+        // Récupérer l'événement associé en utilisant la valeur directement
+        let eventId = scanList.eventId
+        let eventsDescriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in
+                event.eventId == eventId
+            }
+        )
+        
+        guard let event = try modelContext.fetch(eventsDescriptor).first,
+              let truckId = event.assignedTruckId else {
+            print("ℹ️ [TruckStatusService] ScanList sans camion assigné")
+            return
+        }
+        
+        try updateTruckStatusById(truckId: truckId, modelContext: modelContext)
     }
     
     /// Appelé quand un événement est créé, modifié ou supprimé

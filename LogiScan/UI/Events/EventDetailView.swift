@@ -20,6 +20,9 @@ struct EventDetailView: View {
     // ✅ Binding depuis le parent pour survivre aux reconstructions
     @Binding var activeQuoteBuilder: String?  // EventID actif dans QuoteBuilder
     
+    // 🔥 Service Firebase pour synchroniser le statut du devis
+    private let firebaseService = FirebaseService()
+    
     @State private var isEditing = false
     @State private var showDeleteConfirmation = false
     @State private var isSaving = false
@@ -146,6 +149,9 @@ struct EventDetailView: View {
         .onAppear {
             // Charger le compteur une seule fois au chargement
             loadQuoteItemsCount()
+            
+            // 🔥 Synchroniser le statut du devis depuis Firebase
+            syncQuoteStatusFromFirebase()
         }
         .overlay {
             if isSaving {
@@ -229,12 +235,12 @@ struct EventDetailView: View {
                         .textFieldStyle(.roundedBorder)
                 }
             } else {
-                EventInfoRow(icon: "clock", title: "Montage", value: event.setupStartTime.formatted(date: .abbreviated, time: .shortened))
-                EventInfoRow(icon: "calendar.badge.clock", title: "Début", value: event.startDate.formatted(date: .abbreviated, time: .shortened))
-                EventInfoRow(icon: "calendar.badge.checkmark", title: "Fin", value: event.endDate.formatted(date: .abbreviated, time: .shortened))
+                EventDetailRow(icon: "clock", title: "Montage", value: event.setupStartTime.formatted(date: .abbreviated, time: .shortened))
+                EventDetailRow(icon: "calendar.badge.clock", title: "Début", value: event.startDate.formatted(date: .abbreviated, time: .shortened))
+                EventDetailRow(icon: "calendar.badge.checkmark", title: "Fin", value: event.endDate.formatted(date: .abbreviated, time: .shortened))
                 
                 if !event.eventAddress.isEmpty {
-                    EventInfoRow(icon: "location.fill", title: "Adresse", value: event.eventAddress)
+                    EventDetailRow(icon: "location.fill", title: "Adresse", value: event.eventAddress)
                 }
             }
         }
@@ -280,16 +286,16 @@ struct EventDetailView: View {
                 }
             } else {
                 if !event.clientName.isEmpty {
-                    EventInfoRow(icon: "person.fill", title: "Nom", value: event.clientName)
+                    EventDetailRow(icon: "person.fill", title: "Nom", value: event.clientName)
                 }
                 if !event.clientPhone.isEmpty {
-                    EventInfoRow(icon: "phone.fill", title: "Téléphone", value: event.clientPhone)
+                    EventDetailRow(icon: "phone.fill", title: "Téléphone", value: event.clientPhone)
                 }
                 if !event.clientEmail.isEmpty {
-                    EventInfoRow(icon: "envelope.fill", title: "Email", value: event.clientEmail)
+                    EventDetailRow(icon: "envelope.fill", title: "Email", value: event.clientEmail)
                 }
                 if !event.clientAddress.isEmpty {
-                    EventInfoRow(icon: "building.2.fill", title: "Adresse", value: event.clientAddress)
+                    EventDetailRow(icon: "building.2.fill", title: "Adresse", value: event.clientAddress)
                 }
                 
                 if event.clientName.isEmpty && event.clientPhone.isEmpty {
@@ -636,11 +642,42 @@ struct EventDetailView: View {
             }
         }
     }
+    
+    /// 🔥 Synchronise le statut du devis depuis Firebase
+    private func syncQuoteStatusFromFirebase() {
+        Task {
+            do {
+                print("📥 [EventDetailView] Synchronisation du statut du devis pour: \(event.eventId)")
+                
+                guard let firestoreEvent = try await firebaseService.fetchEvent(eventId: event.eventId) else {
+                    print("⚠️ [EventDetailView] Événement non trouvé dans Firebase")
+                    return
+                }
+                
+                // Mettre à jour le statut du devis local si différent
+                await MainActor.run {
+                    if event.quoteStatus.rawValue != firestoreEvent.quoteStatus {
+                        print("🔄 [EventDetailView] Mise à jour du statut: \(event.quoteStatus.rawValue) → \(firestoreEvent.quoteStatus)")
+                        
+                        if let newStatus = QuoteStatus(rawValue: firestoreEvent.quoteStatus) {
+                            event.quoteStatus = newStatus
+                            try? modelContext.save()
+                            print("✅ [EventDetailView] Statut du devis synchronisé")
+                        }
+                    } else {
+                        print("✅ [EventDetailView] Statut du devis déjà à jour")
+                    }
+                }
+            } catch {
+                print("⚠️ [EventDetailView] Erreur sync Firebase: \(error.localizedDescription)")
+            }
+        }
+    }
 }
 
 // MARK: - Supporting Views
 
-struct EventInfoRow: View {
+struct EventDetailRow: View {
     let icon: String
     let title: String
     let value: String

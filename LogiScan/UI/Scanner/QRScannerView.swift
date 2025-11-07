@@ -13,10 +13,26 @@ struct QRScannerView: UIViewControllerRepresentable {
     @Binding var isScanning: Bool
     @Binding var isTorchOn: Bool
     let onCodeScanned: (String) -> Void
+    let requiresTapToScan: Bool // 🆕 Nécessite un tap pour scanner
+    
+    init(
+        scannedCode: Binding<String?>,
+        isScanning: Binding<Bool>,
+        isTorchOn: Binding<Bool>,
+        requiresTapToScan: Bool = true, // Par défaut: tap requis
+        onCodeScanned: @escaping (String) -> Void
+    ) {
+        self._scannedCode = scannedCode
+        self._isScanning = isScanning
+        self._isTorchOn = isTorchOn
+        self.requiresTapToScan = requiresTapToScan
+        self.onCodeScanned = onCodeScanned
+    }
     
     func makeUIViewController(context: Context) -> QRScannerViewController {
         let controller = QRScannerViewController()
         controller.delegate = context.coordinator
+        controller.requiresTapToScan = requiresTapToScan
         return controller
     }
     
@@ -70,20 +86,57 @@ class QRScannerViewController: UIViewController {
     private var videoCaptureDevice: AVCaptureDevice?
     private var isSessionRunning = false
     var isTorchOn = false  // Public pour SwiftUI
+    var requiresTapToScan = true // 🆕 Nécessite un tap pour scanner
+    private var canScan = false // 🆕 Contrôle si le scan est autorisé
     
     override func viewDidLoad() {
         super.viewDidLoad()
         setupCamera()
+        
+        // 🆕 Ajouter un gesture recognizer pour le tap
+        if requiresTapToScan {
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+            view.addGestureRecognizer(tapGesture)
+            view.isUserInteractionEnabled = true
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         startScanning()
+        
+        // Si pas de tap requis, autoriser le scan immédiatement
+        if !requiresTapToScan {
+            canScan = true
+        }
     }
     
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         stopScanning()
+    }
+    
+    // 🆕 Handler pour le tap
+    @objc private func handleTap() {
+        if requiresTapToScan && !canScan {
+            canScan = true
+            // Feedback visuel et haptique
+            AudioServicesPlaySystemSound(SystemSoundID(1104)) // Tap sound
+            
+            // Animation visuelle pour indiquer que le scan est activé
+            let flashView = UIView(frame: view.bounds)
+            flashView.backgroundColor = .systemBlue
+            flashView.alpha = 0.3
+            view.addSubview(flashView)
+            
+            UIView.animate(withDuration: 0.2) {
+                flashView.alpha = 0
+            } completion: { _ in
+                flashView.removeFromSuperview()
+            }
+            
+            print("📸 Tap détecté - Scan activé pour le prochain code QR")
+        }
     }
     
     private func setupCamera() {
@@ -180,6 +233,37 @@ class QRScannerViewController: UIViewController {
         }
         
         view.addSubview(overlayView)
+        
+        // 🆕 Ajouter un label d'instruction si tap requis
+        if requiresTapToScan {
+            let instructionLabel = UILabel()
+            instructionLabel.text = "👆 Appuyez sur l'écran pour scanner"
+            instructionLabel.textColor = .white
+            instructionLabel.font = .systemFont(ofSize: 16, weight: .semibold)
+            instructionLabel.textAlignment = .center
+            instructionLabel.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+            instructionLabel.layer.cornerRadius = 12
+            instructionLabel.clipsToBounds = true
+            instructionLabel.translatesAutoresizingMaskIntoConstraints = false
+            
+            view.addSubview(instructionLabel)
+            
+            NSLayoutConstraint.activate([
+                instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
+                instructionLabel.widthAnchor.constraint(equalToConstant: 300),
+                instructionLabel.heightAnchor.constraint(equalToConstant: 50)
+            ])
+            
+            // Animation pulsante pour attirer l'attention
+            let pulseAnimation = CABasicAnimation(keyPath: "opacity")
+            pulseAnimation.fromValue = 1.0
+            pulseAnimation.toValue = 0.5
+            pulseAnimation.duration = 1.0
+            pulseAnimation.autoreverses = true
+            pulseAnimation.repeatCount = .infinity
+            instructionLabel.layer.add(pulseAnimation, forKey: "pulse")
+        }
     }
     
     func startScanning() {
@@ -239,9 +323,21 @@ class QRScannerViewController: UIViewController {
 extension QRScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         
+        // 🆕 Vérifier si le scan est autorisé
+        guard canScan else {
+            print("⏸️ Scan ignoré - Appuyez sur l'écran pour activer le scan")
+            return
+        }
+        
         guard let metadataObject = metadataObjects.first else { return }
         guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { return }
         guard let stringValue = readableObject.stringValue else { return }
+        
+        // Désactiver le scan après avoir scanné (nécessitera un nouveau tap)
+        if requiresTapToScan {
+            canScan = false
+            print("🔒 Scan désactivé - Tapez à nouveau pour scanner")
+        }
         
         // Feedback haptique
         AudioServicesPlaySystemSound(SystemSoundID(kSystemSoundID_Vibrate))

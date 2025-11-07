@@ -67,7 +67,10 @@ final class ScanList {
     
     /// Vérifie si la liste est complète
     var isComplete: Bool {
-        scannedItems >= totalItems && totalItems > 0
+        // Une liste est complète SI :
+        // 1. Il y a des articles à scanner (totalItems > 0)
+        // 2. ET tous les articles ont été scannés (scannedItems >= totalItems)
+        totalItems > 0 && scannedItems >= totalItems
     }
     
     /// Nom descriptif de la liste basé sur la direction

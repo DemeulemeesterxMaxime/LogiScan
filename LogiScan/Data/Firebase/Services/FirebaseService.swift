@@ -457,6 +457,47 @@ class FirebaseService: ObservableObject {
         return results
     }
     
+    /// Récupérer un événement spécifique depuis Firebase
+    func fetchEvent(eventId: String) async throws -> FirestoreEvent? {
+        print("📥 [FirebaseService] Récupération de l'événement: \(eventId)")
+        
+        let snapshot = try await eventsRef.document(eventId).getDocument()
+        
+        guard snapshot.exists, let data = snapshot.data() else {
+            print("⚠️ [FirebaseService] Événement \(eventId) n'existe pas dans Firebase")
+            return nil
+        }
+        
+        // Convertir les données Firestore en FirestoreEvent
+        var eventData = data
+        
+        // Convertir les Timestamp en TimeInterval (pour la sérialisation JSON)
+        if let setupTimestamp = eventData["setupStartTime"] as? Timestamp {
+            eventData["setupStartTime"] = setupTimestamp.dateValue().timeIntervalSince1970
+        }
+        if let startTimestamp = eventData["startDate"] as? Timestamp {
+            eventData["startDate"] = startTimestamp.dateValue().timeIntervalSince1970
+        }
+        if let endTimestamp = eventData["endDate"] as? Timestamp {
+            eventData["endDate"] = endTimestamp.dateValue().timeIntervalSince1970
+        }
+        if let createdTimestamp = eventData["createdAt"] as? Timestamp {
+            eventData["createdAt"] = createdTimestamp.dateValue().timeIntervalSince1970
+        }
+        if let updatedTimestamp = eventData["updatedAt"] as? Timestamp {
+            eventData["updatedAt"] = updatedTimestamp.dateValue().timeIntervalSince1970
+        }
+        
+        // Décoder en FirestoreEvent avec le décodeur configuré pour les dates
+        let jsonData = try JSONSerialization.data(withJSONObject: eventData)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        let firestoreEvent = try decoder.decode(FirestoreEvent.self, from: jsonData)
+        
+        print("✅ [FirebaseService] Événement \(eventId) récupéré depuis Firebase")
+        return firestoreEvent
+    }
+    
     /// Récupérer tous les camions
     func fetchTrucks() async throws -> [[String: Any]] {
         let snapshot = try await trucksRef.getDocuments()

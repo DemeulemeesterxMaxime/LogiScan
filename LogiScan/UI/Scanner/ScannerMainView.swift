@@ -22,7 +22,7 @@ struct ScannerMainView: View {
     @State private var hasScannedOnce = false  // Pour ne plus afficher l'instruction après le 1er scan
     @State private var isTorchOn = false  // État de la torche/flash
     
-    // NOUVEAU : Bandeau de sélection de mode
+    // NOUVEAU : Bandeau de sélection de mode - toujours démarrer en mode libre
     @State private var selectedMode: ScannerMode = .free
     @State private var selectedEvent: Event? = nil
     @State private var selectedScanList: ScanList? = nil
@@ -51,6 +51,10 @@ struct ScannerMainView: View {
         }
         .onAppear {
             checkCameraPermission()
+            // 🆕 Toujours réinitialiser en mode "Scan libre" à l'ouverture
+            selectedMode = .free
+            selectedEvent = nil
+            selectedScanList = nil
         }
         .sheet(isPresented: $viewModel.showResult) {
             scanResultSheet
@@ -211,6 +215,7 @@ struct ScannerMainView: View {
                         scannedCode: $viewModel.scannedCode,
                         isScanning: $viewModel.isScanning,
                         isTorchOn: $isTorchOn,
+                        requiresTapToScan: true, // 🆕 Nécessite un tap
                         onCodeScanned: viewModel.handleScannedCode
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 0))

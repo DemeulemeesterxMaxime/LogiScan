@@ -13,6 +13,7 @@ struct EventScanListView: View {
     @Environment(\.dismiss) private var dismiss
     
     @Query private var allAssets: [Asset]
+    @Query private var allScanLists: [ScanList]  // 🆕 Pour trouver la liste suivante
     @StateObject private var scanListService = ScanListService()
     
     @Bindable var scanList: ScanList  // 🆕 Utiliser @Bindable pour observer les changements
@@ -23,13 +24,33 @@ struct EventScanListView: View {
     @State private var alertMessage = ""
     @State private var selectedFilter: ScanItemStatus? = nil
     @State private var searchText = ""
+    @State private var navigateToNextList = false  // 🆕 Navigation vers liste suivante
+    @State private var nextScanList: ScanList?  // 🆕 Liste suivante
     
     // Throttling pour éviter les scans trop rapides
     @State private var lastScanTime: Date?
     private let minimumScanInterval: TimeInterval = 1.0 // 1 seconde entre chaque scan
     
+    // 🆕 Trouver la liste suivante du même événement
+    private var nextList: ScanList? {
+        allScanLists
+            .filter { $0.eventId == scanList.eventId && $0.scanListId != scanList.scanListId }
+            .filter { $0.status != .completed && $0.status != .cancelled }
+            .sorted { $0.createdAt < $1.createdAt }
+            .first
+    }
+    
     private var filteredItems: [PreparationListItem] {
         var items = scanList.items
+        
+        // 🐛 DEBUG: Afficher le nombre d'items
+        if items.isEmpty {
+            print("⚠️ [EventScanListView] scanList.items est VIDE pour scanListId: \(scanList.scanListId)")
+            print("   - eventId: \(scanList.eventId)")
+            print("   - totalItems: \(scanList.totalItems)")
+        } else {
+            print("✅ [EventScanListView] \(items.count) items trouvés pour scanListId: \(scanList.scanListId)")
+        }
         
         // Filtrer par statut
         if let filter = selectedFilter {
@@ -119,6 +140,20 @@ struct EventScanListView: View {
         } message: {
             Text(alertMessage)
         }
+        .onAppear {
+            print("🔍 [EventScanListView] onAppear - État initial:")
+            print("   - scanListId: \(scanList.scanListId)")
+            print("   - eventName: \(scanList.eventName)")
+            print("   - direction: \(scanList.scanDirection.displayName)")
+            print("   - status: \(scanList.status.displayName)")
+            print("   - scannedItems: \(scanList.scannedItems)")
+            print("   - totalItems: \(scanList.totalItems)")
+            print("   - progress: \(scanList.progressPercentage)%")
+            print("   - isComplete: \(scanList.isComplete)")
+            print("   - items.count: \(scanList.items.count)")
+            
+            refreshScanListStatus()
+        }
     }
     
     // MARK: - Header
@@ -127,16 +162,27 @@ struct EventScanListView: View {
         VStack(spacing: 12) {
             // Titre et statut
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(scanList.eventName)
                         .font(.headline)
                     
-                    HStack(spacing: 8) {
+                    // Badge de statut amélioré
+                    HStack(spacing: 6) {
                         Image(systemName: scanList.status.icon)
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                        
                         Text(scanList.status.displayName)
+                            .font(.caption)
+                            .fontWeight(.semibold)
                     }
-                    .font(.caption)
-                    .foregroundColor(statusColor)
+                    .foregroundStyle(scanList.isComplete ? .white : statusColor)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(scanList.isComplete ? Color.green : statusColor.opacity(0.15))
+                    )
                 }
                 
                 Spacer()
@@ -145,49 +191,58 @@ struct EventScanListView: View {
                     Text("\(scanList.scannedItems) / \(scanList.totalItems)")
                         .font(.title2)
                         .fontWeight(.bold)
+                        .foregroundStyle(scanList.isComplete ? .green : .primary)
                     
                     Text("\(scanList.progressPercentage)%")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .fontWeight(.semibold)
+                        .foregroundColor(scanList.isComplete ? .green : .secondary)
                 }
             }
             
-            // Barre de progression
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
+            // Barre de progression OU Bouton de navigation si terminé
+            // 🐛 FIX: Double vérification pour éviter l'affichage erroné avec liste vide
+            if scanList.isComplete && scanList.totalItems > 0 && !scanList.items.isEmpty {
+                // 🆕 Liste terminée : afficher le bouton de navigation
+                completionActionButton
+            } else {
+                // En cours : afficher la barre de progression
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                        
+                        Rectangle()
+                            .fill(progressGradient)
+                            .frame(width: geometry.size.width * scanList.progress)
+                    }
+                }
+                .frame(height: 8)
+                .cornerRadius(4)
+                
+                // Statistiques
+                HStack(spacing: 20) {
+                    StatBadge(
+                        icon: "circle",
+                        value: "\(scanList.items.filter { $0.status == .pending }.count)",
+                        label: "À faire",
+                        color: .gray
+                    )
                     
-                    Rectangle()
-                        .fill(progressGradient)
-                        .frame(width: geometry.size.width * scanList.progress)
+                    StatBadge(
+                        icon: "circle.lefthalf.filled",
+                        value: "\(scanList.items.filter { $0.status == .partial }.count)",
+                        label: "Partiel",
+                        color: .orange
+                    )
+                    
+                    StatBadge(
+                        icon: "checkmark.circle.fill",
+                        value: "\(scanList.items.filter { $0.status == .completed }.count)",
+                        label: "Terminé",
+                        color: .green
+                    )
                 }
-            }
-            .frame(height: 8)
-            .cornerRadius(4)
-            
-            // Statistiques
-            HStack(spacing: 20) {
-                StatBadge(
-                    icon: "circle",
-                    value: "\(scanList.items.filter { $0.status == .pending }.count)",
-                    label: "À faire",
-                    color: .gray
-                )
-                
-                StatBadge(
-                    icon: "circle.lefthalf.filled",
-                    value: "\(scanList.items.filter { $0.status == .partial }.count)",
-                    label: "Partiel",
-                    color: .orange
-                )
-                
-                StatBadge(
-                    icon: "checkmark.circle.fill",
-                    value: "\(scanList.items.filter { $0.status == .completed }.count)",
-                    label: "Terminé",
-                    color: .green
-                )
             }
         }
         .padding()
@@ -394,6 +449,16 @@ struct EventScanListView: View {
         }
     }
     
+    private func refreshScanListStatus() {
+        Task { @MainActor in
+            do {
+                try scanListService.refreshScanListStatus(scanList, modelContext: modelContext)
+            } catch {
+                print("⚠️ [EventScanListView] Erreur refresh status: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     private func deleteScanList() {
         Task { @MainActor in
             do {
@@ -405,6 +470,103 @@ struct EventScanListView: View {
                 showAlert = true
             }
         }
+    }
+    
+    // MARK: - Completion Action Button
+    
+    private var completionActionButton: some View {
+        VStack(spacing: 16) {
+            // Message de félicitations avec animation
+            VStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(.green)
+                
+                Text("Liste complète !")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                
+                Text("Tous les articles ont été scannés")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.green.opacity(0.1))
+            )
+            
+            // Bouton d'action
+            if let next = nextList {
+                // Il y a une liste suivante
+                NavigationLink(destination: EventScanListView(scanList: next)) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.title3)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Passer à la liste suivante")
+                                .font(.headline)
+                            Text(next.displayName)
+                                .font(.caption)
+                                .opacity(0.8)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundStyle(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        LinearGradient(
+                            colors: [.blue, .blue.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(12)
+                    .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
+                }
+            } else {
+                // Pas de liste suivante, proposer de changer d'événement
+                Button(action: {
+                    dismiss() // Retour à la liste des événements
+                }) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.checkmark")
+                            .font(.title3)
+                        
+                        Text("Toutes les listes terminées")
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundStyle(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        LinearGradient(
+                            colors: [.green, .green.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(12)
+                    .shadow(color: .green.opacity(0.3), radius: 8, y: 4)
+                }
+            }
+        }
+        .padding(.horizontal)
     }
 }
 

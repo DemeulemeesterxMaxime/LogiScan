@@ -818,14 +818,14 @@ struct AssetQRCodeView: View {
     }
 
     private func generateQRCode() {
+        // 🆕 Format JSON cohérent avec QRPayload
         let qrPayload = """
             {
                 "v": 1,
                 "type": "asset",
-                "assetId": "\(asset.assetId)",
-                "stockSku": "\(stockItem.sku)",
-                "name": "\(stockItem.name)",
-                "serialNumber": "\(asset.serialNumber ?? "")"
+                "id": "\(asset.assetId)",
+                "sku": "\(stockItem.sku)",
+                "sn": "\(asset.serialNumber ?? "")"
             }
             """
 
@@ -1490,17 +1490,20 @@ struct AddAssetSheet: View {
     }
 
     private func generateQRPayload(assetId: String) -> String {
+        // 🆕 Format JSON cohérent avec QRPayload
         let payload: [String: Any] = [
+            "v": 1,
             "type": "asset",
-            "assetId": assetId,
+            "id": assetId,
             "sku": stockItem.sku,
-            "name": stockItem.name,
+            "sn": ""
         ]
 
         guard let jsonData = try? JSONSerialization.data(withJSONObject: payload),
             let jsonString = String(data: jsonData, encoding: .utf8)
         else {
-            return "{\"type\":\"asset\",\"assetId\":\"\(assetId)\"}"
+            // Fallback avec format correct
+            return "{\"v\":1,\"type\":\"asset\",\"id\":\"\(assetId)\",\"sku\":\"\(stockItem.sku)\",\"sn\":\"\"}"
         }
 
         return jsonString

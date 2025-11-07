@@ -545,14 +545,18 @@ struct AssetDetailView: View {
         let context = CIContext()
         let filter = CIFilter.qrCodeGenerator()
 
-        // Payload: Asset ID + Numéro de série + SKU
-        var payload = "ASSET:\(asset.assetId)"
-        if let serialNumber = asset.serialNumber {
-            payload += "|SN:\(serialNumber)"
+        // 🆕 Utiliser le format JSON moderne pour la cohérence
+        let qrPayload = """
+        {
+            "v": 1,
+            "type": "asset",
+            "id": "\(asset.assetId)",
+            "sku": "\(asset.sku)",
+            "sn": "\(asset.serialNumber ?? "")"
         }
-        payload += "|SKU:\(asset.sku)"
+        """
 
-        filter.message = Data(payload.utf8)
+        filter.message = Data(qrPayload.utf8)
 
         if let outputImage = filter.outputImage {
             // Upscale pour meilleure qualité

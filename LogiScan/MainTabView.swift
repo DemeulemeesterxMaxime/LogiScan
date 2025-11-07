@@ -15,6 +15,10 @@ struct MainTabView: View {
     @State private var authService = AuthService()
     @State private var userListener: ListenerRegistration?
     @StateObject private var quoteStatusSync = QuoteStatusSyncService()
+    @StateObject private var syncManager = SyncManager() // 🆕 Pour la synchronisation complète
+    
+    // 🆕 Onglet sélectionné par défaut : Scanner (index 2)
+    @State private var selectedTab = 2
     
     // Query pour les notifications non lues
     @Query(filter: #Predicate<TaskNotification> { !$0.isRead })
@@ -60,13 +64,14 @@ struct MainTabView: View {
     }
     
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             // 1. Stock
             StockListView()
                 .tabItem {
                     Image(systemName: "cube.box.fill")
                     Text("Stock")
                 }
+                .tag(0)
 
             // 2. Camions
             TrucksListView()
@@ -74,8 +79,9 @@ struct MainTabView: View {
                     Image(systemName: "truck.box.fill")
                     Text("Camions")
                 }
+                .tag(1)
 
-            // 3. Scanner QR - CENTRE
+            // 3. Scanner QR - CENTRE (page par défaut)
             ScannerMainView(
                 assetRepository: AssetRepository(modelContext: modelContext),
                 movementRepository: MovementRepository(modelContext: modelContext)
@@ -84,6 +90,7 @@ struct MainTabView: View {
                     Image(systemName: "qrcode.viewfinder")
                     Text("Scanner")
                 }
+                .tag(2)
 
             // 4. Événements
             EventsListView()
@@ -91,6 +98,7 @@ struct MainTabView: View {
                     Image(systemName: "calendar.circle.fill")
                     Text("Événements")
                 }
+                .tag(3)
 
             // 5. Profil/Admin - Conditionnel selon le rôle
             if permissionService.isAdmin() {
@@ -100,6 +108,7 @@ struct MainTabView: View {
                         Text("Dashboard")
                     }
                     .badge(unreadCount > 0 ? unreadCount : 0)
+                    .tag(4)
             } else {
                 ProfileView()
                     .tabItem {
@@ -107,18 +116,25 @@ struct MainTabView: View {
                         Text("Profil")
                     }
                     .badge(unreadCount > 0 ? unreadCount : 0)
+                    .tag(4)
             }
         }
         .accentColor(.blue)
         .onAppear {
             startUserMonitoring()
             
-            // Synchroniser les statuts des devis au démarrage
+            // Synchroniser au démarrage
             Task {
+                // 1. Synchroniser les statuts des devis
                 await quoteStatusSync.syncAllEvents(modelContext: modelContext)
                 
-                // 🆕 Mettre à jour les statuts des camions en fonction des événements
+                // 2. Mettre à jour les statuts des camions
                 try? TruckStatusService.updateAllTruckStatuses(modelContext: modelContext)
+                
+                // 3. 🆕 Synchroniser les ScanLists depuis Firebase
+                print("🔄 [MainTabView] Synchronisation complète depuis Firebase...")
+                await syncManager.syncFromFirebase(modelContext: modelContext)
+                print("✅ [MainTabView] Synchronisation initiale terminée")
             }
         }
         .onDisappear {
