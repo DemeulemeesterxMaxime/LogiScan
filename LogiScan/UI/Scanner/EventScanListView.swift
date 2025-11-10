@@ -128,10 +128,13 @@ struct EventScanListView: View {
             }
         }
         .sheet(isPresented: $showingScanner) {
-            ContextualScannerView(
+            ScannerSheetView(
                 scanList: scanList,
                 onScanComplete: { result in
                     handleScan(result)
+                },
+                onDismiss: {
+                    showingScanner = false
                 }
             )
         }
@@ -390,8 +393,14 @@ struct EventScanListView: View {
         // Mettre à jour le timestamp
         lastScanTime = now
         
+        print("🔍 [EventScanListView] handleScan - Début")
+        print("   - AssetId: \(result.assetId)")
+        print("   - SKU: \(result.sku)")
+        print("   - Liste avant scan: \(scanList.scannedItems)/\(scanList.totalItems)")
+        
         Task { @MainActor in
             do {
+                // Enregistrer le scan
                 try scanListService.recordScan(
                     assetId: result.assetId,
                     sku: result.sku,
@@ -400,16 +409,28 @@ struct EventScanListView: View {
                     modelContext: modelContext
                 )
                 
-                // Feedback positif
-                alertTitle = "✅ Scan réussi"
-                alertMessage = "Article scanné avec succès"
+                print("✅ [EventScanListView] Scan enregistré avec succès")
+                print("   - Liste après scan: \(scanList.scannedItems)/\(scanList.totalItems)")
+                print("   - Statut liste: \(scanList.status.displayName)")
+                print("   - isComplete: \(scanList.isComplete)")
+                
+                // Feedback positif adapté selon le statut
+                if scanList.isComplete {
+                    alertTitle = "🎉 Liste complète !"
+                    alertMessage = "Tous les articles ont été scannés"
+                } else {
+                    alertTitle = "✅ Scan réussi"
+                    alertMessage = "Article scanné (\(scanList.scannedItems)/\(scanList.totalItems))"
+                }
                 showAlert = true
                 
             } catch let error as ScanListError {
+                print("⚠️ [EventScanListView] Erreur scan: \(error.localizedDescription)")
                 alertTitle = "⚠️ Erreur"
                 alertMessage = error.localizedDescription
                 showAlert = true
             } catch {
+                print("❌ [EventScanListView] Erreur inattendue: \(error.localizedDescription)")
                 alertTitle = "❌ Erreur"
                 alertMessage = "Erreur lors du scan: \(error.localizedDescription)"
                 showAlert = true
@@ -418,6 +439,10 @@ struct EventScanListView: View {
     }
     
     private func undoScan(assetId: String, item: PreparationListItem) {
+        print("🔄 [EventScanListView] undoScan - Début")
+        print("   - AssetId: \(assetId)")
+        print("   - Item: \(item.name)")
+        
         Task { @MainActor in
             do {
                 try scanListService.undoScan(
@@ -426,7 +451,13 @@ struct EventScanListView: View {
                     scanList: scanList,
                     modelContext: modelContext
                 )
+                
+                print("✅ [EventScanListView] Scan annulé avec succès")
+                print("   - Liste après annulation: \(scanList.scannedItems)/\(scanList.totalItems)")
+                print("   - Statut liste: \(scanList.status.displayName)")
+                
             } catch {
+                print("❌ [EventScanListView] Erreur annulation: \(error.localizedDescription)")
                 alertTitle = "❌ Erreur"
                 alertMessage = "Impossible d'annuler: \(error.localizedDescription)"
                 showAlert = true
@@ -708,5 +739,74 @@ struct PreparationFilterChip: View {
             .cornerRadius(20)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Scanner Sheet View
+
+/// Vue helper pour le scanner avec accès aux assets via @Query
+private struct ScannerSheetView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allAssets: [Asset]
+    
+    let scanList: ScanList
+    let onScanComplete: (ScannedAssetResult) -> Void
+    let onDismiss: () -> Void
+    
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
+    @State private var showAlert = false
+    
+    var body: some View {
+        NavigationStack {
+            ModernQRScannerView(
+                isScanning: .constant(false),
+                isTorchOn: .constant(false),
+                onCodeScanned: { code in
+                    handleScan(code)
+                },
+                onShowList: {
+                    onDismiss()
+                }
+            )
+            .navigationTitle("Scanner")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Fermer") {
+                        onDismiss()
+                    }
+                }
+            }
+            .alert(alertTitle, isPresented: $showAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(alertMessage)
+            }
+        }
+    }
+    
+    private func handleScan(_ code: String) {
+        var foundAsset: Asset? = nil
+        
+        for asset in allAssets {
+            if asset.qrPayload == code {
+                foundAsset = asset
+                break
+            }
+        }
+        
+        if let asset = foundAsset {
+            let result = ScannedAssetResult(
+                assetId: asset.assetId,
+                sku: asset.sku
+            )
+            onScanComplete(result)
+            onDismiss()
+        } else {
+            alertTitle = "Article inconnu"
+            alertMessage = "Le QR code scanné ne correspond à aucun article"
+            showAlert = true
+        }
     }
 }

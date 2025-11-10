@@ -257,6 +257,9 @@ class ScanListService: ObservableObject {
         modelContext: ModelContext
     ) throws {
         print("📱 [ScanListService] Scan de l'asset: \(assetId)")
+        print("   - SKU: \(sku)")
+        print("   - Liste: \(scanList.displayName)")
+        print("   - Progression avant: \(scanList.scannedItems)/\(scanList.totalItems)")
         
         // Vérifier que l'asset existe
         guard let asset = allAssets.first(where: { $0.assetId == assetId }) else {
@@ -273,6 +276,10 @@ class ScanListService: ObservableObject {
             throw ScanListError.itemNotInList
         }
         
+        print("   - Item trouvé: \(scanListItem.name)")
+        print("   - Quantité item avant: \(scanListItem.quantityScanned)/\(scanListItem.quantityRequired)")
+        print("   - Statut item avant: \(scanListItem.status.displayName)")
+        
         // Vérifier que l'asset n'est pas déjà scanné
         if scanListItem.scannedAssets.contains(assetId) {
             throw ScanListError.assetAlreadyScanned
@@ -283,26 +290,42 @@ class ScanListService: ObservableObject {
             throw ScanListError.quantityExceeded
         }
         
-        // Ajouter le scan
+        // 🔧 Ajouter le scan (updateStatus() est appelé automatiquement dans addScannedAsset)
         scanListItem.addScannedAsset(assetId)
+        
+        print("   - Quantité item après: \(scanListItem.quantityScanned)/\(scanListItem.quantityRequired)")
+        print("   - Statut item après: \(scanListItem.status.displayName)")
+        print("   - Item complet: \(scanListItem.isComplete)")
         
         // 🆕 Mettre à jour le statut de l'asset en fonction de la direction du scan
         updateAssetStatus(asset: asset, scanDirection: scanList.scanDirection)
         
-        // Mettre à jour la ScanList
+        // 🔧 Recalculer le total scanné de la liste
+        let oldScannedItems = scanList.scannedItems
         scanList.scannedItems = scanList.items.reduce(0) { $0 + $1.quantityScanned }
         scanList.updatedAt = Date()
         
-        // Vérifier si la liste est complète
+        print("   - Progression après calcul: \(scanList.scannedItems)/\(scanList.totalItems)")
+        print("   - Variation: +\(scanList.scannedItems - oldScannedItems)")
+        
+        // 🔧 Vérifier si la liste est complète et mettre à jour son statut
+        let oldStatus = scanList.status
+        
         if scanList.isComplete {
             scanList.status = .completed
             scanList.completedAt = Date()
-            print("🎉 [ScanListService] Liste de scan complétée!")
-        } else if scanList.status == .pending {
+            print("🎉 [ScanListService] Liste de scan COMPLÉTÉE!")
+            print("   - Statut: \(oldStatus.displayName) → \(scanList.status.displayName)")
+        } else if scanList.status == .pending && scanList.scannedItems > 0 {
             scanList.status = .inProgress
+            print("▶️ [ScanListService] Liste de scan EN COURS")
+            print("   - Statut: \(oldStatus.displayName) → \(scanList.status.displayName)")
         }
         
-        // Sauvegarder
+        print("   - Statut final liste: \(scanList.status.displayName)")
+        print("   - isComplete: \(scanList.isComplete)")
+        
+        // 🔧 Sauvegarder avec notification explicite des changements
         try modelContext.save()
         
         // 🆕 Synchroniser avec Firebase après chaque scan
@@ -315,8 +338,9 @@ class ScanListService: ObservableObject {
             }
         }
         
-        print("✅ [ScanListService] Scan enregistré: \(scanListItem.name) (\(scanListItem.quantityScanned)/\(scanListItem.quantityRequired))")
+        print("✅ [ScanListService] Scan enregistré avec succès")
         print("📦 [ScanListService] Statut asset mis à jour: \(asset.status.displayName)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     }
     
     /// Met à jour le statut d'un asset en fonction de la direction du scan
@@ -371,35 +395,55 @@ class ScanListService: ObservableObject {
         modelContext: ModelContext
     ) throws {
         print("↩️ [ScanListService] Annulation du scan: \(assetId)")
+        print("   - SKU: \(sku)")
+        print("   - Progression avant: \(scanList.scannedItems)/\(scanList.totalItems)")
+        print("   - Statut avant: \(scanList.status.displayName)")
         
         // Trouver le ScanListItem correspondant
         guard let scanListItem = scanList.items.first(where: { $0.sku == sku }) else {
             throw ScanListError.itemNotInList
         }
         
+        print("   - Item: \(scanListItem.name)")
+        print("   - Quantité item avant: \(scanListItem.quantityScanned)/\(scanListItem.quantityRequired)")
+        
         // Vérifier que l'asset est bien scanné
         guard scanListItem.scannedAssets.contains(assetId) else {
             throw ScanListError.assetNotScanned
         }
         
-        // Retirer le scan
+        // 🔧 Retirer le scan (updateStatus() est appelé automatiquement dans removeScannedAsset)
         scanListItem.removeScannedAsset(assetId)
         
-        // Mettre à jour la ScanList
+        print("   - Quantité item après: \(scanListItem.quantityScanned)/\(scanListItem.quantityRequired)")
+        print("   - Statut item après: \(scanListItem.status.displayName)")
+        
+        // 🔧 Recalculer le total scanné de la liste
         scanList.scannedItems = scanList.items.reduce(0) { $0 + $1.quantityScanned }
         scanList.updatedAt = Date()
         
-        // Mettre à jour le statut
+        // 🔧 Mettre à jour le statut de la liste
+        let oldStatus = scanList.status
+        
         if scanList.scannedItems == 0 {
             scanList.status = .pending
+            scanList.completedAt = nil
+            print("⏸️ [ScanListService] Liste remise en attente")
         } else if scanList.status == .completed {
+            // Si la liste était complète et qu'on annule un scan, elle repasse en cours
             scanList.status = .inProgress
+            scanList.completedAt = nil
+            print("▶️ [ScanListService] Liste remise en cours")
         }
+        
+        print("   - Progression après: \(scanList.scannedItems)/\(scanList.totalItems)")
+        print("   - Statut après: \(scanList.status.displayName)")
         
         // Sauvegarder
         try modelContext.save()
         
-        print("✅ [ScanListService] Scan annulé: \(scanListItem.name) (\(scanListItem.quantityScanned)/\(scanListItem.quantityRequired))")
+        print("✅ [ScanListService] Scan annulé avec succès")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     }
     
     /// Recalcule et met à jour le statut d'une ScanList en fonction de ses items

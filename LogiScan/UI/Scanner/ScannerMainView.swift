@@ -17,9 +17,7 @@ struct ScannerMainView: View {
     @State private var showingPermissionAlert = false
     @State private var cameraPermission: AVAuthorizationStatus = .notDetermined
     @State private var scrollOffset: CGFloat = 0
-    @State private var isScanReady = false  // Pour activer le scan après un tap
-    @State private var showTapInstruction = true  // Afficher l'instruction au début
-    @State private var hasScannedOnce = false  // Pour ne plus afficher l'instruction après le 1er scan
+    // ✅ SUPPRIMÉ - Variables pour tap instruction (scan automatique maintenant)
     @State private var isTorchOn = false  // État de la torche/flash
     
     // NOUVEAU : Bandeau de sélection de mode - toujours démarrer en mode libre
@@ -193,15 +191,8 @@ struct ScannerMainView: View {
                 }
             },
             onScanAgain: {
-                // Réinitialiser pour un nouveau scan
-                // Ne plus afficher l'instruction après le premier scan
-                isScanReady = hasScannedOnce ? true : false
-                showTapInstruction = !hasScannedOnce
-                
-                // Si on a déjà scanné une fois, redémarrer directement
-                if hasScannedOnce {
-                    viewModel.startScanning()
-                }
+                // ✅ Redémarrer le scan automatiquement
+                viewModel.startScanning()
             }
         )
     }
@@ -209,20 +200,12 @@ struct ScannerMainView: View {
     private var scannerView: some View {
         GeometryReader { geometry in
             ZStack {
-                // Camera View avec overlay de scanning
-                ZStack {
-                    QRScannerView(
-                        scannedCode: $viewModel.scannedCode,
-                        isScanning: $viewModel.isScanning,
-                        isTorchOn: $isTorchOn,
-                        requiresTapToScan: true, // 🆕 Nécessite un tap
-                        onCodeScanned: viewModel.handleScannedCode
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 0))
-                    
-                    // Scanning Frame Animation avec offset pour mode Event
-                    ScanningFrameOverlay(topOffset: selectedMode == .event ? 120 : 0)
-                }
+                // ✅ Nouvelle interface de scan moderne
+                ModernQRScannerView(
+                    isScanning: $viewModel.isScanning,
+                    isTorchOn: $isTorchOn,
+                    onCodeScanned: viewModel.handleScannedCode
+                )
                 
                 // Overlay avec contrôles
                 VStack(spacing: 0) {
@@ -249,11 +232,8 @@ struct ScannerMainView: View {
                     
                     Spacer()
                     
-                    // Instruction de tap (overlay central)
-                    if showTapInstruction && !isScanReady {
-                        tapInstructionView
-                            .transition(.opacity.combined(with: .scale))
-                    }
+                    // ✅ SUPPRIMÉ - Plus besoin d'instruction pour taper
+                    // Le scan est maintenant automatique
                     
                     Spacer()
                 }
@@ -276,13 +256,10 @@ struct ScannerMainView: View {
                     Spacer()
                 }
             }
-            .onTapGesture {
-                handleScreenTap()
-            }
+            // ✅ SUPPRIMÉ - Plus besoin de tap gesture, le scan est automatique
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.showSuccessAnimation)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.showDuplicateWarning)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showTapInstruction)
     }
     
     private var permissionView: some View {
@@ -378,7 +355,7 @@ struct ScannerMainView: View {
             Spacer()
             
             // Indicateur "Prêt à scanner" au-dessus des boutons
-            if isScanReady && viewModel.isScanning {
+            if viewModel.isScanning {
                 HStack(spacing: 8) {
                     Circle()
                         .fill(Color.green)
@@ -408,33 +385,24 @@ struct ScannerMainView: View {
                 }
                 
                 // Bouton Scanner central (plus gros)
-                Button(action: {
-                    handleScreenTap()
-                }) {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.white, lineWidth: 4)
-                            .frame(width: 80, height: 80)
-                        
-                        Circle()
-                            .fill(
-                                isScanReady && viewModel.isScanning ? 
-                                    viewModel.currentMode.gradient :
-                                    LinearGradient(colors: [.gray.opacity(0.6)], startPoint: .top, endPoint: .bottom)
-                            )
-                            .frame(width: 68, height: 68)
-                        
-                        if isScanReady {
-                            Image(systemName: "qrcode.viewfinder")
-                                .font(.title)
-                                .foregroundColor(.white)
-                                .symbolEffect(.pulse, isActive: viewModel.isScanning)
-                        } else {
-                            Image(systemName: "hand.tap.fill")
-                                .font(.title)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                    }
+                // ✅ SUPPRIMÉ - Le scan est automatique, pas besoin de bouton
+                ZStack {
+                    Circle()
+                        .stroke(Color.white, lineWidth: 4)
+                        .frame(width: 80, height: 80)
+                    
+                    Circle()
+                        .fill(
+                            viewModel.isScanning ? 
+                                viewModel.currentMode.gradient :
+                                LinearGradient(colors: [.gray.opacity(0.6)], startPoint: .top, endPoint: .bottom)
+                        )
+                        .frame(width: 68, height: 68)
+                    
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.title)
+                        .foregroundColor(.white)
+                        .symbolEffect(.pulse, isActive: viewModel.isScanning)
                 }
                 .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
                 
@@ -459,9 +427,7 @@ struct ScannerMainView: View {
     
     private func handleModeChange() {
         // Réinitialiser le scanner
-        isScanReady = false
-        showTapInstruction = true
-        hasScannedOnce = false  // Réinitialiser pour le nouveau mode
+        // ✅ SUPPRIMÉ - Plus besoin de gérer les variables tap
         viewModel.stopScanning()
         
         // Adapter le ViewModel selon le mode
@@ -529,69 +495,11 @@ struct ScannerMainView: View {
         }
     }
     
-    private func handleScreenTap() {
-        if !isScanReady {
-            // Premier tap : activer le scan
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                isScanReady = true
-                showTapInstruction = false
-                hasScannedOnce = true  // Marquer qu'on a scanné au moins une fois
-            }
-            
-            // Démarrer le scan après un court délai
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                viewModel.startScanning()
-            }
-            
-            // Feedback haptique
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-        }
-    }
+    // ✅ SUPPRIMÉ - handleScreenTap() n'est plus nécessaire avec le scan automatique
     
     // MARK: - Helper Views
     
-    private var tapInstructionView: some View {
-        VStack(spacing: 16) {
-            // Icône main qui tape
-            ZStack {
-                Circle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 100, height: 100)
-                    .scaleEffect(showTapInstruction ? 1.0 : 1.2)
-                    .opacity(showTapInstruction ? 1.0 : 0.0)
-                    .animation(
-                        .easeInOut(duration: 1.5)
-                            .repeatForever(autoreverses: true),
-                        value: showTapInstruction
-                    )
-                
-                Image(systemName: "hand.tap.fill")
-                    .font(.system(size: 50))
-                    .foregroundColor(.white)
-                    .symbolEffect(.pulse)
-            }
-            
-            VStack(spacing: 8) {
-                Text("Touchez l'écran pour scanner")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                
-                Text("Appuyez n'importe où pour activer la détection")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .padding(32)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.3), radius: 20, y: 10)
-        )
-        .padding(.horizontal, 32)
-    }
+    // ✅ SUPPRIMÉ - Plus besoin d'instruction pour taper
     
     // MARK: - Helper Views
     
@@ -712,34 +620,25 @@ struct ScannerMainView: View {
                 
                 Spacer()
                 
-                // Bouton scanner central (plus gros)
-                Button(action: {
-                    handleScreenTap()
-                }) {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.white, lineWidth: 4)
-                            .frame(width: 72, height: 72)
-                        
-                        Circle()
-                            .fill(
-                                isScanReady && viewModel.isScanning ? 
-                                    viewModel.currentMode.gradient :
-                                    LinearGradient(colors: [.gray.opacity(0.6)], startPoint: .top, endPoint: .bottom)
-                            )
-                            .frame(width: 60, height: 60)
-                        
-                        if isScanReady {
-                            Image(systemName: "qrcode.viewfinder")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .symbolEffect(.pulse, isActive: viewModel.isScanning)
-                        } else {
-                            Image(systemName: "hand.tap.fill")
-                                .font(.title2)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                    }
+                // Bouton scanner central (indicateur visuel uniquement)
+                // ✅ MODIFIÉ - Le scan est automatique, juste un indicateur visuel
+                ZStack {
+                    Circle()
+                        .stroke(Color.white, lineWidth: 4)
+                        .frame(width: 72, height: 72)
+                    
+                    Circle()
+                        .fill(
+                            viewModel.isScanning ? 
+                                viewModel.currentMode.gradient :
+                                LinearGradient(colors: [.gray.opacity(0.6)], startPoint: .top, endPoint: .bottom)
+                        )
+                        .frame(width: 60, height: 60)
+                    
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                        .symbolEffect(.pulse, isActive: viewModel.isScanning)
                 }
                 
                 Spacer()
@@ -767,7 +666,7 @@ struct ScannerMainView: View {
             .padding(.horizontal, 32)
             
             // Indicateur de scan
-            if isScanReady && viewModel.isScanning {
+            if viewModel.isScanning {
                 HStack(spacing: 8) {
                     Circle()
                         .fill(Color.green)
@@ -779,17 +678,8 @@ struct ScannerMainView: View {
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.8))
                 }
-            } else if !isScanReady {
-                HStack(spacing: 8) {
-                    Image(systemName: "hand.tap")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
-                    
-                    Text("Touchez pour activer")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
-                }
             }
+            // ✅ SUPPRIMÉ - Message "Touchez pour activer" obsolète
         }
         .padding(.vertical, 12)
     }

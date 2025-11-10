@@ -16,7 +16,7 @@ struct ScanModeBanner: View {
     
     let onModeChange: () -> Void
     
-    @State private var showEventPicker = false
+    @State private var showEventScanFlow = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -33,15 +33,8 @@ struct ScanModeBanner: View {
         .padding(.horizontal)
         .padding(.top, 8)
         .animation(.spring(response: 0.3), value: selectedMode)
-        .sheet(isPresented: $showEventPicker) {
-            EventPickerForScanner(
-                selectedEvent: $selectedEvent,
-                selectedScanList: $selectedScanList,
-                onSelect: {
-                    showEventPicker = false
-                    onModeChange()
-                }
-            )
+        .sheet(isPresented: $showEventScanFlow) {
+            EventScanFlowView()
         }
     }
     
@@ -49,13 +42,18 @@ struct ScanModeBanner: View {
     
     private func modeButton(_ mode: ScannerMode) -> some View {
         Button {
+            print("🔄 [ScanModeBanner] Mode sélectionné: \(mode.displayName)")
             selectedMode = mode
+            
             if mode != .event {
+                // Si on quitte le mode événement, réinitialiser
                 selectedEvent = nil
                 selectedScanList = nil
-            } else if selectedEvent == nil {
-                // Ouvrir le picker si aucun événement sélectionné
-                showEventPicker = true
+                print("   → Événement et liste réinitialisés")
+            } else {
+                // ✅ Ouvrir le flux en étapes pour sélectionner événement puis liste
+                print("   → Ouverture du flux de sélection événement/liste")
+                showEventScanFlow = true
             }
             onModeChange()
         } label: {

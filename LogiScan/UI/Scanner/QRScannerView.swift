@@ -19,7 +19,7 @@ struct QRScannerView: UIViewControllerRepresentable {
         scannedCode: Binding<String?>,
         isScanning: Binding<Bool>,
         isTorchOn: Binding<Bool>,
-        requiresTapToScan: Bool = true, // Par défaut: tap requis
+        requiresTapToScan: Bool = true, // ✅ Retour au tap requis par défaut
         onCodeScanned: @escaping (String) -> Void
     ) {
         self._scannedCode = scannedCode
@@ -234,36 +234,8 @@ class QRScannerViewController: UIViewController {
         
         view.addSubview(overlayView)
         
-        // 🆕 Ajouter un label d'instruction si tap requis
-        if requiresTapToScan {
-            let instructionLabel = UILabel()
-            instructionLabel.text = "👆 Appuyez sur l'écran pour scanner"
-            instructionLabel.textColor = .white
-            instructionLabel.font = .systemFont(ofSize: 16, weight: .semibold)
-            instructionLabel.textAlignment = .center
-            instructionLabel.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
-            instructionLabel.layer.cornerRadius = 12
-            instructionLabel.clipsToBounds = true
-            instructionLabel.translatesAutoresizingMaskIntoConstraints = false
-            
-            view.addSubview(instructionLabel)
-            
-            NSLayoutConstraint.activate([
-                instructionLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                instructionLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
-                instructionLabel.widthAnchor.constraint(equalToConstant: 300),
-                instructionLabel.heightAnchor.constraint(equalToConstant: 50)
-            ])
-            
-            // Animation pulsante pour attirer l'attention
-            let pulseAnimation = CABasicAnimation(keyPath: "opacity")
-            pulseAnimation.fromValue = 1.0
-            pulseAnimation.toValue = 0.5
-            pulseAnimation.duration = 1.0
-            pulseAnimation.autoreverses = true
-            pulseAnimation.repeatCount = .infinity
-            instructionLabel.layer.add(pulseAnimation, forKey: "pulse")
-        }
+        // ✅ NE PLUS afficher le message "Appuyez sur l'écran"
+        // Le scan est maintenant automatique par défaut
     }
     
     func startScanning() {
@@ -323,17 +295,22 @@ class QRScannerViewController: UIViewController {
 extension QRScannerViewController: AVCaptureMetadataOutputObjectsDelegate {
     func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
         
-        // 🆕 Vérifier si le scan est autorisé
-        guard canScan else {
-            print("⏸️ Scan ignoré - Appuyez sur l'écran pour activer le scan")
-            return
-        }
-        
         guard let metadataObject = metadataObjects.first else { return }
         guard let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject else { return }
         guard let stringValue = readableObject.stringValue else { return }
         
-        // Désactiver le scan après avoir scanné (nécessitera un nouveau tap)
+        // ✅ Si le tap n'est pas requis, le scan est toujours autorisé
+        if !requiresTapToScan {
+            canScan = true
+        }
+        
+        // 🆕 Vérifier si le scan est autorisé
+        guard canScan else {
+            print("⏸️ Scan détecté mais ignoré - Scan automatique activé")
+            return
+        }
+        
+        // Désactiver le scan après avoir scanné (nécessitera un nouveau tap si requis)
         if requiresTapToScan {
             canScan = false
             print("🔒 Scan désactivé - Tapez à nouveau pour scanner")
