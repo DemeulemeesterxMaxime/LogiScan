@@ -19,6 +19,7 @@ final class Company: @unchecked Sendable {
     var siret: String?    // Optionnel car pas obligatoire
     var createdAt: Date
     var ownerId: String   // User ID de l'admin principal
+    var language: String  // Langue de l'entreprise (code ISO: "fr", "en", etc.)
     
     init(
         companyId: String = UUID().uuidString,
@@ -29,7 +30,8 @@ final class Company: @unchecked Sendable {
         email: String,
         siret: String? = nil,
         createdAt: Date = Date(),
-        ownerId: String
+        ownerId: String,
+        language: String = "fr"  // Français par défaut
     ) {
         self.companyId = companyId
         self.name = name
@@ -40,5 +42,6 @@ final class Company: @unchecked Sendable {
         self.siret = siret
         self.createdAt = createdAt
         self.ownerId = ownerId
+        self.language = language
     }
 }

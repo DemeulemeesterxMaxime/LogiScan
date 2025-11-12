@@ -39,6 +39,7 @@ struct SettingsView: View {
     @State private var editCompanyPhone = ""
     @State private var editCompanyAddress = ""
     @State private var editCompanySiret = ""
+    @State private var editCompanyLanguage: AppLanguage = .french
     @State private var selectedLogoItem: PhotosPickerItem?
     @State private var logoImage: UIImage?
     @State private var isUploadingLogo = false
@@ -215,6 +216,17 @@ struct SettingsView: View {
             SettingsInfoRow(label: "SIRET", value: siret, icon: "doc.text")
         }
         
+        // Affichage de la langue
+        HStack {
+            Label("Langue", systemImage: "globe")
+            Spacer()
+            HStack(spacing: 6) {
+                Text(AppLanguage(rawValue: company.language)?.flag ?? "🌍")
+                Text(AppLanguage(rawValue: company.language)?.displayName ?? company.language)
+            }
+            .foregroundColor(.secondary)
+        }
+        
         if permissionService.checkPermission(.editCompany) {
             Button(action: { 
                 startEditing(company: company)
@@ -281,6 +293,18 @@ struct SettingsView: View {
             .focused($focusedField, equals: .siret)
             .submitLabel(.done)
             .onSubmit { focusedField = nil }
+        
+        // Picker de langue
+        Picker("Langue", selection: $editCompanyLanguage) {
+            ForEach(AppLanguage.allCases, id: \.self) { language in
+                HStack {
+                    Text(language.flag)
+                    Text(language.displayName)
+                }
+                .tag(language)
+            }
+        }
+        .pickerStyle(.menu)
         
         Button(action: { 
             focusedField = nil // Fermer le clavier
@@ -482,6 +506,7 @@ struct SettingsView: View {
         editCompanyPhone = company.phone ?? ""
         editCompanyAddress = company.address ?? ""
         editCompanySiret = company.siret ?? ""
+        editCompanyLanguage = AppLanguage(rawValue: company.language) ?? .french
         isEditingCompany = true
     }
     
@@ -494,6 +519,7 @@ struct SettingsView: View {
         let phone = editCompanyPhone
         let address = editCompanyAddress
         let siret = editCompanySiret
+        let language = editCompanyLanguage
         let logoToUpload = logoImage
         
         // Mettre à jour l'état UI une seule fois au début
@@ -511,7 +537,8 @@ struct SettingsView: View {
                 email: email,
                 siret: siret.isEmpty ? nil : siret,
                 createdAt: company.createdAt,
-                ownerId: company.ownerId
+                ownerId: company.ownerId,
+                language: language.rawValue
             )
             
             // Upload logo si modifié
@@ -526,7 +553,8 @@ struct SettingsView: View {
                     email: updatedCompany.email,
                     siret: updatedCompany.siret,
                     createdAt: updatedCompany.createdAt,
-                    ownerId: updatedCompany.ownerId
+                    ownerId: updatedCompany.ownerId,
+                    language: updatedCompany.language
                 )
             }
             

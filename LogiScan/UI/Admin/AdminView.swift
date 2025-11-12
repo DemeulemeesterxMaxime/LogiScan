@@ -47,6 +47,7 @@ struct AdminView: View {
     @State private var editCompanyAddress = ""
     @State private var editCompanyEmail = ""
     @State private var editCompanySiret = ""
+    @State private var editCompanyLanguage: AppLanguage = .french
     
     // Upload logo
     @State private var selectedLogoItem: PhotosPickerItem?
@@ -217,6 +218,26 @@ struct AdminView: View {
                 
                 if let siret = company.siret {
                     AdminInfoRow(label: "SIRET", value: siret, icon: "doc.text")
+                }
+                
+                // Affichage de la langue
+                HStack(alignment: .top) {
+                    Image(systemName: "globe")
+                        .foregroundStyle(.blue)
+                        .frame(width: 20)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Langue")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 6) {
+                            Text(AppLanguage(rawValue: company.language)?.flag ?? "🌍")
+                            Text(AppLanguage(rawValue: company.language)?.displayName ?? company.language)
+                                .font(.body)
+                        }
+                    }
+                    
+                    Spacer()
                 }
                 
                 AdminInfoRow(
@@ -744,6 +765,16 @@ struct AdminView: View {
                         .lineLimit(3...5)
                     TextField("SIRET", text: $editCompanySiret)
                         .keyboardType(.numberPad)
+                    
+                    Picker("Langue", selection: $editCompanyLanguage) {
+                        ForEach(AppLanguage.allCases, id: \.self) { language in
+                            HStack {
+                                Text(language.flag)
+                                Text(language.displayName)
+                            }
+                            .tag(language)
+                        }
+                    }
                 }
                 
                 Section("Logo") {
@@ -824,6 +855,7 @@ struct AdminView: View {
                 editCompanyPhone = company.phone ?? ""
                 editCompanyAddress = company.address ?? ""
                 editCompanySiret = company.siret ?? ""
+                editCompanyLanguage = AppLanguage(rawValue: company.language) ?? .french
             }
         }
     }
@@ -1035,7 +1067,8 @@ struct AdminView: View {
                     email: editCompanyEmail,
                     siret: editCompanySiret.isEmpty ? nil : editCompanySiret,
                     createdAt: company.createdAt,
-                    ownerId: company.ownerId
+                    ownerId: company.ownerId,
+                    language: editCompanyLanguage.rawValue
                 )
                 
                 try await companyService.updateCompany(updatedCompany)

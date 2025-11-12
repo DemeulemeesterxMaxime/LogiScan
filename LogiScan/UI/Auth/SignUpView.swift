@@ -29,6 +29,7 @@ struct SignUpView: View {
     @State private var companySiret = ""
     @State private var selectedLogoItem: PhotosPickerItem?
     @State private var selectedLogoImage: UIImage?
+    @State private var selectedLanguage: AppLanguage = .french
     
     // Rejoindre une entreprise
     @State private var invitationCode = ""
@@ -386,6 +387,27 @@ struct SignUpView: View {
                 keyboardType: .numberPad
             )
             
+            // Langue de l'entreprise
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Langue de l'entreprise")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.9))
+                
+                Picker("Langue", selection: $selectedLanguage) {
+                    ForEach(AppLanguage.allCases, id: \.self) { language in
+                        HStack {
+                            Text(language.flag)
+                            Text(language.displayName)
+                        }
+                        .tag(language)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .background(Color.white.opacity(0.9))
+                .cornerRadius(8)
+            }
+            .padding(.vertical, 8)
+            
             // Bouton de création
             Button {
                 createCompanyAccount()
@@ -505,7 +527,8 @@ struct SignUpView: View {
                     phone: companyPhone,
                     email: companyEmail,
                     siret: companySiret.isEmpty ? nil : companySiret,
-                    ownerId: userId
+                    ownerId: userId,
+                    language: selectedLanguage.rawValue
                 )
                 
                 let companyService = CompanyService()
@@ -523,7 +546,8 @@ struct SignUpView: View {
                         email: company.email,
                         siret: company.siret,
                         createdAt: company.createdAt,
-                        ownerId: company.ownerId
+                        ownerId: company.ownerId,
+                        language: company.language
                     )
                     try await companyService.updateCompany(updatedCompany)
                 }
