@@ -12,6 +12,7 @@ import FirebaseFirestore
 class TaskNotificationService {
     static let shared = TaskNotificationService()
     private let db = Firestore.firestore()
+    private let notificationManager = NotificationManager.shared
     
     private init() {}
     
@@ -189,10 +190,11 @@ extension TaskNotificationService {
     /// Notifier lors de l'attribution d'une tâche
     func notifyTaskAssigned(task: TodoTask, modelContext: ModelContext) throws {
         guard let assignedToUserId = task.assignedToUserId,
-              let _ = task.assignedToUserName else {
+              let assignedToUserName = task.assignedToUserName else {
             return
         }
         
+        // Créer la notification interne
         try createNotification(
             taskId: task.taskId,
             taskTitle: task.displayTitle,
@@ -202,6 +204,11 @@ extension TaskNotificationService {
             companyId: task.companyId,
             modelContext: modelContext
         )
+        
+        // Envoyer notification Apple native
+        Task { @MainActor in
+            await notificationManager.notifyTaskAssigned(task: task, userName: assignedToUserName)
+        }
     }
     
     /// Notifier lorsqu'une tâche est prête (tâche précédente terminée)
@@ -217,6 +224,11 @@ extension TaskNotificationService {
                 companyId: task.companyId,
                 modelContext: modelContext
             )
+            
+            // Notification Apple native
+            Task { @MainActor in
+                await notificationManager.notifyTaskReady(task: task, previousTaskTitle: "la tâche précédente")
+            }
         } else {
             // Tâche libre-service → notifier toute l'équipe
             try createNotification(
@@ -228,6 +240,11 @@ extension TaskNotificationService {
                 companyId: task.companyId,
                 modelContext: modelContext
             )
+            
+            // Notification Apple native
+            Task { @MainActor in
+                await notificationManager.notifyTaskAvailable(task: task)
+            }
         }
     }
     
@@ -246,6 +263,12 @@ extension TaskNotificationService {
             companyId: task.companyId,
             modelContext: modelContext
         )
+        
+        // Notification Apple native
+        Task { @MainActor in
+            let userName = task.assignedToUserName ?? "un utilisateur"
+            await notificationManager.notifyTaskCompleted(task: task, completedBy: userName)
+        }
         
         // Si il y a une tâche suivante, la débloquer
         if let nextTask = nextTask {
@@ -284,6 +307,11 @@ extension TaskNotificationService {
                 modelContext: modelContext
             )
         }
+        
+        // Notification Apple native
+        Task { @MainActor in
+            await notificationManager.notifyTaskCancelled(task: task, reason: reason)
+        }
     }
     
     /// Notifier lors du démarrage d'une tâche
@@ -315,5 +343,10 @@ extension TaskNotificationService {
             companyId: task.companyId,
             modelContext: modelContext
         )
+        
+        // Notification Apple native
+        Task { @MainActor in
+            await notificationManager.notifyTaskOverdue(task: task)
+        }
     }
 }
