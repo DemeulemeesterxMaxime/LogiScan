@@ -32,6 +32,7 @@ class ScannerViewModel: ObservableObject {
     // MARK: - Context
     @Published var selectedTruck: Truck?
     @Published var selectedEvent: Event?
+    @Published var currentActiveScanList: ScanList?  // Liste de scan active en mode événementiel
     
     // MARK: - Statistics
     @Published var sessionStats: SessionStats = SessionStats()
@@ -47,13 +48,21 @@ class ScannerViewModel: ObservableObject {
     
     private let assetRepository: AssetRepositoryProtocol
     private let movementRepository: MovementRepositoryProtocol
+    private var modelContext: ModelContext?  // Context pour les opérations SwiftData
     
     init(
         assetRepository: AssetRepositoryProtocol,
-        movementRepository: MovementRepositoryProtocol
+        movementRepository: MovementRepositoryProtocol,
+        modelContext: ModelContext? = nil
     ) {
         self.assetRepository = assetRepository
         self.movementRepository = movementRepository
+        self.modelContext = modelContext
+    }
+    
+    /// Définit le ModelContext pour les opérations SwiftData
+    func setModelContext(_ context: ModelContext) {
+        self.modelContext = context
     }
     
     // MARK: - Scan Control
@@ -350,6 +359,55 @@ class ScannerViewModel: ObservableObject {
                 playErrorSound()
                 return
             }
+            
+            // 🆕 MODE ÉVÉNEMENTIEL : Utiliser la logique de liste de scan
+            if let scanList = currentActiveScanList, let context = modelContext {
+                do {
+                    try await processScanForList(
+                        asset: foundAsset,
+                        scanList: scanList,
+                        modelContext: context
+                    )
+                    
+                    // Animation de succès
+                    showSuccessAnimation = true
+                    playSuccessSound()
+                    
+                    // Reprendre le scan après 0.5s
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    showSuccessAnimation = false
+                    
+                    // Vérifier si la liste est complète
+                    if scanList.isComplete {
+                        endCurrentSession()
+                        showSessionComplete()
+                    } else {
+                        startScanning()
+                    }
+                    
+                    return
+                    
+                } catch let scanListError as ScanListError {
+                    await showErrorMessage(scanListError.localizedDescription)
+                    playErrorSound()
+                    
+                    // Reprendre le scan après 1.5s
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    startScanning()
+                    return
+                    
+                } catch {
+                    await showErrorMessage("Erreur scan liste: \(error.localizedDescription)")
+                    playErrorSound()
+                    
+                    // Reprendre le scan après 1.5s
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    startScanning()
+                    return
+                }
+            }
+            
+            // MODE CLASSIQUE : Logique existante
             
             // Vérifier si déjà scanné dans cette session
             if let session = currentSession, session.scannedAssets.contains(foundAsset.assetId) {

@@ -53,6 +53,9 @@ struct ScannerMainView: View {
             selectedMode = .free
             selectedEvent = nil
             selectedScanList = nil
+            
+            // 🆕 Passer le ModelContext au ViewModel
+            viewModel.setModelContext(modelContext)
         }
         .sheet(isPresented: $viewModel.showResult) {
             scanResultSheet
