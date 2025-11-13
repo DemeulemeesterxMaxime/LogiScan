@@ -430,8 +430,10 @@ struct ScannerMainView: View {
     
     private func handleModeChange() {
         // Réinitialiser le scanner
-        // ✅ SUPPRIMÉ - Plus besoin de gérer les variables tap
         viewModel.stopScanning()
+        
+        // ✅ Réinitialiser le ViewModel pour éviter les états mixtes
+        viewModel.currentActiveScanList = nil
         
         // Adapter le ViewModel selon le mode
         switch selectedMode {
@@ -445,17 +447,13 @@ struct ScannerMainView: View {
             
         case .event:
             // Mode événement : utiliser la liste sélectionnée
-            if let event = selectedEvent, let _ = selectedScanList {
+            if let event = selectedEvent, let scanList = selectedScanList {
                 // Utiliser un mode approprié selon le LogisticsStatus de l'événement
                 let scanMode = determineScanMode(for: event)
-                // Note: on ne passe pas expectedAssets car la logique de scan utilise maintenant selectedScanList
+                // Définir la liste active dans le ViewModel
+                viewModel.currentActiveScanList = scanList
                 viewModel.selectMode(scanMode, truck: nil, event: event, expectedAssets: nil)
             }
-        }
-        
-        // Redémarrer le scan
-        if cameraPermission == .authorized {
-            viewModel.startScanning()
         }
     }
     

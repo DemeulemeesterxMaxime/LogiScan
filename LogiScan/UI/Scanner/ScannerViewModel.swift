@@ -373,42 +373,65 @@ class ScannerViewModel: ObservableObject {
                     showSuccessAnimation = true
                     playSuccessSound()
                     
-                    // Reprendre le scan après 0.5s
-                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    // Attendre puis arrêter l'animation
+                    try? await Task.sleep(nanoseconds: 800_000_000)
                     showSuccessAnimation = false
                     
                     // Vérifier si la liste est complète
                     if scanList.isComplete {
                         endCurrentSession()
                         showSessionComplete()
-                    } else {
-                        startScanning()
                     }
                     
+                    // ✅ Ne pas redémarrer automatiquement - attendre le prochain hold
                     return
                     
                 } catch let scanListError as ScanListError {
                     await showErrorMessage(scanListError.localizedDescription)
                     playErrorSound()
                     
-                    // Reprendre le scan après 1.5s
+                    // Attendre puis réinitialiser
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
-                    startScanning()
+                    // ✅ Ne pas redémarrer automatiquement - attendre le prochain hold
                     return
                     
                 } catch {
                     await showErrorMessage("Erreur scan liste: \(error.localizedDescription)")
                     playErrorSound()
                     
-                    // Reprendre le scan après 1.5s
+                    // Attendre puis réinitialiser
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
-                    startScanning()
+                    // ✅ Ne pas redémarrer automatiquement - attendre le prochain hold
                     return
                 }
             }
             
             // MODE CLASSIQUE : Logique existante
             
+            // ✅ En mode LIBRE, toujours afficher les infos de l'asset (pas de gestion de duplicata)
+            if currentMode == .free {
+                // Créer le résultat de scan avec toutes les infos
+                scanResult = ScanResult(
+                    type: .asset,
+                    asset: foundAsset,
+                    title: foundAsset.name,
+                    subtitle: "SKU: \(foundAsset.sku)",
+                    status: foundAsset.status.displayName,
+                    statusColor: foundAsset.status.color,
+                    rawPayload: scannedCode ?? ""
+                )
+                
+                // Animation de succès
+                showSuccessAnimation = true
+                playSuccessSound()
+                
+                // Afficher le résultat
+                showResult = true
+                stopScanning()
+                return
+            }
+            
+            // Pour INVENTAIRE et autres modes : vérifier duplicata
             // Vérifier si déjà scanné dans cette session
             if let session = currentSession, session.scannedAssets.contains(foundAsset.assetId) {
                 showDuplicateWarning = true
@@ -417,8 +440,7 @@ class ScannerViewModel: ObservableObject {
                 // Attendre 1 seconde puis reprendre le scan
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 showDuplicateWarning = false
-                startScanning()
-                return
+                return  // ✅ Ne pas restart automatiquement, attendre le hold
             }
             
             // Ajouter à la session
@@ -476,24 +498,11 @@ class ScannerViewModel: ObservableObject {
             showSuccessAnimation = true
             playSuccessSound()
             
-            // Selon le mode, afficher le résultat ou reprendre le scan
-            if currentMode == .free {
-                // Mode libre: afficher le résultat
-                showResult = true
-                stopScanning()
-            } else {
-                // Modes workflow: reprendre le scan après 0.5s
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                showSuccessAnimation = false
-                
-                // Vérifier si la session est complète
-                if let session = currentSession, session.isComplete {
-                    endCurrentSession()
-                    showSessionComplete()
-                } else {
-                    startScanning()
-                }
-            }
+            // Mode inventaire et workflow: feedback visuel puis attendre le prochain hold
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            showSuccessAnimation = false
+            
+            // ✅ Ne pas redémarrer automatiquement - attendre le prochain hold
             
         } catch {
             await showErrorMessage("Erreur lors de la recherche de l'asset: \(error.localizedDescription)")

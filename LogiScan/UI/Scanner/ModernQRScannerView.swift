@@ -55,15 +55,25 @@ struct ModernQRScannerView: View {
                     .padding(.bottom, 40)
             }
         }
-        .contentShape(Rectangle())  // ✅ Permet le tap sur toute la vue
-        .onTapGesture {
-            // Le tap déclenche le scan si arrêté
-            if !isScanning {
-                withAnimation(.spring(response: 0.3)) {
-                    isScanning = true
+        .contentShape(Rectangle())  // ✅ Permet le gesture sur toute la vue
+        .gesture(
+            // ✅ NOUVEAU : Hold-to-scan - maintenir = scan actif, relâcher = arrêt
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isScanning {
+                        withAnimation(.spring(response: 0.3)) {
+                            isScanning = true
+                        }
+                    }
                 }
-            }
-        }
+                .onEnded { _ in
+                    if isScanning {
+                        withAnimation(.spring(response: 0.3)) {
+                            isScanning = false
+                        }
+                    }
+                }
+        )
     }
     
     // MARK: - Scan Frame Only (coins uniquement, pas de fond sombre)
