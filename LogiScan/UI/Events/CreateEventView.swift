@@ -317,7 +317,7 @@ struct CreateEventView: View {
                             Image(systemName: "truck.box")
                                 .foregroundColor(.secondary)
                                 .frame(width: 20)
-                            Text("Camion assigné")
+                            Text("assigned_truck".localized())
                                 .foregroundColor(.secondary)
                                 .font(.subheadline)
                         }

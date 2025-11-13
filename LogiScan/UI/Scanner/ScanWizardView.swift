@@ -464,7 +464,7 @@ struct EventSelectionForWizard: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
             
-            Text("Aucun événement")
+            Text("no_event".localized())
                 .font(.headline)
                 .foregroundStyle(.secondary)
             

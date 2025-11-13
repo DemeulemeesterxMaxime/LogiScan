@@ -143,7 +143,7 @@ struct ScanOverlayView: View {
             // Progress Bar
             VStack(spacing: 8) {
                 HStack {
-                    Text("Progression")
+                    Text("progression".localized())
                         .font(.subheadline)
                         .fontWeight(.medium)
                     
@@ -220,7 +220,7 @@ struct ScanOverlayView: View {
                     VStack(spacing: 4) {
                         Image(systemName: "list.clipboard")
                             .font(.title3)
-                        Text("Liste")
+                        Text("list".localized())
                             .font(.caption2)
                     }
                     .frame(maxWidth: .infinity)
@@ -264,7 +264,7 @@ struct ScanOverlayView: View {
                     VStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.title3)
-                        Text("Terminer")
+                        Text("finish".localized())
                             .font(.caption2)
                     }
                     .frame(maxWidth: .infinity)

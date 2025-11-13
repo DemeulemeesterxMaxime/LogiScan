@@ -15,6 +15,7 @@ struct LogiScanApp: App {
     let sharedModelContainer: ModelContainer
     @StateObject private var authService = AuthService()
     @StateObject private var userSessionService = UserSessionService()
+    @StateObject private var localizationManager = LocalizationManager.shared
 
     init() {
         // 🔥 INITIALISATION FIREBASE
@@ -125,10 +126,26 @@ struct LogiScanApp: App {
                     MainTabView()
                         .environmentObject(authService)
                         .environmentObject(userSessionService)
+                        .environmentObject(localizationManager)
                         .onAppear {
                             // Charger les données d'exemple au premier lancement
                             let context = sharedModelContainer.mainContext
                             SampleData.createSampleData(modelContext: context)
+                            
+                            // Synchroniser la langue avec celle de l'entreprise
+                            Task {
+                                if let companyId = userSessionService.currentUser?.companyId {
+                                    do {
+                                        let companyService = CompanyService()
+                                        let company = try await companyService.fetchCompany(companyId: companyId)
+                                        await MainActor.run {
+                                            localizationManager.syncWithCompanyLanguage(company.language)
+                                        }
+                                    } catch {
+                                        print("⚠️ Erreur chargement langue entreprise: \(error)")
+                                    }
+                                }
+                            }
                         }
                 } else if let error = userSessionService.error {
                     // Erreur de chargement du profil
@@ -170,6 +187,7 @@ struct LogiScanApp: App {
                 LoginView()
                     .environmentObject(authService)
                     .environmentObject(userSessionService)
+                    .environmentObject(localizationManager)
             }
         }
         .modelContainer(sharedModelContainer)

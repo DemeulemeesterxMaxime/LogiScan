@@ -18,6 +18,7 @@ struct FirestoreCompany: Codable {
     let siret: String?    // Optionnel
     let createdAt: Timestamp
     let ownerId: String
+    let language: String  // Langue de l'entreprise
     
     // Conversion vers SwiftData
     func toSwiftData() -> Company {
@@ -30,7 +31,8 @@ struct FirestoreCompany: Codable {
             email: email,
             siret: siret,
             createdAt: createdAt.dateValue(),
-            ownerId: ownerId
+            ownerId: ownerId,
+            language: language
         )
     }
 }
@@ -47,7 +49,8 @@ extension Company {
             email: email,
             siret: siret,
             createdAt: Timestamp(date: createdAt),
-            ownerId: ownerId
+            ownerId: ownerId,
+            language: language
         )
     }
 }

@@ -76,7 +76,7 @@ struct QRBatchPDFView: View {
 
                             // Options
                             VStack(alignment: .leading, spacing: 16) {
-                                Text("Format")
+                                Text("format".localized())
                                     .font(.headline)
 
                                 Text("• Format A4 paysage")

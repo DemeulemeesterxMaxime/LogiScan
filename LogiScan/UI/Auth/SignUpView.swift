@@ -11,6 +11,7 @@ import SwiftUI
 struct SignUpView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var localizationManager: LocalizationManager
 
     // Étape 1 : Choix du type de compte
     @State private var accountChoice: AccountChoice? = nil
@@ -29,6 +30,7 @@ struct SignUpView: View {
     @State private var companySiret = ""
     @State private var selectedLogoItem: PhotosPickerItem?
     @State private var selectedLogoImage: UIImage?
+    @State private var selectedLanguage: AppLanguage = .french
     
     // Rejoindre une entreprise
     @State private var invitationCode = ""
@@ -133,20 +135,20 @@ struct SignUpView: View {
     
     private var headerTitle: String {
         switch currentStep {
-        case 1: return "Créer un compte"
-        case 2: return "Vos informations"
-        case 3: return accountChoice == .createCompany ? "Votre entreprise" : "Code d'invitation"
-        default: return "Créer un compte"
+        case 1: return "create_account".localized()
+        case 2: return "your_information".localized()
+        case 3: return accountChoice == .createCompany ? "your_company".localized() : "invitation_code".localized()
+        default: return "create_account".localized()
         }
     }
     
     private var headerSubtitle: String {
         switch currentStep {
-        case 1: return "Choisissez votre type de compte"
-        case 2: return "Entrez vos informations personnelles"
+        case 1: return "choose_account_type".localized()
+        case 2: return "enter_personal_info".localized()
         case 3: 
             if accountChoice == .createCompany {
-                return "Créez votre entreprise"
+                return "create_your_company".localized()
             } else {
                 return "Entrez le code fourni par votre employeur"
             }
@@ -171,7 +173,7 @@ struct SignUpView: View {
                         .foregroundColor(.white)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Créer une entreprise")
+                        Text("create_company".localized())
                             .font(.headline)
                             .foregroundColor(.white)
                         Text("Vous êtes propriétaire")
@@ -206,7 +208,7 @@ struct SignUpView: View {
                         .foregroundColor(.white)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Rejoindre une entreprise")
+                        Text("join_company".localized())
                             .font(.headline)
                             .foregroundColor(.white)
                         Text("Vous êtes employé")
@@ -237,14 +239,14 @@ struct SignUpView: View {
             // Nom
             SignUpFormField(
                 icon: "person.fill",
-                placeholder: "Nom complet",
+                placeholder: "full_name".localized(),
                 text: $name
             )
             
             // Email
             SignUpFormField(
                 icon: "envelope.fill",
-                placeholder: "Email",
+                placeholder: "email".localized(),
                 text: $email,
                 keyboardType: .emailAddress,
                 autocapitalization: .never
@@ -253,7 +255,7 @@ struct SignUpView: View {
             // Mot de passe
             SignUpFormField(
                 icon: "lock.fill",
-                placeholder: "Mot de passe",
+                placeholder: "password".localized(),
                 text: $password,
                 isSecure: true
             )
@@ -261,7 +263,7 @@ struct SignUpView: View {
             // Confirmation mot de passe
             SignUpFormField(
                 icon: "lock.fill",
-                placeholder: "Confirmer le mot de passe",
+                placeholder: "confirm_password".localized(),
                 text: $confirmPassword,
                 isSecure: true
             )
@@ -287,7 +289,7 @@ struct SignUpView: View {
                     currentStep = 3
                 }
             } label: {
-                Text("Suivant")
+                Text("next".localized())
                     .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
                     .padding()
@@ -350,21 +352,21 @@ struct SignUpView: View {
             // Nom de l'entreprise
             SignUpFormField(
                 icon: "building.2.fill",
-                placeholder: "Nom de l'entreprise",
+                placeholder: "company_name".localized(),
                 text: $companyName
             )
             
             // Adresse
             SignUpFormField(
                 icon: "map.fill",
-                placeholder: "Adresse",
+                placeholder: "company_address".localized(),
                 text: $companyAddress
             )
             
             // Téléphone
             SignUpFormField(
                 icon: "phone.fill",
-                placeholder: "Téléphone",
+                placeholder: "company_phone".localized(),
                 text: $companyPhone,
                 keyboardType: .phonePad
             )
@@ -386,6 +388,50 @@ struct SignUpView: View {
                 keyboardType: .numberPad
             )
             
+            // Langue de l'entreprise
+            VStack(alignment: .leading, spacing: 8) {
+                Text("company_language".localized())
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.9))
+                
+                // Menu déroulant pour la sélection de langue
+                Menu {
+                    ForEach(AppLanguage.allCases, id: \.self) { language in
+                        Button(action: {
+                            selectedLanguage = language
+                        }) {
+                            HStack {
+                                Text(language.flag)
+                                Text(language.displayName)
+                                if selectedLanguage == language {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text(selectedLanguage.flag)
+                            .font(.title3)
+                        Text(selectedLanguage.displayName)
+                            .font(.subheadline)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                    }
+                    .padding()
+                    .background(Color.white.opacity(0.3))
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                    )
+                }
+            }
+            .padding(.vertical, 8)
+            
             // Bouton de création
             Button {
                 createCompanyAccount()
@@ -395,7 +441,7 @@ struct SignUpView: View {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
-                        Text("Créer mon entreprise")
+                        Text("create_company".localized())
                             .fontWeight(.semibold)
                     }
                 }
@@ -505,7 +551,8 @@ struct SignUpView: View {
                     phone: companyPhone,
                     email: companyEmail,
                     siret: companySiret.isEmpty ? nil : companySiret,
-                    ownerId: userId
+                    ownerId: userId,
+                    language: selectedLanguage.rawValue
                 )
                 
                 let companyService = CompanyService()
@@ -523,7 +570,8 @@ struct SignUpView: View {
                         email: company.email,
                         siret: company.siret,
                         createdAt: company.createdAt,
-                        ownerId: company.ownerId
+                        ownerId: company.ownerId,
+                        language: company.language
                     )
                     try await companyService.updateCompany(updatedCompany)
                 }

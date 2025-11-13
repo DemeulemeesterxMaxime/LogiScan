@@ -76,7 +76,7 @@ struct ContextualScannerView: View {
         VStack(spacing: 16) {
             // Progression
             HStack {
-                Text("Progression")
+                Text("progression".localized())
                     .font(.headline)
                     .foregroundColor(.white)
                 

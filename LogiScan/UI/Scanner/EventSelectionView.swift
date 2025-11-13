@@ -77,7 +77,7 @@ struct EventSelectionView: View {
                 .font(.system(size: 64))
                 .foregroundStyle(.secondary)
             
-            Text("Aucun événement")
+            Text("no_event".localized())
                 .font(.title2)
                 .fontWeight(.semibold)
             
@@ -347,7 +347,7 @@ struct PhaseRow: View {
                         }
                         .font(.caption)
                     } else {
-                        Text("Non démarrée")
+                        Text("not_started".localized())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

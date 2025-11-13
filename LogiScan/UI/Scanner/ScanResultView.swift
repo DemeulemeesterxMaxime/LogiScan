@@ -27,7 +27,7 @@ struct ScanResultView: View {
                         assetDetails(result)
                         actionButtons
                     } else {
-                        Text("Aucun résultat")
+                        Text("no_results".localized())
                             .foregroundColor(.secondary)
                     }
                 }
@@ -116,7 +116,7 @@ struct ScanResultView: View {
     
     private func assetDetails(_ result: ScanResult) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Détails")
+            Text("details".localized())
                 .font(.headline)
             
             if let asset = result.asset {
@@ -168,7 +168,7 @@ struct ScanResultView: View {
             }) {
                 HStack {
                     Image(systemName: "arrow.left.arrow.right")
-                    Text("Créer mouvement")
+                    Text("create_movement".localized())
                 }
                 .frame(maxWidth: .infinity)
                 .padding()

@@ -43,7 +43,7 @@ struct ScanListView: View {
                             viewModel.endCurrentSession()
                             dismiss()
                         }) {
-                            Text("Terminer")
+                            Text("finish".localized())
                                 .fontWeight(.semibold)
                         }
                     }

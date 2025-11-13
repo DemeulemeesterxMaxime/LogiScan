@@ -12,6 +12,7 @@ import FirebaseAuth
 
 struct SettingsView: View {
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var localizationManager: LocalizationManager
     @Environment(\.modelContext) private var modelContext
     @Query private var stockItems: [StockItem]
     @Query private var events: [Event]
@@ -39,10 +40,13 @@ struct SettingsView: View {
     @State private var editCompanyPhone = ""
     @State private var editCompanyAddress = ""
     @State private var editCompanySiret = ""
+    @State private var editCompanyLanguage: AppLanguage = .french
     @State private var selectedLogoItem: PhotosPickerItem?
     @State private var logoImage: UIImage?
     @State private var isUploadingLogo = false
     @State private var isSavingCompany = false
+    @State private var showingRestartAlert = false
+    @State private var previousLanguage: AppLanguage = .french
     
     // FocusState pour gérer le clavier
     @FocusState private var focusedField: CompanyField?
@@ -94,7 +98,7 @@ struct SettingsView: View {
             // Section Actions
             actionsSection
         }
-        .navigationTitle("Paramètres")
+        .navigationTitle("settings".localized())
         .navigationBarTitleDisplayMode(.large)
         .refreshable {
             await loadData()
@@ -104,23 +108,23 @@ struct SettingsView: View {
                 await loadData()
             }
         }
-        .alert("Déconnexion", isPresented: $showingLogoutConfirm) {
-            Button("Annuler", role: .cancel) {}
-            Button("Se déconnecter", role: .destructive) {
+        .alert("logout".localized(), isPresented: $showingLogoutConfirm) {
+            Button("cancel".localized(), role: .cancel) {}
+            Button("logout".localized(), role: .destructive) {
                 logout()
             }
         } message: {
-            Text("Voulez-vous vraiment vous déconnecter ?")
+            Text("logout_confirm".localized())
         }
-        .alert(selectedDeleteType?.title ?? "Supprimer", isPresented: $showingDeleteDataConfirm) {
-            Button("Annuler", role: .cancel) {}
-            Button("Supprimer", role: .destructive) {
+        .alert(selectedDeleteType?.title ?? "delete".localized(), isPresented: $showingDeleteDataConfirm) {
+            Button("cancel".localized(), role: .cancel) {}
+            Button("delete".localized(), role: .destructive) {
                 if let type = selectedDeleteType {
                     deleteData(type: type)
                 }
             }
         } message: {
-            Text("Cette action est irréversible. Toutes les données seront supprimées.")
+            Text("delete_confirm".localized())
         }
         .sheet(isPresented: $showingNewCodeSheet) {
             if let companyId = company?.companyId {
@@ -128,6 +132,11 @@ struct SettingsView: View {
                     Task { await loadData() }
                 }
             }
+        }
+        .alert("language_changed".localized(), isPresented: $showingRestartAlert) {
+            Button("ok".localized(), role: .cancel) {}
+        } message: {
+            Text("restart_required".localized())
         }
     }
     
@@ -159,7 +168,7 @@ struct SettingsView: View {
             
             if let user = currentUser {
                 HStack {
-                    Label("Rôle", systemImage: "person.badge.key")
+                    Label("role".localized(), systemImage: "person.badge.key")
                     Spacer()
                     if let role = user.role {
                         RoleBadge(role: role)
@@ -167,7 +176,7 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            Text("Mon Profil")
+            Text("my_profile".localized())
         }
     }
     
@@ -182,7 +191,7 @@ struct SettingsView: View {
     }
     
     private func companySection(company: Company) -> some View {
-        Section(header: Text("Mon Entreprise")) {
+        Section(header: Text("my_company".localized())) {
             if !isEditingCompany {
                 companyReadOnlyView(company: company)
             } else {
@@ -202,24 +211,35 @@ struct SettingsView: View {
             }
         }
         
-        SettingsInfoRow(label: "Nom", value: editCompanyName.isEmpty ? company.name : editCompanyName, icon: "building.2")
-        SettingsInfoRow(label: "Email", value: editCompanyEmail.isEmpty ? company.email : editCompanyEmail, icon: "envelope")
+        SettingsInfoRow(label: "company_name".localized(), value: editCompanyName.isEmpty ? company.name : editCompanyName, icon: "building.2")
+        SettingsInfoRow(label: "email".localized(), value: editCompanyEmail.isEmpty ? company.email : editCompanyEmail, icon: "envelope")
         
         if let phone = company.phone {
-            SettingsInfoRow(label: "Téléphone", value: phone, icon: "phone")
+            SettingsInfoRow(label: "company_phone".localized(), value: phone, icon: "phone")
         }
         if let address = company.address {
-            SettingsInfoRow(label: "Adresse", value: address, icon: "mappin")
+            SettingsInfoRow(label: "company_address".localized(), value: address, icon: "mappin")
         }
         if let siret = company.siret {
-            SettingsInfoRow(label: "SIRET", value: siret, icon: "doc.text")
+            SettingsInfoRow(label: "company_siret".localized(), value: siret, icon: "doc.text")
+        }
+        
+        // Affichage de la langue
+        HStack {
+            Label("language".localized(), systemImage: "globe")
+            Spacer()
+            HStack(spacing: 6) {
+                Text(AppLanguage(rawValue: company.language)?.flag ?? "🌍")
+                Text(AppLanguage(rawValue: company.language)?.displayName ?? company.language)
+            }
+            .foregroundColor(.secondary)
         }
         
         if permissionService.checkPermission(.editCompany) {
             Button(action: { 
                 startEditing(company: company)
             }) {
-                Label("Modifier", systemImage: "pencil")
+                Label("edit".localized(), systemImage: "pencil")
             }
         }
     }
@@ -234,7 +254,7 @@ struct SettingsView: View {
                     .scaledToFit()
                     .frame(height: 80)
             } else {
-                Label("Changer le logo", systemImage: "photo")
+                Label("change_logo".localized(), systemImage: "photo")
             }
         }
         .onChange(of: selectedLogoItem) { _, newValue in
@@ -247,14 +267,14 @@ struct SettingsView: View {
         }
         
         // TextFields avec IDs stables et FocusState
-        TextField("Nom de l'entreprise", text: $editCompanyName)
+        TextField("company_name".localized(), text: $editCompanyName)
             .id("companyName")
             .focused($focusedField, equals: .name)
             .textContentType(.organizationName)
             .submitLabel(.next)
             .onSubmit { focusedField = .email }
         
-        TextField("Email", text: $editCompanyEmail)
+        TextField("email".localized(), text: $editCompanyEmail)
             .id("companyEmail")
             .focused($focusedField, equals: .email)
             .keyboardType(.emailAddress)
@@ -263,24 +283,36 @@ struct SettingsView: View {
             .submitLabel(.next)
             .onSubmit { focusedField = .phone }
         
-        TextField("Téléphone", text: $editCompanyPhone)
+        TextField("company_phone".localized(), text: $editCompanyPhone)
             .id("companyPhone")
             .focused($focusedField, equals: .phone)
             .keyboardType(.phonePad)
             .textContentType(.telephoneNumber)
         
-        TextField("Adresse", text: $editCompanyAddress)
+        TextField("company_address".localized(), text: $editCompanyAddress)
             .id("companyAddress")
             .focused($focusedField, equals: .address)
             .textContentType(.fullStreetAddress)
             .submitLabel(.next)
             .onSubmit { focusedField = .siret }
         
-        TextField("SIRET", text: $editCompanySiret)
+        TextField("company_siret".localized(), text: $editCompanySiret)
             .id("companySiret")
             .focused($focusedField, equals: .siret)
             .submitLabel(.done)
             .onSubmit { focusedField = nil }
+        
+        // Picker de langue
+        Picker("language".localized(), selection: $editCompanyLanguage) {
+            ForEach(AppLanguage.allCases, id: \.self) { language in
+                HStack {
+                    Text(language.flag)
+                    Text(language.displayName)
+                }
+                .tag(language)
+            }
+        }
+        .pickerStyle(.menu)
         
         Button(action: { 
             focusedField = nil // Fermer le clavier
@@ -290,12 +322,12 @@ struct SettingsView: View {
                 if isSavingCompany {
                     ProgressView()
                 }
-                Label(isSavingCompany ? "Enregistrement..." : "Enregistrer", systemImage: "checkmark.circle.fill")
+                Label(isSavingCompany ? "saving".localized() : "save".localized(), systemImage: "checkmark.circle.fill")
             }
         }
         .disabled(isSavingCompany || editCompanyName.isEmpty || editCompanyEmail.isEmpty)
         
-        Button("Annuler", role: .cancel) {
+        Button("cancel".localized(), role: .cancel) {
             focusedField = nil // Fermer le clavier
             isEditingCompany = false
         }
@@ -347,7 +379,7 @@ struct SettingsView: View {
             }
         } header: {
             HStack {
-                Text("Membres")
+                Text("members".localized())
                 Spacer()
                 Text("\(members.count)")
                     .font(.caption)
@@ -384,7 +416,7 @@ struct SettingsView: View {
                     }
                     
                     HStack {
-                        Text("\(code.usedCount)/\(code.maxUses) utilisations")
+                        Text("\(code.usedCount)/\(code.maxUses) \("code_uses".localized())")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
@@ -400,21 +432,21 @@ struct SettingsView: View {
                     Button(role: .destructive) {
                         deleteCode(code)
                     } label: {
-                        Label("Supprimer", systemImage: "trash")
+                        Label("delete".localized(), systemImage: "trash")
                     }
                     
                     if code.isActive {
                         Button {
                             deactivateCode(code)
                         } label: {
-                            Label("Désactiver", systemImage: "pause.circle")
+                            Label("deactivate".localized(), systemImage: "pause.circle")
                         }
                         .tint(.orange)
                     } else {
                         Button {
                             activateCode(code)
                         } label: {
-                            Label("Activer", systemImage: "play.circle")
+                            Label("activate".localized(), systemImage: "play.circle")
                         }
                         .tint(.green)
                     }
@@ -422,10 +454,10 @@ struct SettingsView: View {
             }
             
             Button(action: { showingNewCodeSheet = true }) {
-                Label("Générer un code", systemImage: "plus.circle.fill")
+                Label("generate_code".localized(), systemImage: "plus.circle.fill")
             }
         } header: {
-            Text("Codes d'invitation")
+            Text("invitation_codes".localized())
         }
     }
     
@@ -435,40 +467,40 @@ struct SettingsView: View {
                 selectedDeleteType = .trucks
                 showingDeleteDataConfirm = true
             } label: {
-                Label("Supprimer tous les camions (\(trucks.count))", systemImage: "trash")
+                Label("\("delete_all_trucks".localized()) (\(trucks.count))", systemImage: "trash")
             }
             
             Button(role: .destructive) {
                 selectedDeleteType = .stock
                 showingDeleteDataConfirm = true
             } label: {
-                Label("Supprimer tout le stock (\(stockItems.count))", systemImage: "trash")
+                Label("\("delete_all_stock".localized()) (\(stockItems.count))", systemImage: "trash")
             }
             
             Button(role: .destructive) {
                 selectedDeleteType = .events
                 showingDeleteDataConfirm = true
             } label: {
-                Label("Supprimer tous les événements (\(events.count))", systemImage: "trash")
+                Label("\("delete_all_events".localized()) (\(events.count))", systemImage: "trash")
             }
             
             Button(role: .destructive) {
                 selectedDeleteType = .all
                 showingDeleteDataConfirm = true
             } label: {
-                Label("Supprimer toutes les données", systemImage: "trash.fill")
+                Label("delete_all_data".localized(), systemImage: "trash.fill")
             }
         } header: {
-            Text("Gestion des données")
+            Text("data_management".localized())
         } footer: {
-            Text("Actions irréversibles. Utilisez avec précaution.")
+            Text("irreversible_actions".localized())
         }
     }
     
     private var actionsSection: some View {
         Section {
             Button(action: { showingLogoutConfirm = true }) {
-                Label("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right")
+                Label("logout".localized(), systemImage: "rectangle.portrait.and.arrow.right")
                     .foregroundColor(.red)
             }
         }
@@ -482,6 +514,8 @@ struct SettingsView: View {
         editCompanyPhone = company.phone ?? ""
         editCompanyAddress = company.address ?? ""
         editCompanySiret = company.siret ?? ""
+        editCompanyLanguage = AppLanguage(rawValue: company.language) ?? .french
+        previousLanguage = editCompanyLanguage // Sauvegarder la langue actuelle
         isEditingCompany = true
     }
     
@@ -494,6 +528,7 @@ struct SettingsView: View {
         let phone = editCompanyPhone
         let address = editCompanyAddress
         let siret = editCompanySiret
+        let language = editCompanyLanguage
         let logoToUpload = logoImage
         
         // Mettre à jour l'état UI une seule fois au début
@@ -511,7 +546,8 @@ struct SettingsView: View {
                 email: email,
                 siret: siret.isEmpty ? nil : siret,
                 createdAt: company.createdAt,
-                ownerId: company.ownerId
+                ownerId: company.ownerId,
+                language: language.rawValue
             )
             
             // Upload logo si modifié
@@ -526,7 +562,8 @@ struct SettingsView: View {
                     email: updatedCompany.email,
                     siret: updatedCompany.siret,
                     createdAt: updatedCompany.createdAt,
-                    ownerId: updatedCompany.ownerId
+                    ownerId: updatedCompany.ownerId,
+                    language: updatedCompany.language
                 )
             }
             
@@ -539,6 +576,20 @@ struct SettingsView: View {
                 self.selectedLogoItem = nil
                 self.isSavingCompany = false
                 self.isEditingCompany = false
+                
+                // Détecter le changement de langue
+                let languageChanged = previousLanguage != language
+                
+                // Synchroniser la langue de l'app avec celle de l'entreprise
+                localizationManager.syncWithCompanyLanguage(updatedCompany.language)
+                
+                // Mettre à jour la langue précédente
+                previousLanguage = language
+                
+                // Afficher l'alerte de relance si la langue a changé
+                if languageChanged {
+                    showingRestartAlert = true
+                }
             }
         } catch {
             await MainActor.run {
@@ -604,6 +655,15 @@ struct SettingsView: View {
                 self.company = loadedCompany
                 self.members = loadedMembers
                 self.invitationCodes = loadedCodes
+                
+                // Initialiser previousLanguage avec la langue de l'entreprise
+                if let companyLanguage = AppLanguage(rawValue: loadedCompany.language) {
+                    self.previousLanguage = companyLanguage
+                }
+                
+                // Synchroniser la langue de l'app avec celle de l'entreprise
+                localizationManager.syncWithCompanyLanguage(loadedCompany.language)
+                
                 self.isLoading = false
             }
         } catch {
@@ -730,20 +790,20 @@ struct GenerateInvitationView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Informations") {
-                    TextField("Nom du code (optionnel)", text: $customName)
+                Section("invitation_information".localized()) {
+                    TextField("code_name_optional".localized(), text: $customName)
                         .textInputAutocapitalization(.words)
                     
-                    Text("Ex: 'Équipe Livraison', 'Nouveaux Stagiaires', etc.")
+                    Text("code_example_team".localized())
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 
-                Section("Code d'invitation") {
-                    Toggle("Personnaliser le code", isOn: $useCustomCode)
+                Section("invitation_code_section".localized()) {
+                    Toggle("customize_code".localized(), isOn: $useCustomCode)
                     
                     if useCustomCode {
-                        TextField("Code personnalisé", text: $customCode)
+                        TextField("custom_code".localized(), text: $customCode)
                             .textInputAutocapitalization(.characters)
                             .autocorrectionDisabled()
                             .onChange(of: customCode) { _, newValue in
@@ -753,7 +813,7 @@ struct GenerateInvitationView: View {
                                     .replacingOccurrences(of: " ", with: "-")
                             }
                         
-                        Text("Ex: 'LIVRAISON-2025', 'TEAM-A', etc.")
+                        Text("code_example_custom".localized())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         
@@ -761,7 +821,7 @@ struct GenerateInvitationView: View {
                             HStack {
                                 Image(systemName: "info.circle")
                                     .foregroundStyle(.blue)
-                                Text("Aperçu: \(customCode)")
+                                Text("\("code_preview".localized()): \(customCode)")
                                     .font(.caption)
                                     .fontWeight(.bold)
                                     .monospaced()
@@ -792,16 +852,16 @@ struct GenerateInvitationView: View {
                     }
                     .pickerStyle(.menu)
                     
-                    Stepper("Validité: \(validityDays) jours", value: $validityDays, in: 1...365)
-                    Stepper("Utilisations max: \(maxUses)", value: $maxUses, in: 1...100)
+                    Stepper("\("validity_days".localized().replacingOccurrences(of: "{0}", with: "\(validityDays)"))", value: $validityDays, in: 1...365)
+                    Stepper("\("max_uses".localized().replacingOccurrences(of: "{0}", with: "\(maxUses)"))", value: $maxUses, in: 1...100)
                 }
                 
-                Section("Permissions du rôle") {
+                Section("role_permissions".localized()) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Ce code donnera le rôle: **\(roleDisplayName(selectedRole))**")
+                        Text("\("code_will_give_role".localized()) **\(roleDisplayName(selectedRole))**")
                             .font(.subheadline)
                         
-                        Text("Permissions incluses:")
+                        Text("permissions_included".localized())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.top, 4)
@@ -836,11 +896,11 @@ struct GenerateInvitationView: View {
                             Button(action: {
                                 UIPasteboard.general.string = code.code
                             }) {
-                                Label("Copier", systemImage: "doc.on.doc")
+                                Label("copy".localized(), systemImage: "doc.on.doc")
                             }
                         }
                     } header: {
-                        Text("Code généré")
+                        Text("code_generated".localized())
                     }
                 }
                 
@@ -853,28 +913,30 @@ struct GenerateInvitationView: View {
                 
                 Section {
                     if useCustomCode {
-                        Text("⚠️ Assurez-vous que le code personnalisé est unique et facile à partager.")
+                        Text("ensure_unique_code".localized())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     
-                    Text("Le code expirera dans \(validityDays) jours et pourra être utilisé \(maxUses) fois maximum.")
+                    Text("code_validity_info".localized()
+                        .replacingOccurrences(of: "{0}", with: "\(validityDays)")
+                        .replacingOccurrences(of: "{1}", with: "\(maxUses)"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle("Nouveau code")
+            .navigationTitle("new_code".localized())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Fermer") {
+                    Button("close".localized()) {
                         onDismiss()
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .primaryAction) {
-                    Button(isGenerating ? "Génération..." : "Générer") {
+                    Button(isGenerating ? "generating".localized() : "generate".localized()) {
                         Task {
                             await generateCode()
                         }
@@ -990,14 +1052,14 @@ struct MemberDetailView: View {
         Form {
             Section {
                 HStack {
-                    Text("Nom")
+                    Text("name".localized())
                     Spacer()
                     Text(member.displayName)
                         .foregroundColor(.secondary)
                 }
                 
                 HStack {
-                    Text("Email")
+                    Text("email".localized())
                     Spacer()
                     Text(member.email)
                         .foregroundColor(.secondary)
@@ -1008,7 +1070,7 @@ struct MemberDetailView: View {
                         .foregroundColor(.yellow)
                 }
             } header: {
-                Text("Informations")
+                Text("info".localized())
             }
             
             if !isOwner {
@@ -1019,7 +1081,7 @@ struct MemberDetailView: View {
                         }
                     }
                 } header: {
-                    Text("Permissions")
+                    Text("permissions".localized())
                 }
                 
                 Section {
@@ -1043,20 +1105,20 @@ struct MemberDetailView: View {
         .toolbar {
             if !isOwner && selectedRole != member.role {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(isSaving ? "Enregistrement..." : "Enregistrer") {
+                    Button(isSaving ? "saving".localized() : "save".localized()) {
                         Task { await saveMember() }
                     }
                     .disabled(isSaving)
                 }
             }
         }
-        .alert("Retirer le membre", isPresented: $showingDeleteConfirm) {
-            Button("Annuler", role: .cancel) {}
-            Button("Retirer", role: .destructive) {
+        .alert("remove_member".localized(), isPresented: $showingDeleteConfirm) {
+            Button("cancel".localized(), role: .cancel) {}
+            Button("remove".localized(), role: .destructive) {
                 Task { await removeMember() }
             }
         } message: {
-            Text("Voulez-vous vraiment retirer \(member.displayName) de votre entreprise ?")
+            Text("remove_member_confirm".localized().replacingOccurrences(of: "{0}", with: member.displayName))
         }
     }
     

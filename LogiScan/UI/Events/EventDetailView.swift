@@ -11,6 +11,7 @@ import SwiftData
 struct EventDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var localizationManager: LocalizationManager
     @Query private var trucks: [Truck]
     // ❌ SUPPRIMÉ: @Query private var allQuoteItems: [QuoteItem]
     // Cette Query rendait la vue hyper-réactive et causait des reconstructions intempestives
@@ -162,7 +163,7 @@ struct EventDetailView: View {
                     VStack(spacing: 12) {
                         ProgressView()
                             .scaleEffect(1.2)
-                        Text("Enregistrement...")
+                        Text("saving".localized())
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -252,7 +253,7 @@ struct EventDetailView: View {
     
     private var clientInfoSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Informations client")
+            Text("client_info".localized())
                 .font(.headline)
             
             if isEditing {
@@ -314,7 +315,7 @@ struct EventDetailView: View {
     
     private var truckSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Camion assigné")
+            Text("assigned_truck".localized())
                 .font(.headline)
             
             if isEditing {
@@ -428,7 +429,7 @@ struct EventDetailView: View {
                     HStack {
                         Image(systemName: "checkmark.seal.fill")
                             .foregroundColor(.green)
-                        Text("Devis terminé")
+                        Text("quote_finalized".localized())
                             .font(.headline)
                             .foregroundColor(.green)
                         Spacer()

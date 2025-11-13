@@ -128,7 +128,7 @@ struct TruckDetailView: View {
     
     private var truckInfoSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Caractéristiques")
+            Text("characteristics".localized())
                 .font(.headline)
             
             HStack {
@@ -161,8 +161,8 @@ struct TruckDetailView: View {
     
     private var periodSelector: some View {
         Picker("Période", selection: $selectedPeriod) {
-            Text("Semaine").tag(CalendarPeriod.week)
-            Text("Mois").tag(CalendarPeriod.month)
+            Text("week".localized()).tag(CalendarPeriod.week)
+            Text("month".localized()).tag(CalendarPeriod.month)
         }
         .pickerStyle(.segmented)
         .padding(.horizontal)
@@ -171,7 +171,7 @@ struct TruckDetailView: View {
     private var agendaSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Agenda")
+                Text("agenda".localized())
                     .font(.headline)
                 
                 Spacer()
@@ -267,7 +267,7 @@ struct TruckDetailView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } header: {
-                    Text("Identification")
+                    Text("identification".localized())
                 } footer: {
                     Text("Si vous ajoutez un nom, celui-ci remplacera la plaque d'immatriculation dans l'application.")
                 }
@@ -381,7 +381,7 @@ struct DayAgendaRow: View {
                 Spacer()
                 
                 if events.isEmpty {
-                    Text("Libre")
+                    Text("free".localized())
                         .font(.caption2)
                         .foregroundColor(.green)
                 } else {

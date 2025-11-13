@@ -10,6 +10,7 @@ import SwiftUI
 
 struct EventsListView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var localizationManager: LocalizationManager
     @Query private var events: [Event]
     @StateObject private var syncManager = SyncManager()
     @State private var selectedStatus: EventStatus? = nil
@@ -39,7 +40,7 @@ struct EventsListView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         FilterChip(
-                            title: "Tous",
+                            title: "all".localized(),
                             isSelected: selectedStatus == nil,
                             action: { selectedStatus = nil }
                         )
@@ -61,7 +62,7 @@ struct EventsListView: View {
                         EventRow(event: event)
                     }
                 }
-                .searchable(text: $searchText, prompt: "Rechercher un événement...")
+                .searchable(text: $searchText, prompt: "search".localized())
                 .listStyle(.plain)
                 .refreshable {
                     await refreshData()
@@ -69,7 +70,7 @@ struct EventsListView: View {
                 .overlay {
                     if syncManager.isSyncing {
                         VStack {
-                            ProgressView("Synchronisation...")
+                            ProgressView("synchronization".localized())
                                 .padding()
                                 .background(Color(.systemBackground).opacity(0.9))
                                 .cornerRadius(10)
@@ -78,7 +79,7 @@ struct EventsListView: View {
                     }
                 }
             }
-            .navigationTitle("Événements")
+            .navigationTitle("events".localized())
             .refreshable {
                 await syncManager.syncFromFirebase(modelContext: modelContext)
             }
@@ -136,7 +137,7 @@ struct EventRow: View {
                     HStack(spacing: 4) {
                         Image(systemName: "doc.text.fill")
                             .font(.caption2)
-                        Text("Devis")
+                        Text("quote".localized())
                             .font(.caption2)
                     }
                     .fontWeight(.medium)

@@ -243,7 +243,7 @@ struct SimpleScanResultView: View {
                         .font(.system(size: 60))
                         .foregroundColor(.blue)
                     
-                    Text("Code scanné")
+                    Text("scanned_code".localized())
                         .font(.title2)
                         .fontWeight(.semibold)
                 }

@@ -67,7 +67,7 @@ struct QRCodeShareView: View {
                     }) {
                         HStack {
                             Image(systemName: "square.and.arrow.up")
-                            Text("Partager")
+                            Text("share".localized())
                         }
                         .frame(maxWidth: .infinity)
                         .padding()

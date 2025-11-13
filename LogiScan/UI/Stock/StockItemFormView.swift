@@ -180,7 +180,7 @@ struct StockItemFormView: View {
                         }
                     } else {
                         HStack {
-                            Text("SKU")
+                            Text("sku".localized())
                                 .foregroundColor(.secondary)
                             Spacer()
                             Text(sku)
@@ -257,7 +257,7 @@ struct StockItemFormView: View {
 
                     if ownershipType == .owned {
                         HStack {
-                            Text("Valeur unitaire")
+                            Text("unit_value".localized())
                             Spacer()
                             TextField("0.00", text: $unitValue)
                                 .keyboardType(.decimalPad)
@@ -297,17 +297,17 @@ struct StockItemFormView: View {
                 if !isExistingArticle || selectedExistingItem == nil {
                     Section("Caractéristiques techniques") {
                         HStack {
-                            Text("Poids unitaire")
+                            Text("unit_weight".localized())
                             Spacer()
                             TextField("0.0", text: $unitWeight)
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 80)
-                            Text("kg")
+                            Text("kg".localized())
                         }
 
                         HStack {
-                            Text("Volume unitaire")
+                            Text("unit_volume".localized())
                             Spacer()
                             TextField("0.0", text: $unitVolume)
                                 .keyboardType(.decimalPad)
@@ -317,7 +317,7 @@ struct StockItemFormView: View {
                         }
 
                         HStack {
-                            Text("Consommation")
+                            Text("consumption".localized())
                             Spacer()
                             TextField("0", text: $powerConsumption)
                                 .keyboardType(.decimalPad)
@@ -340,7 +340,7 @@ struct StockItemFormView: View {
                                 Text("×")
                                 TextField("0", text: $dimensionHeight)
                                     .keyboardType(.decimalPad)
-                                Text("cm")
+                                Text("cm".localized())
                             }
 
                             if let vol = calculatedVolume {
@@ -378,7 +378,7 @@ struct StockItemFormView: View {
                         Label("Ajouter des étiquettes", systemImage: "tag")
                     }
                 } header: {
-                    Text("Étiquettes")
+                    Text("labels".localized())
                 } footer: {
                     Text("Utilisez les étiquettes pour faciliter la recherche")
                 }

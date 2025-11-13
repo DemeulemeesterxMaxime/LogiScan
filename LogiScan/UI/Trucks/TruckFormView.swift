@@ -11,6 +11,7 @@ import SwiftData
 struct TruckFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var localizationManager: LocalizationManager
     
     let truck: Truck?
     
@@ -41,7 +42,7 @@ struct TruckFormView: View {
             Form {
                 Section("Identification") {
                     HStack {
-                        Text("Immatriculation")
+                        Text("license_plate".localized())
                         Spacer()
                         TextField("AB-123-CD", text: $licensePlate)
                             .textFieldStyle(.roundedBorder)
@@ -54,7 +55,7 @@ struct TruckFormView: View {
                 Section("Capacités") {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Volume maximum")
+                            Text("max_volume".localized())
                             Spacer()
                             Text(String(format: "%.0f m³", maxVolume))
                                 .foregroundColor(.secondary)
@@ -76,7 +77,7 @@ struct TruckFormView: View {
                     
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Poids maximum")
+                            Text("max_weight".localized())
                             Spacer()
                             Text(String(format: "%.0f kg", maxWeight))
                                 .foregroundColor(.secondary)
@@ -153,7 +154,7 @@ struct TruckFormView: View {
                         VStack(spacing: 12) {
                             ProgressView()
                                 .scaleEffect(1.2)
-                            Text("Enregistrement...")
+                            Text("saving".localized())
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
@@ -275,7 +276,7 @@ struct TruckPreviewCard: View {
             // Infos
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("Camion")
+                    Text("truck".localized())
                         .font(.headline)
                     
                     Spacer()
@@ -294,8 +295,8 @@ struct TruckPreviewCard: View {
                 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Capacité")
-                            .font(.caption2)
+                        Text("capacity_label".localized())
+                            .font(.caption)
                             .foregroundColor(.secondary)
                         
                         Text(String(format: "%.0f kg", maxWeight))
@@ -306,8 +307,8 @@ struct TruckPreviewCard: View {
                     Spacer()
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Volume")
-                            .font(.caption2)
+                        Text("volume".localized())
+                            .font(.caption)
                             .foregroundColor(.secondary)
                         
                         Text(String(format: "%.0f m³", maxVolume))

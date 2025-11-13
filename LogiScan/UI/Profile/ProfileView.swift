@@ -11,6 +11,7 @@ import FirebaseAuth
 
 struct ProfileView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var localizationManager: LocalizationManager
     @Query private var allTasks: [TodoTask]
     @State private var permissionService = PermissionService.shared
     @State private var authService = AuthService()
@@ -63,7 +64,7 @@ struct ProfileView: View {
                         companyRow(user: user)
                     }
                 } header: {
-                    Text("Mon Profil")
+                    Text("my_profile".localized())
                 }
                 
                 // Section Mes Tâches (visible pour tous les employés)
@@ -71,10 +72,10 @@ struct ProfileView: View {
                     Section {
                         NavigationLink {
                             TodoListView(defaultFilter: .myTasks)
-                                .navigationTitle("Mes tâches")
+                                .navigationTitle("my_tasks".localized())
                         } label: {
                             HStack {
-                                Label("Mes tâches du jour", systemImage: "checklist")
+                                Label("my_daily_tasks".localized(), systemImage: "checklist")
                                 
                                 Spacer()
                                 
@@ -96,10 +97,10 @@ struct ProfileView: View {
                         
                         NavigationLink {
                             TodoListView(defaultFilter: .unassigned)
-                                .navigationTitle("Tâches disponibles")
+                                .navigationTitle("available_tasks".localized())
                         } label: {
                             HStack {
-                                Label("Tâches disponibles", systemImage: "tray.2")
+                                Label("available_tasks".localized(), systemImage: "tray.2")
                                 
                                 Spacer()
                                 
@@ -119,9 +120,9 @@ struct ProfileView: View {
                             }
                         }
                     } header: {
-                        Text("Mes Tâches")
+                        Text("my_tasks".localized())
                     } footer: {
-                        Text("Gérez vos tâches personnelles et prenez des tâches en libre-service.")
+                        Text("my_tasks_description".localized())
                             .font(.caption)
                     }
                 }
@@ -133,7 +134,7 @@ struct ProfileView: View {
                             NavigationLink {
                                 CreateTaskView()
                             } label: {
-                                Label("Créer une tâche", systemImage: "plus.circle")
+                                Label("create_task".localized(), systemImage: "plus.circle")
                                     .foregroundColor(.blue)
                             }
                         }
@@ -142,7 +143,7 @@ struct ProfileView: View {
                             NavigationLink {
                                 AdminTaskManagementView()
                             } label: {
-                                Label("Gérer toutes les tâches", systemImage: "list.bullet.clipboard")
+                                Label("manage_all_tasks".localized(), systemImage: "list.bullet.clipboard")
                             }
                         }
                         
@@ -150,13 +151,13 @@ struct ProfileView: View {
                             NavigationLink {
                                 AdminTaskManagementView()
                             } label: {
-                                Label("Attribuer des tâches", systemImage: "person.badge.plus")
+                                Label("assign_tasks".localized(), systemImage: "person.badge.plus")
                             }
                         }
                     } header: {
-                        Text("Gestion des Tâches")
+                        Text("manage_tasks".localized())
                     } footer: {
-                        Text("Créez et attribuez des tâches aux membres de votre équipe.")
+                        Text("task_management_description".localized())
                             .font(.caption)
                     }
                 }
@@ -167,10 +168,10 @@ struct ProfileView: View {
                         NavigationLink {
                             CompanySettingsView()
                         } label: {
-                            Label("Gérer mon entreprise", systemImage: "building.2")
+                            Label("manage_my_company".localized(), systemImage: "building.2")
                         }
                     } header: {
-                        Text("Entreprise")
+                        Text("company".localized())
                     }
                 }
                 
@@ -180,10 +181,10 @@ struct ProfileView: View {
                         NavigationLink {
                             AdminView()
                         } label: {
-                            Label("Administration complète", systemImage: "gear.badge")
+                            Label("full_administration".localized(), systemImage: "gear.badge")
                         }
                     } header: {
-                        Text("Administration")
+                        Text("administration".localized())
                     }
                 }
                 
@@ -191,7 +192,7 @@ struct ProfileView: View {
                 Section {
                     Button(action: { showingLogoutConfirm = true }) {
                         HStack {
-                            Label("Se déconnecter", systemImage: "rectangle.portrait.and.arrow.right")
+                            Label("sign_out".localized(), systemImage: "rectangle.portrait.and.arrow.right")
                                 .foregroundColor(.orange)
                             Spacer()
                         }
@@ -199,19 +200,19 @@ struct ProfileView: View {
                     
                     Button(action: { showingDeleteAccountConfirm = true }) {
                         HStack {
-                            Label("Supprimer mon compte", systemImage: "trash.circle")
+                            Label("delete_my_account".localized(), systemImage: "trash.circle")
                                 .foregroundColor(.red)
                             Spacer()
                         }
                     }
                 } header: {
-                    Text("Paramètres du compte")
+                    Text("account_settings".localized())
                 } footer: {
                     Text("La suppression du compte est irréversible et supprimera définitivement toutes vos données.")
                         .font(.caption)
                 }
             }
-            .navigationTitle("Profil")
+            .navigationTitle("profile".localized())
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -308,7 +309,7 @@ struct ProfileView: View {
             if let role = user.role {
                 RoleBadge(role: role)
             } else {
-                Text("Aucun rôle")
+                Text("no_role".localized())
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -326,11 +327,11 @@ struct ProfileView: View {
             if user.companyId != nil {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
-                Text("Membre")
+                Text("member".localized())
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             } else {
-                Text("Aucune")
+                Text("none_feminine".localized())
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -486,7 +487,7 @@ struct CompanySettingsView: View {
                         CompanyInfoRow(title: "SIRET", value: siret, icon: "doc.text")
                     }
                 } header: {
-                    Text("Informations")
+                    Text("info".localized())
                 }
                 
                 // Membres de l'entreprise
@@ -496,7 +497,7 @@ struct CompanySettingsView: View {
                     }
                 } header: {
                     HStack {
-                        Text("Membres")
+                        Text("members".localized())
                         Spacer()
                         Text("\(members.count)")
                             .font(.caption)
@@ -513,7 +514,7 @@ struct CompanySettingsView: View {
                             Label("Éditer l'entreprise", systemImage: "pencil")
                         }
                     } header: {
-                        Text("Administration")
+                        Text("administration".localized())
                     }
                 }
             } else if let error = errorMessage {

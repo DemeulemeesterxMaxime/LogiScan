@@ -158,7 +158,7 @@ struct ModeDetailView: View {
                             .foregroundColor(mode.color)
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Actions automatiques")
+                            Text("automatic_actions".localized())
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
@@ -178,7 +178,7 @@ struct ModeDetailView: View {
                             .foregroundColor(mode.color)
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Contexte actuel")
+                            Text("current_context".localized())
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
