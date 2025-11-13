@@ -134,11 +134,7 @@ struct SettingsView: View {
             }
         }
         .alert("language_changed".localized(), isPresented: $showingRestartAlert) {
-            Button("restart_now".localized(), role: .destructive) {
-                // Fermer l'application pour forcer le redémarrage
-                exit(0)
-            }
-            Button("restart_later".localized(), role: .cancel) {}
+            Button("ok".localized(), role: .cancel) {}
         } message: {
             Text("restart_required".localized())
         }

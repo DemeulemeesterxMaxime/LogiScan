@@ -18,6 +18,8 @@ enum AppLanguage: String, Codable, CaseIterable {
     case portuguese = "pt"
     case bengali = "bn"
     case german = "de"
+    case italian = "it"
+    case dutch = "nl"
     
     var displayName: String {
         switch self {
@@ -41,6 +43,10 @@ enum AppLanguage: String, Codable, CaseIterable {
             return "বাংলা"
         case .german:
             return "Deutsch"
+        case .italian:
+            return "Italiano"
+        case .dutch:
+            return "Nederlands"
         }
     }
     
@@ -66,6 +72,10 @@ enum AppLanguage: String, Codable, CaseIterable {
             return "🇧🇩"
         case .german:
             return "🇩🇪"
+        case .italian:
+            return "🇮🇹"
+        case .dutch:
+            return "🇳🇱"
         }
     }
     
@@ -91,6 +101,10 @@ enum AppLanguage: String, Codable, CaseIterable {
             return Locale(identifier: "bn_BD")
         case .german:
             return Locale(identifier: "de_DE")
+        case .italian:
+            return Locale(identifier: "it_IT")
+        case .dutch:
+            return Locale(identifier: "nl_NL")
         }
     }
 }
