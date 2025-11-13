@@ -240,25 +240,3 @@ extension ScannerViewModel {
         set { Self._currentActiveScanList = newValue }
     }
 }
-
-// MARK: - Scan List Error
-
-enum ScanListError: LocalizedError {
-    case assetNotExpected(assetName: String)
-    case assetAlreadyScanned(assetName: String)
-    case listNotActive
-    case listAlreadyCompleted
-    
-    var errorDescription: String? {
-        switch self {
-        case .assetNotExpected(let name):
-            return "❌ '\(name)' n'est pas attendu dans cette liste de scan"
-        case .assetAlreadyScanned(let name):
-            return "⚠️ '\(name)' a déjà été scanné dans cette liste"
-        case .listNotActive:
-            return "❌ Aucune liste de scan active"
-        case .listAlreadyCompleted:
-            return "✅ Cette liste est déjà complète"
-        }
-    }
-}

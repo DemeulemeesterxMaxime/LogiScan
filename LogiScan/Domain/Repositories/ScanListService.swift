@@ -569,51 +569,6 @@ class ScanListService: ObservableObject {
     }
 }
 
-enum ScanListError: LocalizedError {
-    case eventNotFinalized
-    case noItemsInQuote
-    case assetNotFound
-    case skuMismatch(expected: String, found: String)
-    case itemNotInList
-    case assetAlreadyScanned
-    case assetNotScanned
-    case quantityExceeded
-    
-    var errorDescription: String? {
-        switch self {
-        case .eventNotFinalized:
-            return "L'événement n'est pas finalisé. Veuillez d'abord finaliser le devis."
-        case .noItemsInQuote:
-            return "Le devis ne contient aucun article."
-        case .assetNotFound:
-            return "❌ Asset introuvable\n\nVeuillez vérifier le QR code scanné."
-        case .skuMismatch(let expected, let found):
-            return """
-⚠️ Mauvais article scanné
-
-Attendu : \(expected)
-Scanné : \(found)
-
-💡 Scannez le bon article
-"""
-        case .itemNotInList:
-            return """
-❌ Article hors liste
-
-Cet article n'est pas dans la liste de préparation actuelle.
-
-💡 Vérifiez la liste active
-"""
-        case .assetAlreadyScanned:
-            return "✅ Cet asset a déjà été scanné"
-        case .assetNotScanned:
-            return "❌ Cet asset n'a pas été scanné"
-        case .quantityExceeded:
-            return "✅ Quantité déjà atteinte pour cet article"
-        }
-    }
-}
-
 // MARK: - Firebase Synchronization
 
 extension ScanListService {
