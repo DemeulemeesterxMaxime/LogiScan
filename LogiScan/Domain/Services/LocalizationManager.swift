@@ -15,6 +15,8 @@ class LocalizationManager: ObservableObject {
     @Published var currentLanguage: AppLanguage {
         didSet {
             saveLanguage()
+            // Forcer la mise à jour de l'interface
+            objectWillChange.send()
         }
     }
     
