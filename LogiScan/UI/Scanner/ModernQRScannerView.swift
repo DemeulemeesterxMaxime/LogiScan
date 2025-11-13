@@ -47,11 +47,11 @@ struct ModernQRScannerView: View {
             // Zone de scan avec coins uniquement (pas de fond sombre)
             scanFrameOnly
             
-            // Contrôles de scan
+            // ✅ Contrôle Flash uniquement (pas de bouton scan)
             VStack {
                 Spacer()
                 
-                scanControls
+                flashButton
                     .padding(.bottom, 40)
             }
         }
@@ -96,23 +96,6 @@ struct ModernQRScannerView: View {
                 if isScanning {
                     ScanningLine(rect: scanRect, isAnimating: $showScanAnimation)
                 }
-                
-                // Texte d'instruction au-dessus de la zone
-                Text("Placez le QR code dans le cadre")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(
-                        Capsule()
-                            .fill(Color.black.opacity(0.6))
-                            .shadow(radius: 10)
-                    )
-                    .position(
-                        x: scanRect.midX,
-                        y: scanRect.minY - 40
-                    )
             }
             .onAppear {
                 showScanAnimation = true
@@ -202,90 +185,34 @@ struct ModernQRScannerView: View {
         }
     }
     
-    // MARK: - Controls
+    // MARK: - Controls (Flash uniquement)
     
-    private var scanControls: some View {
-        HStack(spacing: 30) {
-            // Bouton Flash
-            Button {
-                isTorchOn.toggle()
-            } label: {
-                VStack(spacing: 8) {
-                    Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
-                        .font(.title2)
-                    Text(isTorchOn ? "Actif" : "Flash")
-                        .font(.caption)
-                }
-                .foregroundColor(.white)
-                .frame(width: 70, height: 70)
-                .background(
-                    Circle()
-                        .fill(isTorchOn ? Color.yellow.opacity(0.3) : Color.white.opacity(0.2))
-                        .shadow(color: isTorchOn ? .yellow.opacity(0.3) : .clear, radius: 10)
-                )
+    private var flashButton: some View {
+        Button {
+            isTorchOn.toggle()
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: isTorchOn ? "flashlight.on.fill" : "flashlight.off.fill")
+                    .font(.title2)
+                Text(isTorchOn ? "Actif" : "Flash")
+                    .font(.caption)
             }
-            
-            // Bouton Scan (principal)
-            Button {
-                withAnimation(.spring(response: 0.3)) {
-                    isScanning.toggle()
-                }
-            } label: {
-                VStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .stroke(Color.white.opacity(0.3), lineWidth: 3)
-                            .frame(width: 70, height: 70)
-                        
-                        if isScanning {
-                            Circle()
-                                .trim(from: 0, to: 0.8)
-                                .stroke(Color.green, lineWidth: 3)
-                                .frame(width: 70, height: 70)
-                                .rotationEffect(.degrees(isScanning ? 360 : 0))
-                                .animation(
-                                    .linear(duration: 1).repeatForever(autoreverses: false),
-                                    value: isScanning
-                                )
-                        }
-                        
-                        Image(systemName: isScanning ? "stop.fill" : "play.fill")
-                            .font(.title2)
-                            .foregroundColor(isScanning ? .green : .white)
-                    }
-                    
-                    Text(isScanning ? "Arrêter" : "Scanner")
-                        .font(.caption)
-                        .foregroundColor(.white)
-                }
-            }
-            
-            // Bouton Liste
-            if let onShowList = onShowList {
-                Button {
-                    onShowList()
-                } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: "list.bullet.clipboard")
-                            .font(.title2)
-                        Text("Liste")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.white)
-                    .frame(width: 70, height: 70)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(0.2))
-                    )
-                }
-            }
+            .foregroundColor(.white)
+            .frame(width: 70, height: 70)
+            .background(
+                Circle()
+                    .fill(isTorchOn ? Color.yellow.opacity(0.3) : Color.white.opacity(0.2))
+                    .shadow(color: isTorchOn ? .yellow.opacity(0.3) : .clear, radius: 10)
+            )
         }
-        .padding(.horizontal, 30)
     }
     
     // MARK: - Actions
     
     private func handleScan(_ code: String) {
+        // ✅ Arrêter le scan pour éviter le mitraillage
+        isScanning = false
+        
         // Animation de succès
         withAnimation(.spring()) {
             showScanAnimation = false

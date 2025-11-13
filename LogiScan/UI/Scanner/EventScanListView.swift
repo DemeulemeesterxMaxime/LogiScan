@@ -503,6 +503,57 @@ struct EventScanListView: View {
         }
     }
     
+    /// ✅ Marque la liste comme complétée et met à jour le statut de l'événement
+    private func markListAsCompleted() {
+        scanList.status = .completed
+        scanList.completedAt = Date()
+        
+        // Sauvegarder
+        do {
+            try modelContext.save()
+            print("✅ [EventScanList] Liste marquée comme complétée: \(scanList.displayName)")
+            
+            // ✅ Mettre à jour le statut de l'événement
+            updateEventStatus()
+        } catch {
+            print("❌ [EventScanList] Erreur sauvegarde: \(error)")
+        }
+    }
+    
+    /// ✅ Met à jour le statut de l'événement selon la liste complétée
+    private func updateEventStatus() {
+        // Récupérer l'événement
+        let fetchDescriptor = FetchDescriptor<Event>(
+            predicate: #Predicate { $0.eventId == scanList.eventId }
+        )
+        
+        guard let event = try? modelContext.fetch(fetchDescriptor).first else {
+            print("❌ [EventScanList] Événement non trouvé")
+            return
+        }
+        
+        // Mettre à jour le statut selon la direction de scan
+        switch scanList.scanDirection {
+        case .stockToTruck:
+            event.logisticsStatus = .inTransitToEvent
+        case .truckToEvent:
+            event.logisticsStatus = .onSite
+        case .eventToTruck:
+            event.logisticsStatus = .inTransitToStock
+        case .truckToStock:
+            event.logisticsStatus = .returned
+        }
+        
+        event.updatedAt = Date()
+        
+        do {
+            try modelContext.save()
+            print("✅ [EventScanList] Statut événement mis à jour: \(event.logisticsStatus)")
+        } catch {
+            print("❌ [EventScanList] Erreur mise à jour événement: \(error)")
+        }
+    }
+    
     // MARK: - Completion Action Button
     
     private var completionActionButton: some View {
@@ -532,7 +583,13 @@ struct EventScanListView: View {
             // Bouton d'action
             if let next = nextList {
                 // Il y a une liste suivante
-                NavigationLink(destination: EventScanListView(scanList: next)) {
+                Button {
+                    // ✅ Marquer la liste actuelle comme complétée
+                    markListAsCompleted()
+                    // Naviguer vers la prochaine liste
+                    nextScanList = next
+                    navigateToNextList = true
+                } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.right.circle.fill")
                             .font(.title3)
@@ -564,9 +621,19 @@ struct EventScanListView: View {
                     .cornerRadius(12)
                     .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
                 }
+                .background(
+                    NavigationLink(
+                        destination: nextScanList.map { EventScanListView(scanList: $0) },
+                        isActive: $navigateToNextList,
+                        label: { EmptyView() }
+                    )
+                    .hidden()
+                )
             } else {
                 // Pas de liste suivante, proposer de changer d'événement
                 Button(action: {
+                    // ✅ Marquer la liste comme complétée avant de fermer
+                    markListAsCompleted()
                     dismiss() // Retour à la liste des événements
                 }) {
                     HStack(spacing: 12) {

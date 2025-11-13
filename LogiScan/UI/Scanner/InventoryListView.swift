@@ -39,7 +39,10 @@ struct InventoryListView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(scannedAssets, id: \.assetId) { asset in
-                                assetRow(asset)
+                                NavigationLink(destination: AssetDetailView(asset: asset)) {
+                                    assetRow(asset)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .padding()
