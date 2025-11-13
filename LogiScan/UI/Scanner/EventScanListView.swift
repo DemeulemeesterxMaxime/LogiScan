@@ -24,8 +24,7 @@ struct EventScanListView: View {
     @State private var alertMessage = ""
     @State private var selectedFilter: ScanItemStatus? = nil
     @State private var searchText = ""
-    @State private var navigateToNextList = false  // 🆕 Navigation vers liste suivante
-    @State private var nextScanList: ScanList?  // 🆕 Liste suivante
+    @State private var nextScanList: ScanList?  // 🆕 Liste suivante pour navigation
     
     // Throttling pour éviter les scans trop rapides
     @State private var lastScanTime: Date?
@@ -142,6 +141,9 @@ struct EventScanListView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(alertMessage)
+        }
+        .navigationDestination(item: $nextScanList) { scanList in
+            EventScanListView(scanList: scanList)
         }
         .onAppear {
             print("🔍 [EventScanListView] onAppear - État initial:")
@@ -523,8 +525,9 @@ struct EventScanListView: View {
     /// ✅ Met à jour le statut de l'événement selon la liste complétée
     private func updateEventStatus() {
         // Récupérer l'événement
+        let eventId = scanList.eventId
         let fetchDescriptor = FetchDescriptor<Event>(
-            predicate: #Predicate { $0.eventId == scanList.eventId }
+            predicate: #Predicate { $0.eventId == eventId }
         )
         
         guard let event = try? modelContext.fetch(fetchDescriptor).first else {
@@ -588,7 +591,6 @@ struct EventScanListView: View {
                     markListAsCompleted()
                     // Naviguer vers la prochaine liste
                     nextScanList = next
-                    navigateToNextList = true
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.right.circle.fill")
@@ -621,14 +623,6 @@ struct EventScanListView: View {
                     .cornerRadius(12)
                     .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
                 }
-                .background(
-                    NavigationLink(
-                        destination: nextScanList.map { EventScanListView(scanList: $0) },
-                        isActive: $navigateToNextList,
-                        label: { EmptyView() }
-                    )
-                    .hidden()
-                )
             } else {
                 // Pas de liste suivante, proposer de changer d'événement
                 Button(action: {

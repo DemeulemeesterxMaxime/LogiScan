@@ -39,10 +39,7 @@ struct InventoryListView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(scannedAssets, id: \.assetId) { asset in
-                                NavigationLink(destination: AssetDetailView(asset: asset)) {
-                                    assetRow(asset)
-                                }
-                                .buttonStyle(.plain)
+                                assetRow(asset)
                             }
                         }
                         .padding()
@@ -146,11 +143,11 @@ struct InventoryListView: View {
             // Icône
             ZStack {
                 Circle()
-                    .fill(asset.status.color.opacity(0.2))
+                    .fill(asset.status.swiftUIColor.opacity(0.2))
                     .frame(width: 44, height: 44)
                 
                 Image(systemName: "cube.box.fill")
-                    .foregroundColor(asset.status.color)
+                    .foregroundColor(asset.status.swiftUIColor)
             }
             
             // Info
@@ -175,8 +172,8 @@ struct InventoryListView: View {
                 .font(.caption)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(asset.status.color.opacity(0.15))
-                .foregroundColor(asset.status.color)
+                .background(asset.status.swiftUIColor.opacity(0.15))
+                .foregroundColor(asset.status.swiftUIColor)
                 .clipShape(Capsule())
         }
         .padding()
@@ -243,19 +240,6 @@ struct InventoryListView: View {
         csvData = service.exportToCSV(session: session, assets: scannedAssets)
         showShareSheet = true
     }
-}
-
-// MARK: - Share Sheet
-
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        return controller
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - Preview
