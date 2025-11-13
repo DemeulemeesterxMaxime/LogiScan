@@ -96,11 +96,13 @@ class QuoteValidationService: ObservableObject {
         }
         
         // Vérifier les conflits avec d'autres événements
+        let currentEventId = event.eventId
+        let cancelledStatus = EventStatus.cancelled.rawValue
         let eventsDescriptor = FetchDescriptor<Event>(
-            predicate: #Predicate { event in
-                event.assignedTruckId == truckId &&
-                event.eventId != event.eventId &&
-                event.status != .cancelled
+            predicate: #Predicate { evt in
+                evt.assignedTruckId == truckId &&
+                evt.eventId != currentEventId &&
+                evt.status.rawValue != cancelledStatus
             }
         )
         
@@ -116,7 +118,7 @@ class QuoteValidationService: ObservableObject {
             ) {
                 print("❌ [QuoteValidation] Conflit de camion avec l'événement '\(otherEvent.name)'")
                 throw QuoteValidationError.truckUnavailable(
-                    truckName: truck.name,
+                    truckName: truck.name ?? truck.licensePlate,
                     conflictingEvent: otherEvent.name
                 )
             }
@@ -204,8 +206,9 @@ class QuoteValidationService: ObservableObject {
         }
         
         // Récupérer toutes les réservations de l'événement
+        let eventId = event.eventId
         let reservationsDescriptor = FetchDescriptor<AssetReservation>(
-            predicate: #Predicate { $0.eventId == event.eventId }
+            predicate: #Predicate { $0.eventId == eventId }
         )
         
         let reservations = try modelContext.fetch(reservationsDescriptor)
@@ -238,15 +241,16 @@ class QuoteValidationService: ObservableObject {
         }
         
         // Récupérer toutes les réservations de l'événement
+        let eventId = event.eventId
         let reservationsDescriptor = FetchDescriptor<AssetReservation>(
-            predicate: #Predicate { $0.eventId == event.eventId }
+            predicate: #Predicate { $0.eventId == eventId }
         )
         
         let reservations = try modelContext.fetch(reservationsDescriptor)
         
         // Marquer toutes les réservations comme terminées
         for reservation in reservations {
-            reservation.status = .completed
+            reservation.status = .returned
             print("   🔓 Asset '\(reservation.assetId)' libéré")
         }
         

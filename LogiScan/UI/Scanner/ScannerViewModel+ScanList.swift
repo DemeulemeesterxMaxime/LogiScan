@@ -68,11 +68,13 @@ extension ScannerViewModel {
         print("📦 [Scanner] Traitement scan pour liste '\(scanList.displayName)'")
         
         // 1. Vérifier que l'asset est attendu dans cette liste
+        let scanListId = scanList.scanListId
+        let assetSku = asset.sku
         let prepItemDescriptor = FetchDescriptor<PreparationListItem>(
             predicate: #Predicate { item in
-                item.scanList?.scanListId == scanList.scanListId &&
-                item.sku == asset.sku &&
-                !item.scanned
+                item.scanListId == scanListId &&
+                item.sku == assetSku &&
+                item.quantityScanned < item.quantityRequired
             }
         )
         
@@ -88,9 +90,7 @@ extension ScannerViewModel {
         }
         
         // 2. Marquer l'item comme scanné
-        prepItem.scanned = true
-        prepItem.scannedAt = Date()
-        prepItem.scannedAssetId = asset.assetId
+        prepItem.addScannedAsset(asset.assetId)
         
         // 3. Mettre à jour le compteur de la liste
         scanList.scannedItems += 1
@@ -167,10 +167,11 @@ extension ScannerViewModel {
         modelContext: ModelContext
     ) -> PreparationListItem? {
         
+        let scanListId = scanList.scanListId
         let descriptor = FetchDescriptor<PreparationListItem>(
             predicate: #Predicate { item in
-                item.scanList?.scanListId == scanList.scanListId &&
-                !item.scanned
+                item.scanListId == scanListId &&
+                item.quantityScanned < item.quantityRequired
             },
             sortBy: [SortDescriptor(\.category), SortDescriptor(\.name)]
         )
@@ -207,7 +208,7 @@ extension ScannerViewModel {
         case .eventToTruck:
             return .reload
         case .truckToStock:
-            return .return
+            return .returnWarehouse
         }
     }
     

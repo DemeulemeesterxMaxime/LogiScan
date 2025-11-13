@@ -66,10 +66,11 @@ class ScanListGenerationService: ObservableObject {
             for quoteItem in quoteItems {
                 for _ in 0..<quoteItem.quantity {
                     let prepItem = PreparationListItem(
-                        scanList: scanList,
+                        scanListId: scanList.scanListId,
                         sku: quoteItem.sku,
                         name: quoteItem.name,
-                        category: quoteItem.category
+                        category: quoteItem.category,
+                        quantityRequired: 1
                     )
                     modelContext.insert(prepItem)
                 }
@@ -185,8 +186,9 @@ class ScanListGenerationService: ObservableObject {
         scanList.updatedAt = Date()
         
         // Trouver la tâche associée (si existe)
+        let scanListId = scanList.scanListId
         let descriptor = FetchDescriptor<TodoTask>(
-            predicate: #Predicate { $0.scanListId == scanList.scanListId }
+            predicate: #Predicate { $0.scanListId == scanListId }
         )
         
         if let task = try modelContext.fetch(descriptor).first {

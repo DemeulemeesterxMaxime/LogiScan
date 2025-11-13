@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftUI
+import SwiftData
 import AVFoundation
 
 @MainActor
@@ -32,7 +33,6 @@ class ScannerViewModel: ObservableObject {
     // MARK: - Context
     @Published var selectedTruck: Truck?
     @Published var selectedEvent: Event?
-    @Published var currentActiveScanList: ScanList?  // Liste de scan active en mode événementiel
     
     // MARK: - Statistics
     @Published var sessionStats: SessionStats = SessionStats()

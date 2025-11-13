@@ -282,7 +282,7 @@ class ScanListService: ObservableObject {
         
         // Vérifier que l'asset n'est pas déjà scanné
         if scanListItem.scannedAssets.contains(assetId) {
-            throw ScanListError.assetAlreadyScanned
+            throw ScanListError.assetAlreadyScanned(assetName: asset.name)
         }
         
         // Vérifier qu'on ne dépasse pas la quantité requise
@@ -423,8 +423,6 @@ class ScanListService: ObservableObject {
         scanList.updatedAt = Date()
         
         // 🔧 Mettre à jour le statut de la liste
-        let oldStatus = scanList.status
-        
         if scanList.scannedItems == 0 {
             scanList.status = .pending
             scanList.completedAt = nil
