@@ -316,7 +316,7 @@ struct CreateTaskView: View {
                     TextField("Lieu", text: $location)
                         .textInputAutocapitalization(.sentences)
                 } header: {
-                    Text("Planification")
+                    Text("planning".localized())
                 }
                 
                 // Section Notifications

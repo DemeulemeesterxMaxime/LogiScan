@@ -220,7 +220,7 @@ struct UnifiedTagPickerView: View {
 
     private var suggestedTagsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Tags suggérés")
+            Text("suggested_tags".localized())
                 .font(.headline)
                 .padding(.horizontal)
                 .padding(.top)

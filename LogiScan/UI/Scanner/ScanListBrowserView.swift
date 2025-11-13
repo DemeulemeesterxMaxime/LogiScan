@@ -494,7 +494,7 @@ struct ScanListMiniCard: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(scanList.isComplete ? .green : .orange)
                         
-                        Text("articles")
+                        Text("items_count".localized())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         

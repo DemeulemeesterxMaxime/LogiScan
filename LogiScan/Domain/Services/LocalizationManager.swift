@@ -1,0 +1,1467 @@
+//
+//  LocalizationManager.swift
+//  LogiScan
+//
+//  Created by GitHub Copilot on 13/11/2025.
+//
+
+import SwiftUI
+import Combine
+
+/// Gestionnaire centralisé pour la localisation de l'application
+class LocalizationManager: ObservableObject {
+    static let shared = LocalizationManager()
+    
+    @Published var currentLanguage: AppLanguage {
+        didSet {
+            saveLanguage()
+        }
+    }
+    
+    private let languageKey = "app_language"
+    
+    private init() {
+        // Charger la langue sauvegardée ou utiliser français par défaut
+        if let savedLanguage = UserDefaults.standard.string(forKey: languageKey),
+           let language = AppLanguage(rawValue: savedLanguage) {
+            self.currentLanguage = language
+        } else {
+            self.currentLanguage = .french
+        }
+    }
+    
+    /// Change la langue de l'application
+    func setLanguage(_ language: AppLanguage) {
+        currentLanguage = language
+    }
+    
+    /// Synchronise la langue avec celle de l'entreprise
+    func syncWithCompanyLanguage(_ companyLanguage: String) {
+        if let language = AppLanguage(rawValue: companyLanguage) {
+            setLanguage(language)
+        }
+    }
+    
+    /// Sauvegarde la langue dans UserDefaults
+    private func saveLanguage() {
+        UserDefaults.standard.set(currentLanguage.rawValue, forKey: languageKey)
+    }
+    
+    /// Récupère une traduction pour une clé donnée
+    func localize(_ key: String) -> String {
+        return Translations.translate(key, language: currentLanguage)
+    }
+}
+
+/// Extension pour faciliter l'accès aux traductions dans les vues
+extension String {
+    func localized() -> String {
+        return LocalizationManager.shared.localize(self)
+    }
+}
+
+/// Structure contenant toutes les traductions de l'application
+struct Translations {
+    static func translate(_ key: String, language: AppLanguage) -> String {
+        let translations: [String: String]
+        
+        switch language {
+        case .english:
+            translations = englishTranslations
+        case .mandarin:
+            translations = mandarinTranslations
+        case .hindi:
+            translations = hindiTranslations
+        case .spanish:
+            translations = spanishTranslations
+        case .french:
+            translations = frenchTranslations
+        case .arabic:
+            translations = arabicTranslations
+        case .russian:
+            translations = russianTranslations
+        case .portuguese:
+            translations = portugueseTranslations
+        case .bengali:
+            translations = bengaliTranslations
+        case .german:
+            translations = germanTranslations
+        }
+        
+        return translations[key] ?? key
+    }
+    
+    // MARK: - Traductions Françaises
+    private static let frenchTranslations: [String: String] = [
+        // Général
+        "cancel": "Annuler",
+        "save": "Enregistrer",
+        "saving": "Enregistrement...",
+        "delete": "Supprimer",
+        "edit": "Modifier",
+        "close": "Fermer",
+        "confirm": "Confirmer",
+        "back": "Retour",
+        "next": "Suivant",
+        "previous": "Précédent",
+        "search": "Rechercher",
+        "filter": "Filtrer",
+        "all": "Tous",
+        "none": "Aucun",
+        "yes": "Oui",
+        "no": "Non",
+        "loading": "Chargement...",
+        "error": "Erreur",
+        "success": "Succès",
+        "warning": "Attention",
+        "ok": "OK",
+        "done": "Terminé",
+        "add": "Ajouter",
+        "remove": "Retirer",
+        "update": "Mettre à jour",
+        "refresh": "Actualiser",
+        "send": "Envoyer",
+        "copy": "Copier",
+        "share": "Partager",
+        "download": "Télécharger",
+        "upload": "Téléverser",
+        "preview": "Aperçu",
+        "details": "Détails",
+        "info": "Informations",
+        "help": "Aide",
+        "about": "À propos",
+        "version": "Version",
+        "copyright": "Droits d'auteur",
+        "required": "Requis",
+        "optional": "Optionnel",
+        "name": "Nom",
+        "description": "Description",
+        "date": "Date",
+        "time": "Heure",
+        "status": "Statut",
+        "type": "Type",
+        "priority": "Priorité",
+        "owner": "Propriétaire",
+        "created": "Créé",
+        "updated": "Mis à jour",
+        "total": "Total",
+        "count": "Nombre",
+        "items": "Articles",
+        "actions": "Actions",
+        
+        // Language change
+        "language_changed": "Langue modifiée",
+        "restart_required": "Veuillez relancer l'application pour appliquer les changements de langue.",
+        "restart_now": "Relancer maintenant",
+        "restart_later": "Plus tard",
+        
+        // Auth
+        "login": "Connexion",
+        "signup": "Inscription",
+        "logout": "Déconnexion",
+        "sign_in": "Se connecter",
+        "sign_up": "S'inscrire",
+        "sign_out": "Se déconnecter",
+        "email": "Email",
+        "password": "Mot de passe",
+        "confirm_password": "Confirmer le mot de passe",
+        "forgot_password": "Mot de passe oublié ?",
+        "reset_password": "Réinitialiser le mot de passe",
+        "reset_password_instructions": "Entrez votre email pour recevoir un lien de réinitialisation",
+        "send_reset_link": "Envoyer le lien",
+        "create_account": "Créer un compte",
+        "already_have_account": "Vous avez déjà un compte ?",
+        "dont_have_account": "Vous n'avez pas de compte ?",
+        "full_name": "Nom complet",
+        "choose_account_type": "Choisissez votre type de compte",
+        "your_information": "Vos informations",
+        "enter_personal_info": "Entrez vos informations personnelles",
+        "your_company": "Votre entreprise",
+        "create_your_company": "Créez votre entreprise",
+        "you_are_owner": "Vous êtes propriétaire",
+        "you_are_employee": "Vous êtes employé",
+        "ask_employer_code": "Demandez le code d'invitation à votre employeur",
+        "min_6_characters": "Au moins 6 caractères",
+        "passwords_match": "Les mots de passe correspondent",
+        "add_logo": "Ajouter un logo",
+        "change_logo": "Changer le logo",
+        
+        // Entreprise
+        "company": "Entreprise",
+        "my_company": "Mon Entreprise",
+        "company_name": "Nom de l'entreprise",
+        "company_email": "Email de l'entreprise",
+        "company_phone": "Téléphone",
+        "company_address": "Adresse",
+        "company_siret": "SIRET",
+        "company_language": "Langue de l'entreprise",
+        "create_company": "Créer une entreprise",
+        "join_company": "Rejoindre une entreprise",
+        "invitation_code": "Code d'invitation",
+        "enter_invitation_code": "Entrez le code d'invitation",
+        "company_details": "Détails de l'entreprise",
+        "company_info": "Informations de l'entreprise",
+        
+        // Rôles
+        "role": "Rôle",
+        "admin": "Admin",
+        "manager": "Manager",
+        "employee": "Employé",
+        "limited_employee": "Employé limité",
+        "administrator": "Administrateur",
+        "permissions": "Permissions",
+        
+        // Dashboard
+        "dashboard": "Tableau de bord",
+        "statistics": "Statistiques",
+        "recent_activity": "Activité récente",
+        "quick_actions": "Actions rapides",
+        "overview": "Aperçu",
+        "reports": "Rapports",
+        "analytics": "Analyses",
+        "welcome": "Bienvenue",
+        "hello": "Bonjour",
+        
+        // Stock
+        "stock": "Stock",
+        "inventory": "Inventaire",
+        "add_item": "Ajouter un article",
+        "edit_item": "Modifier l'article",
+        "delete_item": "Supprimer l'article",
+        "item_name": "Nom de l'article",
+        "quantity": "Quantité",
+        "location": "Emplacement",
+        "category": "Catégorie",
+        "sku": "SKU",
+        "barcode": "Code-barres",
+        "price": "Prix",
+        "unit": "Unité",
+        "supplier": "Fournisseur",
+        "warehouse": "Entrepôt",
+        "stock_level": "Niveau de stock",
+        "low_stock": "Stock bas",
+        "out_of_stock": "Rupture de stock",
+        "in_stock": "En stock",
+        "reorder": "Réapprovisionner",
+        "reorder_level": "Seuil de réapprovisionnement",
+        
+        // Scanner
+        "scanner": "Scanner",
+        "scan": "Scanner",
+        "scan_barcode": "Scanner un code-barres",
+        "scan_qr_code": "Scanner un QR code",
+        "camera_permission": "Permission caméra",
+        "camera_permission_message": "L'accès à la caméra est nécessaire pour scanner",
+        "scan_result": "Résultat du scan",
+        "scan_again": "Scanner à nouveau",
+        "scan_history": "Historique des scans",
+        
+        // Événements
+        "events": "Événements",
+        "event": "Événement",
+        "new_event": "Nouvel événement",
+        "event_name": "Nom de l'événement",
+        "event_date": "Date",
+        "event_location": "Lieu",
+        "event_type": "Type d'événement",
+        "start_date": "Date de début",
+        "end_date": "Date de fin",
+        "all_day": "Toute la journée",
+        "organizer": "Organisateur",
+        "participants": "Participants",
+        "notes": "Notes",
+        
+        // Camions
+        "trucks": "Camions",
+        "truck": "Camion",
+        "add_truck": "Ajouter un camion",
+        "truck_name": "Nom du camion",
+        "truck_plate": "Plaque d'immatriculation",
+        "truck_status": "Statut",
+        "license_plate": "Plaque d'immatriculation",
+        "driver": "Chauffeur",
+        "capacity": "Capacité",
+        "model": "Modèle",
+        "brand": "Marque",
+        "year": "Année",
+        
+        // Tâches
+        "tasks": "Tâches",
+        "task": "Tâche",
+        "new_task": "Nouvelle tâche",
+        "task_title": "Titre de la tâche",
+        "task_description": "Description",
+        "task_priority": "Priorité",
+        "task_status": "Statut",
+        "due_date": "Date d'échéance",
+        "assigned_to": "Assigné à",
+        "created_by": "Créé par",
+        "high_priority": "Priorité haute",
+        "medium_priority": "Priorité moyenne",
+        "low_priority": "Priorité basse",
+        "urgent": "Urgent",
+        
+        // Paramètres
+        "settings": "Paramètres",
+        "profile": "Profil",
+        "my_profile": "Mon Profil",
+        "account_settings": "Paramètres du compte",
+        "app_settings": "Paramètres de l'app",
+        "language": "Langue",
+        "theme": "Thème",
+        "notifications": "Notifications",
+        "privacy": "Confidentialité",
+        "security": "Sécurité",
+        "preferences": "Préférences",
+        "general": "Général",
+        "advanced": "Avancé",
+        
+        // Membres
+        "members": "Membres",
+        "member": "Membre",
+        "add_member": "Ajouter un membre",
+        "remove_member": "Retirer le membre",
+        "member_details": "Détails du membre",
+        "team": "Équipe",
+        "users": "Utilisateurs",
+        "user": "Utilisateur",
+        
+        // Codes d'invitation
+        "invitation_codes": "Codes d'invitation",
+        "generate_code": "Générer un code",
+        "new_code": "Nouveau code",
+        "active": "Actif",
+        "inactive": "Inactif",
+        "activate": "Activer",
+        "deactivate": "Désactiver",
+        "code_uses": "utilisations",
+        "max_uses": "Utilisations max",
+        "validity": "Validité",
+        "expires_on": "Expire le",
+        "never_expires": "N'expire jamais",
+        
+        // Gestion des données
+        "data_management": "Gestion des données",
+        "delete_all_trucks": "Supprimer tous les camions",
+        "delete_all_stock": "Supprimer tout le stock",
+        "delete_all_events": "Supprimer tous les événements",
+        "delete_all_data": "Supprimer toutes les données",
+        "export_data": "Exporter les données",
+        "import_data": "Importer les données",
+        "backup": "Sauvegarde",
+        "restore": "Restaurer",
+        
+        // Messages de confirmation
+        "logout_confirm": "Voulez-vous vraiment vous déconnecter ?",
+        "delete_confirm": "Cette action est irréversible. Toutes les données seront supprimées.",
+        "save_changes": "Enregistrer les modifications",
+        "discard_changes": "Annuler les modifications",
+        "unsaved_changes": "Modifications non enregistrées",
+        "are_you_sure": "Êtes-vous sûr ?",
+        "cannot_undo": "Cette action ne peut pas être annulée",
+        
+        // Statuts
+        "available": "Disponible",
+        "unavailable": "Indisponible",
+        "in_use": "En cours d'utilisation",
+        "maintenance": "Maintenance",
+        "completed": "Terminé",
+        "pending": "En attente",
+        "in_progress": "En cours",
+        "cancelled": "Annulé",
+        "delayed": "Retardé",
+        "on_time": "À l'heure",
+        "late": "En retard",
+        "early": "En avance",
+        
+        // Filtres
+        "filter_by_category": "Filtrer par catégorie",
+        "filter_by_status": "Filtrer par statut",
+        "filter_by_location": "Filtrer par emplacement",
+        "filter_by_date": "Filtrer par date",
+        "filter_by_user": "Filtrer par utilisateur",
+        "filter_by_priority": "Filtrer par priorité",
+        "sort_by": "Trier par",
+        "sort_by_name": "Trier par nom",
+        "sort_by_date": "Trier par date",
+        "sort_by_quantity": "Trier par quantité",
+        "sort_by_priority": "Trier par priorité",
+        "sort_ascending": "Ordre croissant",
+        "sort_descending": "Ordre décroissant",
+        "show_all": "Tout afficher",
+        "show_active": "Afficher actifs",
+        "show_archived": "Afficher archivés",
+        
+        // Dates et temps
+        "today": "Aujourd'hui",
+        "yesterday": "Hier",
+        "tomorrow": "Demain",
+        "this_week": "Cette semaine",
+        "last_week": "Semaine dernière",
+        "next_week": "Semaine prochaine",
+        "this_month": "Ce mois",
+        "last_month": "Mois dernier",
+        "next_month": "Mois prochain",
+        "this_year": "Cette année",
+        "last_year": "Année dernière",
+        "days": "jours",
+        "weeks": "semaines",
+        "months": "mois",
+        "years": "années",
+        "ago": "il y a",
+        "from_now": "d'ici",
+        
+        // Messages d'erreur
+        "error_occurred": "Une erreur s'est produite",
+        "try_again": "Réessayer",
+        "something_went_wrong": "Quelque chose s'est mal passé",
+        "check_connection": "Vérifiez votre connexion",
+        "no_internet": "Pas de connexion Internet",
+        "invalid_email": "Email invalide",
+        "invalid_password": "Mot de passe invalide",
+        "passwords_dont_match": "Les mots de passe ne correspondent pas",
+        "field_required": "Ce champ est requis",
+        "invalid_format": "Format invalide",
+        
+        // Messages de succès
+        "saved_successfully": "Enregistré avec succès",
+        "deleted_successfully": "Supprimé avec succès",
+        "updated_successfully": "Mis à jour avec succès",
+        "created_successfully": "Créé avec succès",
+        "sent_successfully": "Envoyé avec succès",
+        "operation_successful": "Opération réussie",
+        
+        // Autres
+        "view": "Voir",
+        "open": "Ouvrir",
+        "select": "Sélectionner",
+        "selected": "Sélectionné",
+        "unselect": "Désélectionner",
+        "select_all": "Tout sélectionner",
+        "clear_all": "Tout effacer",
+        "apply": "Appliquer",
+        "reset": "Réinitialiser",
+        "clear": "Effacer",
+        "more": "Plus",
+        "less": "Moins",
+        "show_more": "Afficher plus",
+        "show_less": "Afficher moins",
+        "expand": "Développer",
+        "collapse": "Réduire",
+        "full_screen": "Plein écran",
+        "exit_full_screen": "Quitter plein écran",
+        "print": "Imprimer",
+        "export": "Exporter",
+        "import": "Importer",
+        
+        // LoginView spécifique
+        "app_tagline": "Gestion d'inventaire intelligente",
+        "no_account_yet": "Pas encore de compte ?",
+        
+        // DashboardView spécifique
+        "metrics": "Métriques",
+        "synchronization": "Synchronisation...",
+        "syncing": "Synchronisation en cours...",
+        
+        // ProfileView spécifique
+        "my_tasks": "Mes tâches",
+        "my_daily_tasks": "Mes tâches du jour",
+        "available_tasks": "Tâches disponibles",
+        "task_count": "tâches",
+        "delete_account": "Supprimer le compte",
+        "reauthenticate": "Réauthentification requise",
+        "enter_credentials": "Entrez vos identifiants",
+        "manage_tasks": "Gestion des Tâches",
+        "create_task": "Créer une tâche",
+        "manage_all_tasks": "Gérer toutes les tâches",
+        "assign_tasks": "Attribuer des tâches",
+        "task_management_description": "Créez et attribuez des tâches aux membres de votre équipe.",
+        "my_tasks_description": "Gérez vos tâches personnelles et prenez des tâches en libre-service.",
+        "manage_my_company": "Gérer mon entreprise",
+        "full_administration": "Administration complète",
+        "administration": "Administration",
+        "delete_my_account": "Supprimer mon compte",
+        
+        // Stock spécifique
+        "add_stock_item": "Ajouter un article",
+        "stock_list": "Liste du stock",
+        "no_items": "Aucun article",
+        "no_items_in_stock": "Aucun article en stock",
+        "add_first_item": "Commencez par ajouter votre premier article",
+        "configure_new_item": "Configurer un nouvel article",
+        "try_modify_filters": "Essayez de modifier vos filtres ou votre recherche",
+        "reset_filters": "Réinitialiser les filtres",
+        "print_qr_codes": "Imprimer les QR codes",
+        "generate_print_qr": "Générez et imprimez des QR codes pour vos articles",
+        "equipment_type": "Type de matériel",
+        "categories": "Catégories",
+        "tags": "Étiquettes",
+        "only_used_tags_shown": "Seules les étiquettes utilisées sont affichées",
+        "filters": "Filtres",
+        "select_items_print": "Sélectionnez les articles et références à imprimer",
+        "export_csv": "Exporter en CSV",
+        "export_inventory_file": "Exportez votre inventaire dans un fichier",
+        "sync_now": "Synchroniser maintenant",
+        "last_sync": "Dernière synchro",
+        "never_synced": "Jamais synchronisé",
+        "available_actions": "Actions disponibles",
+        "main_item": "Article principal",
+        "qr_print_title": "Impression QR codes",
+        "select_items_refs_qr": "Sélectionnez les articles et leurs références individuelles dont vous souhaitez imprimer les QR codes",
+        
+        // Events spécifique
+        "event_details": "Détails de l'événement",
+        "add_event": "Ajouter un événement",
+        
+        // Trucks spécifique
+        "truck_list": "Liste des camions",
+        "add_new_truck": "Ajouter un camion",
+        
+        // Scanner spécifique
+        "scan_mode": "Mode de scan",
+        "free_scan": "Scan libre",
+        "event_scan": "Scan événement",
+        "inventory_scan": "Scan inventaire",
+        "scan_lists": "Listes de scan",
+        "scan_asset": "Scanner un asset",
+        "scan_success": "Scan réussi",
+        "scan_error": "Erreur de scan",
+        "camera_access": "Accès caméra",
+        "camera_access_required": "L'accès à la caméra est requis pour scanner",
+        "open_settings": "Ouvrir les paramètres",
+        "scan_item": "Scanner un article",
+        "scanning": "Scan en cours...",
+        "tap_to_scan": "Appuyez pour scanner",
+        "unknown_code": "Code inconnu",
+        
+        // Events additionnelles
+        "no_events": "Aucun événement",
+        "create_first_event": "Créez votre premier événement",
+        "event_title": "Titre de l'événement",
+        "client_name": "Nom du client",
+        "delivery_date": "Date de livraison",
+        "return_date": "Date de retour",
+        "quote": "Devis",
+        "cart": "Panier",
+        "finalize_quote": "Finaliser le devis",
+        "add_to_cart": "Ajouter au panier",
+        "event_created": "Événement créé",
+        "quote_version": "Version du devis",
+        "history": "Historique",
+        
+        // Trucks additionnelles
+        "no_trucks": "Aucun camion",
+        "add_first_truck": "Ajoutez votre premier camion",
+        "truck_details": "Détails du camion",
+        "registration": "Immatriculation",
+        "truck_model": "Modèle",
+        "truck_brand": "Marque",
+        "truck_year": "Année",
+        "truck_capacity": "Capacité",
+        "truck_driver": "Chauffeur",
+        "truck_available": "Disponible",
+        "truck_in_use": "En cours d'utilisation",
+        "truck_maintenance": "En maintenance",
+        "volume": "Volume",
+        
+        // Tasks additionnelles
+        "task_list": "Liste des tâches",
+        "create_new_task": "Créer une nouvelle tâche",
+        "no_tasks": "Aucune tâche",
+        "task_details": "Détails de la tâche",
+        "task_assigned_to": "Assignée à",
+        "task_created_by": "Créée par",
+        "task_due_date": "Date d'échéance",
+        "task_completed": "Tâche terminée",
+        "mark_complete": "Marquer comme terminée",
+        "mark_incomplete": "Marquer comme non terminée",
+        "unassigned": "Non assigné",
+        "assign_to_me": "M'assigner",
+        "reassign": "Réassigner",
+        "task_suggestions": "Suggestions de tâches",
+        
+        // Admin additionnelles
+        "admin_dashboard": "Tableau de bord admin",
+        "user_management": "Gestion des utilisateurs",
+        "company_management": "Gestion de l'entreprise",
+        "system_settings": "Paramètres système",
+        "data_export": "Export des données",
+        "data_import": "Import des données",
+        "backup_restore": "Sauvegarde & Restauration",
+        "logs": "Journaux",
+        "permissions_management": "Gestion des permissions",
+        
+        // Actions communes
+        "duplicate": "Dupliquer",
+        "archive": "Archiver",
+        "unarchive": "Désarchiver",
+        "move": "Déplacer",
+        "rename": "Renommer",
+        "properties": "Propriétés",
+        "visibility": "Visibilité",
+        "public": "Public",
+        "private": "Privé",
+        "shared": "Partagé",
+        
+        // Dates
+        "select_date": "Sélectionner une date",
+        "select_time": "Sélectionner une heure",
+        "date_range": "Plage de dates",
+        "start_time": "Heure de début",
+        "end_time": "Heure de fin",
+        "duration": "Durée",
+        "hour": "Heure",
+        "minute": "Minute",
+        "second": "Seconde",
+        
+        // Validation
+        "min_length": "Longueur minimale",
+        "max_length": "Longueur maximale",
+        "must_be_positive": "Doit être positif",
+        "must_be_number": "Doit être un nombre",
+        
+        // Succès
+        "saved": "Enregistré",
+        "deleted": "Supprimé",
+        "sent": "Envoyé",
+        "copied": "Copié",
+        "shared_successfully": "Partagé avec succès",
+        
+        // Erreurs
+        "error_loading": "Erreur de chargement",
+        "error_saving": "Erreur d'enregistrement",
+        "error_deleting": "Erreur de suppression",
+        "network_error": "Erreur réseau",
+        "permission_denied": "Permission refusée",
+        "not_found": "Non trouvé",
+        "already_exists": "Existe déjà",
+        
+        // Confirmations
+        "delete_confirmation": "Êtes-vous sûr de vouloir supprimer cet élément ?",
+        "archive_confirmation": "Êtes-vous sûr de vouloir archiver cet élément ?",
+        "discard_changes_confirmation": "Voulez-vous abandonner les modifications ?",
+        
+        // États vides
+        "no_data": "Aucune donnée",
+        "empty_list": "Liste vide",
+        "no_search_results": "Aucun résultat de recherche",
+        "start_by_adding": "Commencez par ajouter",
+        
+        // Général
+        "empty_state": "Aucune donnée disponible",
+        "no_results": "Aucun résultat",
+        "load_more": "Charger plus",
+        
+        // Dashboard clés additionnelles
+        "test_data_created": "Données de test créées",
+        "test_data_message": "Les données de test ont été créées et synchronisées avec Firebase.",
+        "load_test_data": "Charger données test",
+        "loading_data": "Chargement...",
+        "debug_permissions": "Debug permissions",
+        "active_assets": "Assets actifs",
+        "stock_items": "Articles en stock",
+        "total_stock": "Stock total",
+        "movements_today": "Mouvements aujourd'hui",
+        "stock_distribution": "Répartition du stock par catégorie",
+        "no_recent_movements": "Aucun mouvement récent",
+        "asset": "Asset",
+        "new_order": "Nouvel ordre",
+        "view_all": "Voir tout",
+
+        // Clés supplémentaires
+        "add_action": "Ajouter",
+        "additional_info": "Informations complémentaires",
+        "adjustment": "Ajustement",
+        "advice": "Conseil",
+        "agenda": "Agenda",
+        "article": "Article",
+        "assigned_truck": "Camion assigné",
+        "automatic_actions": "Actions automatiques",
+        "available_state": "disponible",
+        "capacity_label": "Capacité",
+        "change": "Changer",
+        "characteristics": "Caractéristiques",
+        "client_info": "Informations client",
+        "cm": "cm",
+        "code_generated": "Code généré",
+        "comments": "Commentaires",
+        "complete_list": "Liste complète",
+        "consumption": "Consommation",
+        "create_movement": "Créer mouvement",
+        "current_context": "Contexte actuel",
+        "current_state": "État actuel",
+        "finish": "Terminer",
+        "flash": "Flash",
+        "format": "Format",
+        "free": "Libre",
+        "from_maintenance": "Depuis maintenance",
+        "identification": "Identification",
+        "individual_references": "Références individuelles",
+        "items_count": "articles",
+        "kg": "kg",
+        "labels": "Étiquettes",
+        "large_size": "Grande taille",
+        "list": "Liste",
+        "max_volume": "Volume maximum",
+        "max_weight": "Poids maximum",
+        "medium_size": "Taille moyenne",
+        "month": "Mois",
+        "never": "Jamais",
+        "next_item": "Prochain article",
+        "no_comments": "Aucun commentaire",
+        "no_event": "Aucun événement",
+        "no_labels": "Aucune étiquette",
+        "no_movement": "Aucun mouvement",
+        "no_role": "Aucun rôle",
+        "none_feminine": "Aucune",
+        "not_defined": "Non définie",
+        "not_planned": "Non planifiée",
+        "not_started": "Non démarrée",
+        "planning": "Planification",
+        "progression": "Progression",
+        "quote_finalized": "Devis terminé",
+        "recent_movements": "Mouvements récents",
+        "remove_action": "Retirer",
+        "scanned_code": "Code scanné",
+        "small_size": "Petite taille",
+        "specifications": "Spécifications",
+        "substitute_items": "Articles substituables",
+        "suggested_tags": "Tags suggérés",
+        "technical_description": "Description technique",
+        "technical_details": "Détails techniques",
+        "to_maintenance": "Vers maintenance",
+        "unit_value": "Valeur unitaire",
+        "unit_volume": "Volume unitaire",
+        "unit_weight": "Poids unitaire",
+        "week": "Semaine",
+        
+        // Settings - Codes d'invitation
+        "irreversible_actions": "Actions irréversibles. Utilisez avec précaution.",
+        "invitation_information": "Informations",
+        "code_name_optional": "Nom du code (optionnel)",
+        "code_example_team": "Ex: 'Équipe Livraison', 'Nouveaux Stagiaires', etc.",
+        "invitation_code_section": "Code d'invitation",
+        "customize_code": "Personnaliser le code",
+        "custom_code": "Code personnalisé",
+        "code_example_custom": "Ex: 'LIVRAISON-2025', 'TEAM-A', etc.",
+        "code_preview": "Aperçu",
+        "auto_generated_code": "Code généré automatiquement",
+        "role_permissions": "Permissions du rôle",
+        "code_will_give_role": "Ce code donnera le rôle:",
+        "permissions_included": "Permissions incluses:",
+        "code_validity_info": "Le code expirera dans {0} jours et pourra être utilisé {1} fois maximum.",
+        "ensure_unique_code": "⚠️ Assurez-vous que le code personnalisé est unique et facile à partager.",
+        "generating": "Génération...",
+        "generate": "Générer",
+        "validity_days": "Validité: {0} jours",
+        "remove_member_confirm": "Voulez-vous vraiment retirer {0} de votre entreprise ?",
+    ]
+    
+    // MARK: - Traductions Anglaises
+    private static let englishTranslations: [String: String] = [
+        // General
+        "cancel": "Cancel",
+        "save": "Save",
+        "saving": "Saving...",
+        "delete": "Delete",
+        "edit": "Edit",
+        "close": "Close",
+        "confirm": "Confirm",
+        "back": "Back",
+        "next": "Next",
+        "previous": "Previous",
+        "search": "Search",
+        "filter": "Filter",
+        "all": "All",
+        "none": "None",
+        "yes": "Yes",
+        "no": "No",
+        "loading": "Loading...",
+        "error": "Error",
+        "success": "Success",
+        "warning": "Warning",
+        
+        // Language change
+        "language_changed": "Language Changed",
+        "restart_required": "Please restart the application to apply language changes.",
+        "restart_now": "Restart Now",
+        "restart_later": "Later",
+        
+        // Auth
+        "login": "Login",
+        "signup": "Sign Up",
+        "logout": "Logout",
+        "email": "Email",
+        "password": "Password",
+        "confirm_password": "Confirm Password",
+        "forgot_password": "Forgot Password?",
+        "reset_password": "Reset Password",
+        "reset_password_instructions": "Enter your email to receive a reset link",
+        "send_reset_link": "Send Reset Link",
+        "create_account": "Create Account",
+        "already_have_account": "Already have an account?",
+        "dont_have_account": "Don't have an account?",
+        "full_name": "Full Name",
+        "choose_account_type": "Choose your account type",
+        "your_information": "Your Information",
+        "enter_personal_info": "Enter your personal information",
+        "your_company": "Your Company",
+        "create_your_company": "Create your company",
+        
+        // Company
+        "company": "Company",
+        "my_company": "My Company",
+        "company_name": "Company Name",
+        "company_email": "Company Email",
+        "company_phone": "Phone",
+        "company_address": "Address",
+        "company_siret": "SIRET",
+        "company_language": "Company Language",
+        "create_company": "Create My Company",
+        "join_company": "Join a Company",
+        "invitation_code": "Invitation Code",
+        "enter_invitation_code": "Enter invitation code",
+        
+        // Roles
+        "role": "Role",
+        "admin": "Admin",
+        "manager": "Manager",
+        "employee": "Employee",
+        "limited_employee": "Limited Employee",
+        
+        // Dashboard
+        "dashboard": "Dashboard",
+        "statistics": "Statistics",
+        "recent_activity": "Recent Activity",
+        "quick_actions": "Quick Actions",
+        
+        // Stock
+        "stock": "Stock",
+        "inventory": "Inventory",
+        "add_item": "Add Item",
+        "edit_item": "Edit Item",
+        "delete_item": "Delete Item",
+        "item_name": "Item Name",
+        "quantity": "Quantity",
+        "location": "Location",
+        "category": "Category",
+        "sku": "SKU",
+        "barcode": "Barcode",
+        
+        // Scanner
+        "scanner": "Scanner",
+        "scan": "Scan",
+        "scan_barcode": "Scan Barcode",
+        "scan_qr_code": "Scan QR Code",
+        "camera_permission": "Camera Permission",
+        "camera_permission_message": "Camera access is required to scan",
+        
+        // Events
+        "events": "Events",
+        "event": "Event",
+        "new_event": "New Event",
+        "event_name": "Event Name",
+        "event_date": "Date",
+        "event_location": "Location",
+        "event_type": "Event Type",
+        
+        // Trucks
+        "trucks": "Trucks",
+        "truck": "Truck",
+        "add_truck": "Add Truck",
+        "truck_name": "Truck Name",
+        "truck_plate": "License Plate",
+        "truck_status": "Status",
+        
+        // Tasks
+        "tasks": "Tasks",
+        "task": "Task",
+        "new_task": "New Task",
+        "task_title": "Task Title",
+        "task_description": "Description",
+        "task_priority": "Priority",
+        "task_status": "Status",
+        "due_date": "Due Date",
+        
+        // Settings
+        "settings": "Settings",
+        "profile": "My Profile",
+        "my_profile": "My Profile",
+        "account_settings": "Account Settings",
+        "app_settings": "App Settings",
+        "language": "Language",
+        "theme": "Theme",
+        "notifications": "Notifications",
+        "privacy": "Privacy",
+        
+        // Members
+        "members": "Members",
+        "member": "Member",
+        "add_member": "Add Member",
+        "remove_member": "Remove Member",
+        "member_details": "Member Details",
+        
+        // Invitation Codes
+        "invitation_codes": "Invitation Codes",
+        "generate_code": "Generate Code",
+        "new_code": "New Code",
+        "active": "Active",
+        "inactive": "Inactive",
+        "activate": "Activate",
+        "deactivate": "Deactivate",
+        "code_uses": "uses",
+        
+        // Data Management
+        "data_management": "Data Management",
+        "delete_all_trucks": "Delete All Trucks",
+        "delete_all_stock": "Delete All Stock",
+        "delete_all_events": "Delete All Events",
+        "delete_all_data": "Delete All Data",
+        
+        // Confirmation Messages
+        "logout_confirm": "Do you really want to log out?",
+        "delete_confirm": "This action is irreversible. All data will be deleted.",
+        "save_changes": "Save Changes",
+        
+        // Status
+        "available": "Available",
+        "unavailable": "Unavailable",
+        "in_use": "In Use",
+        "maintenance": "Maintenance",
+        "completed": "Completed",
+        "pending": "Pending",
+        "in_progress": "In Progress",
+        
+        // Filters
+        "filter_by_category": "Filter by Category",
+        "filter_by_status": "Filter by Status",
+        "filter_by_location": "Filter by Location",
+        "filter_by_date": "Filter by Date",
+        "sort_by": "Sort By",
+        "sort_by_name": "Sort by Name",
+        "sort_by_date": "Sort by Date",
+        "sort_by_quantity": "Sort by Quantity",
+        
+        // LoginView specific
+        "app_tagline": "Smart Inventory Management",
+        "no_account_yet": "No account yet?",
+        "sign_in": "Sign In",
+        
+        // DashboardView specific
+        "metrics": "Metrics",
+        "synchronization": "Synchronization...",
+        "syncing": "Syncing...",
+        
+        // ProfileView specific
+        "my_tasks": "My Tasks",
+        "my_daily_tasks": "My Daily Tasks",
+        "available_tasks": "Available Tasks",
+        "task_count": "tasks",
+        "delete_account": "Delete Account",
+        "reauthenticate": "Reauthentication Required",
+        "enter_credentials": "Enter your credentials",
+        "manage_tasks": "Task Management",
+        "create_task": "Create a Task",
+        "manage_all_tasks": "Manage All Tasks",
+        "assign_tasks": "Assign Tasks",
+        "task_management_description": "Create and assign tasks to your team members.",
+        "my_tasks_description": "Manage your personal tasks and take on self-service tasks.",
+        "manage_my_company": "Manage My Company",
+        "full_administration": "Full Administration",
+        "administration": "Administration",
+        "sign_out": "Sign Out",
+        "delete_my_account": "Delete My Account",
+        
+        // Stock specific
+        "add_stock_item": "Add Stock Item",
+        "stock_list": "Stock List",
+        "no_items": "No Items",
+        "no_items_in_stock": "No items in stock",
+        "add_first_item": "Start by adding your first item",
+        "configure_new_item": "Configure a new item",
+        "try_modify_filters": "Try modifying your filters or search",
+        "reset_filters": "Reset Filters",
+        "clear_all": "Clear All",
+        "print_qr_codes": "Print QR Codes",
+        "generate_print_qr": "Generate and print QR codes for your items",
+        "equipment_type": "Equipment Type",
+        "categories": "Categories",
+        "tags": "Tags",
+        "only_used_tags_shown": "Only used tags are shown",
+        "filters": "Filters",
+        "select_items_print": "Select items and references to print",
+        "export_csv": "Export to CSV",
+        "export_inventory_file": "Export your inventory to a file",
+        "sync_now": "Sync Now",
+        "last_sync": "Last Sync",
+        "never_synced": "Never Synced",
+        "available_actions": "Available Actions",
+        "main_item": "Main Item",
+        "qr_print_title": "QR Codes Printing",
+        "select_items_refs_qr": "Select items and their individual references for which you want to print QR codes",
+        
+        // Events specific
+        "event_details": "Event Details",
+        "add_event": "Add Event",
+        
+        // Trucks specific
+        "truck_list": "Truck List",
+        "add_new_truck": "Add New Truck",
+        
+        // Scanner specific
+        "scan_mode": "Scan Mode",
+        "free_scan": "Free Scan",
+        "event_scan": "Event Scan",
+        "inventory_scan": "Inventory Scan",
+        "scan_lists": "Scan Lists",
+        "scan_asset": "Scan Asset",
+        "scan_success": "Scan Successful",
+        "scan_error": "Scan Error",
+        "camera_access": "Camera Access",
+        "camera_access_required": "Camera access is required to scan",
+        "open_settings": "Open Settings",
+        "scan_item": "Scan Item",
+        "scanning": "Scanning...",
+        "tap_to_scan": "Tap to Scan",
+        "scan_result": "Scan Result",
+        "unknown_code": "Unknown Code",
+        
+        // Events additional
+        "no_events": "No Events",
+        "create_first_event": "Create Your First Event",
+        "event_title": "Event Title",
+        "client_name": "Client Name",
+        "delivery_date": "Delivery Date",
+        "return_date": "Return Date",
+        "quote": "Quote",
+        "cart": "Cart",
+        "finalize_quote": "Finalize Quote",
+        "add_to_cart": "Add to Cart",
+        "event_created": "Event Created",
+        "quote_version": "Quote Version",
+        "history": "History",
+        
+        // Trucks additional
+        "no_trucks": "No Trucks",
+        "add_first_truck": "Add Your First Truck",
+        "truck_details": "Truck Details",
+        "registration": "Registration",
+        "truck_model": "Model",
+        "truck_brand": "Brand",
+        "truck_year": "Year",
+        "truck_capacity": "Capacity",
+        "truck_driver": "Driver",
+        "truck_available": "Available",
+        "truck_in_use": "In Use",
+        "truck_maintenance": "Under Maintenance",
+        "volume": "Volume",
+        "capacity": "Capacity",
+        
+        // Tasks additional
+        "task_list": "Task List",
+        "create_new_task": "Create New Task",
+        "no_tasks": "No Tasks",
+        "task_details": "Task Details",
+        "task_assigned_to": "Assigned To",
+        "task_created_by": "Created By",
+        "task_due_date": "Due Date",
+        "task_completed": "Task Completed",
+        "mark_complete": "Mark as Complete",
+        "mark_incomplete": "Mark as Incomplete",
+        "unassigned": "Unassigned",
+        "assign_to_me": "Assign to Me",
+        "reassign": "Reassign",
+        "task_suggestions": "Task Suggestions",
+        
+        // Admin additional
+        "admin_dashboard": "Admin Dashboard",
+        "user_management": "User Management",
+        "company_management": "Company Management",
+        "system_settings": "System Settings",
+        "data_export": "Data Export",
+        "data_import": "Data Import",
+        "backup_restore": "Backup & Restore",
+        "logs": "Logs",
+        "permissions_management": "Permissions Management",
+        
+        // Common actions
+        "duplicate": "Duplicate",
+        "archive": "Archive",
+        "unarchive": "Unarchive",
+        "move": "Move",
+        "rename": "Rename",
+        "properties": "Properties",
+        "visibility": "Visibility",
+        "public": "Public",
+        "private": "Private",
+        "shared": "Shared",
+        
+        // Dates
+        "select_date": "Select Date",
+        "select_time": "Select Time",
+        "date_range": "Date Range",
+        "start_time": "Start Time",
+        "end_time": "End Time",
+        "duration": "Duration",
+        "hour": "Hour",
+        "minute": "Minute",
+        "second": "Second",
+        
+        // Validation
+        "invalid_email": "Invalid Email",
+        "invalid_format": "Invalid Format",
+        "min_length": "Minimum Length",
+        "max_length": "Maximum Length",
+        "must_be_positive": "Must Be Positive",
+        "must_be_number": "Must Be a Number",
+        
+        // Success
+        "saved": "Saved",
+        "deleted": "Deleted",
+        "updated": "Updated",
+        "created": "Created",
+        "sent": "Sent",
+        "copied": "Copied",
+        "shared_successfully": "Shared Successfully",
+        
+        // Errors
+        "error_loading": "Error Loading",
+        "error_saving": "Error Saving",
+        "error_deleting": "Error Deleting",
+        "network_error": "Network Error",
+        "permission_denied": "Permission Denied",
+        "not_found": "Not Found",
+        "already_exists": "Already Exists",
+        
+        // Confirmations
+        "delete_confirmation": "Are you sure you want to delete this item?",
+        "archive_confirmation": "Are you sure you want to archive this item?",
+        "discard_changes_confirmation": "Do you want to discard changes?",
+        
+        // Empty states
+        "no_data": "No Data",
+        "empty_list": "Empty List",
+        "no_search_results": "No Search Results",
+        "start_by_adding": "Start by Adding",
+        
+        // General
+        "empty_state": "No data available",
+        "no_results": "No results",
+        "load_more": "Load More",
+        
+        // Dashboard additional keys
+        "test_data_created": "Test Data Created",
+        "test_data_message": "Test data has been created and synced with Firebase.",
+        "load_test_data": "Load Test Data",
+        "loading_data": "Loading...",
+        "debug_permissions": "Debug Permissions",
+        "active_assets": "Active Assets",
+        "stock_items": "Stock Items",
+        "total_stock": "Total Stock",
+        "movements_today": "Movements Today",
+        "stock_distribution": "Stock Distribution by Category",
+        "no_recent_movements": "No Recent Movements",
+        "asset": "Asset",
+        "new_order": "New Order",
+        "view_all": "View All",
+
+        // Additional keys
+        "add_action": "Add",
+        "additional_info": "Additional Information",
+        "adjustment": "Adjustment",
+        "advice": "Advice",
+        "agenda": "Agenda",
+        "article": "Article",
+        "assigned_truck": "Assigned Truck",
+        "automatic_actions": "Automatic Actions",
+        "available_state": "available",
+        "capacity_label": "Capacity",
+        "change": "Change",
+        "characteristics": "Characteristics",
+        "client_info": "Client Information",
+        "cm": "cm",
+        "code_generated": "Code Generated",
+        "comments": "Comments",
+        "complete_list": "Complete List",
+        "consumption": "Consumption",
+        "create_movement": "Create Movement",
+        "current_context": "Current Context",
+        "current_state": "Current State",
+        "finish": "Finish",
+        "flash": "Flash",
+        "format": "Format",
+        "free": "Free",
+        "from_maintenance": "From Maintenance",
+        "identification": "Identification",
+        "individual_references": "Individual References",
+        "items_count": "items",
+        "kg": "kg",
+        "labels": "Labels",
+        "large_size": "Large Size",
+        "list": "List",
+        "max_volume": "Maximum Volume",
+        "max_weight": "Maximum Weight",
+        "medium_size": "Medium Size",
+        "month": "Month",
+        "never": "Never",
+        "next_item": "Next Item",
+        "no_comments": "No Comments",
+        "no_event": "No Event",
+        "no_labels": "No Labels",
+        "no_movement": "No Movement",
+        "no_role": "No Role",
+        "none_feminine": "None",
+        "not_defined": "Not Defined",
+        "not_planned": "Not Planned",
+        "not_started": "Not Started",
+        "planning": "Planning",
+        "progression": "Progress",
+        "quote_finalized": "Quote Finalized",
+        "recent_movements": "Recent Movements",
+        "remove_action": "Remove",
+        "scanned_code": "Scanned Code",
+        "small_size": "Small Size",
+        "specifications": "Specifications",
+        "substitute_items": "Substitute Items",
+        "suggested_tags": "Suggested Tags",
+        "technical_description": "Technical Description",
+        "technical_details": "Technical Details",
+        "to_maintenance": "To Maintenance",
+        "unit_value": "Unit Value",
+        "unit_volume": "Unit Volume",
+        "unit_weight": "Unit Weight",
+        "week": "Week",
+        
+        // Settings - Invitation Codes
+        "irreversible_actions": "Irreversible actions. Use with caution.",
+        "invitation_information": "Information",
+        "code_name_optional": "Code name (optional)",
+        "code_example_team": "Ex: 'Delivery Team', 'New Interns', etc.",
+        "invitation_code_section": "Invitation Code",
+        "customize_code": "Customize code",
+        "custom_code": "Custom code",
+        "code_example_custom": "Ex: 'DELIVERY-2025', 'TEAM-A', etc.",
+        "code_preview": "Preview",
+        "auto_generated_code": "Auto-generated code",
+        "role_permissions": "Role Permissions",
+        "code_will_give_role": "This code will grant the role:",
+        "permissions_included": "Permissions included:",
+        "code_validity_info": "The code will expire in {0} days and can be used {1} times maximum.",
+        "ensure_unique_code": "⚠️ Make sure the custom code is unique and easy to share.",
+        "generating": "Generating...",
+        "generate": "Generate",
+        "validity_days": "Validity: {0} days",
+        "remove_member_confirm": "Do you really want to remove {0} from your company?",
+    ]
+    
+    // MARK: - Traductions Mandarin (中文)
+    private static let mandarinTranslations: [String: String] = [:]
+    
+    // MARK: - Traductions Hindi (हिन्दी)
+    private static let hindiTranslations: [String: String] = [:]
+    
+    // MARK: - Traductions Bengali (বাংলা)
+    private static let bengaliTranslations: [String: String] = [:]
+    private static let spanishTranslations: [String: String] = [
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "delete": "Eliminar",
+        "edit": "Editar",
+        "close": "Cerrar",
+        "confirm": "Confirmar",
+        "back": "Atrás",
+        "next": "Siguiente",
+        "search": "Buscar",
+        "filter": "Filtrar",
+        "all": "Todos",
+        "loading": "Cargando...",
+        "settings": "Ajustes",
+        "my_profile": "Mi Perfil",
+        "my_company": "Mi Empresa",
+        "logout": "Cerrar Sesión",
+        "logout_confirm": "¿Realmente quieres cerrar sesión?",
+        "language": "Idioma",
+        "members": "Miembros",
+        "role": "Rol",
+        "admin": "Admin",
+        "manager": "Manager",
+        "employee": "Empleado",
+        "dashboard": "Tablero",
+        "stock": "Stock",
+        "events": "Eventos",
+        "trucks": "Camiones",
+        "tasks": "Tareas",
+    ]
+    
+    // MARK: - Traductions Portugaises
+    private static let portugueseTranslations: [String: String] = [
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "delete": "Eliminar",
+        "edit": "Editar",
+        "close": "Fechar",
+        "confirm": "Confirmar",
+        "back": "Voltar",
+        "next": "Próximo",
+        "search": "Pesquisar",
+        "filter": "Filtrar",
+        "all": "Todos",
+        "loading": "Carregando...",
+        "settings": "Configurações",
+        "my_profile": "Meu Perfil",
+        "my_company": "Minha Empresa",
+        "logout": "Sair",
+        "logout_confirm": "Você realmente quer sair?",
+        "language": "Idioma",
+        "members": "Membros",
+        "role": "Função",
+        "admin": "Admin",
+        "manager": "Gerente",
+        "employee": "Funcionário",
+        "dashboard": "Painel",
+        "stock": "Estoque",
+        "events": "Eventos",
+        "trucks": "Caminhões",
+        "tasks": "Tarefas",
+        "scanner": "Scanner",
+        "profile": "Perfil",
+        "company_name": "Nome da Empresa",
+        "company_language": "Idioma da Empresa",
+        "email": "E-mail",
+        "password": "Senha",
+        "full_name": "Nome Completo",
+        "create_account": "Criar Conta",
+        "create_company": "Criar Empresa",
+        "join_company": "Entrar em Empresa",
+        "invitation_code": "Código de Convite",
+    ]
+    
+    // MARK: - Traductions Allemandes
+    private static let germanTranslations: [String: String] = [
+        "cancel": "Abbrechen",
+        "save": "Speichern",
+        "delete": "Löschen",
+        "edit": "Bearbeiten",
+        "close": "Schließen",
+        "confirm": "Bestätigen",
+        "back": "Zurück",
+        "next": "Weiter",
+        "search": "Suchen",
+        "filter": "Filtern",
+        "all": "Alle",
+        "loading": "Laden...",
+        "settings": "Einstellungen",
+        "my_profile": "Mein Profil",
+        "my_company": "Mein Unternehmen",
+        "logout": "Abmelden",
+        "logout_confirm": "Möchten Sie sich wirklich abmelden?",
+        "language": "Sprache",
+        "members": "Mitglieder",
+        "role": "Rolle",
+        "admin": "Admin",
+        "manager": "Manager",
+        "employee": "Mitarbeiter",
+        "dashboard": "Dashboard",
+        "stock": "Lager",
+        "events": "Ereignisse",
+        "trucks": "LKWs",
+        "tasks": "Aufgaben",
+        "scanner": "Scanner",
+        "profile": "Profil",
+        "company_name": "Firmenname",
+        "company_language": "Firmensprache",
+        "email": "E-Mail",
+        "password": "Passwort",
+        "full_name": "Vollständiger Name",
+        "create_account": "Konto erstellen",
+        "create_company": "Firma erstellen",
+        "join_company": "Firma beitreten",
+        "invitation_code": "Einladungscode",
+    ]
+    
+    // MARK: - Traductions Russes
+    private static let russianTranslations: [String: String] = [
+        "cancel": "Отмена",
+        "save": "Сохранить",
+        "delete": "Удалить",
+        "edit": "Редактировать",
+        "close": "Закрыть",
+        "confirm": "Подтвердить",
+        "back": "Назад",
+        "next": "Далее",
+        "search": "Поиск",
+        "filter": "Фильтр",
+        "all": "Все",
+        "loading": "Загрузка...",
+        "settings": "Настройки",
+        "my_profile": "Мой Профиль",
+        "my_company": "Моя Компания",
+        "logout": "Выйти",
+        "logout_confirm": "Вы действительно хотите выйти?",
+        "language": "Язык",
+        "members": "Участники",
+        "role": "Роль",
+        "admin": "Админ",
+        "manager": "Менеджер",
+        "employee": "Сотрудник",
+        "dashboard": "Панель",
+        "stock": "Склад",
+        "events": "События",
+        "trucks": "Грузовики",
+        "tasks": "Задачи",
+        "scanner": "Сканер",
+        "profile": "Профиль",
+        "company_name": "Название компании",
+        "company_language": "Язык компании",
+        "email": "Электронная почта",
+        "password": "Пароль",
+        "full_name": "Полное имя",
+        "create_account": "Создать аккаунт",
+        "create_company": "Создать компанию",
+        "join_company": "Присоединиться к компании",
+        "invitation_code": "Код приглашения",
+    ]
+    
+    // MARK: - Traductions Arabes
+    private static let arabicTranslations: [String: String] = [
+        "cancel": "إلغاء",
+        "save": "حفظ",
+        "delete": "حذف",
+        "edit": "تعديل",
+        "close": "إغلاق",
+        "confirm": "تأكيد",
+        "back": "رجوع",
+        "next": "التالي",
+        "search": "بحث",
+        "filter": "تصفية",
+        "all": "الكل",
+        "loading": "جاري التحميل...",
+        "settings": "الإعدادات",
+        "my_profile": "ملفي الشخصي",
+        "my_company": "شركتي",
+        "logout": "تسجيل الخروج",
+        "logout_confirm": "هل تريد حقاً تسجيل الخروج؟",
+        "language": "اللغة",
+        "members": "الأعضاء",
+        "role": "الدور",
+        "admin": "مدير",
+        "manager": "مدير",
+        "employee": "موظف",
+        "dashboard": "لوحة القيادة",
+        "stock": "المخزون",
+        "events": "الأحداث",
+        "trucks": "الشاحنات",
+        "tasks": "المهام",
+        "scanner": "الماسح",
+        "profile": "الملف الشخصي",
+        "company_name": "اسم الشركة",
+        "company_language": "لغة الشركة",
+        "email": "البريد الإلكتروني",
+        "password": "كلمة المرور",
+        "full_name": "الاسم الكامل",
+        "create_account": "إنشاء حساب",
+        "create_company": "إنشاء شركة",
+        "join_company": "الانضمام إلى شركة",
+        "invitation_code": "رمز الدعوة",
+    ]
+}

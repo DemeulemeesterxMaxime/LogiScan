@@ -175,7 +175,7 @@ struct LocationHistoryView: View {
                         .font(.system(size: 50))
                         .foregroundColor(.gray)
 
-                    Text("Aucun mouvement")
+                    Text("no_movement".localized())
                         .font(.headline)
                         .foregroundColor(.secondary)
 

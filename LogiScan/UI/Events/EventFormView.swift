@@ -11,6 +11,7 @@ import SwiftUI
 struct EventFormView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var localizationManager: LocalizationManager
 
     // États du formulaire
     @State private var eventName = ""
@@ -76,7 +77,7 @@ struct EventFormView: View {
                         VStack(spacing: 12) {
                             ProgressView()
                                 .scaleEffect(1.2)
-                            Text("Enregistrement...")
+                            Text("saving".localized())
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }

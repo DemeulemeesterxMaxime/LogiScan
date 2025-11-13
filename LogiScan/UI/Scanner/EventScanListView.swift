@@ -670,7 +670,7 @@ struct PreparationItemRow: View {
                             Spacer()
                             
                             Button(action: { onUndo(assetId) }) {
-                                Text("Annuler")
+                                Text("cancel".localized())
                                     .font(.caption)
                                     .foregroundColor(.red)
                             }

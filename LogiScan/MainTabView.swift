@@ -11,6 +11,7 @@ import FirebaseFirestore
 
 struct MainTabView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var localizationManager: LocalizationManager
     @State private var permissionService = PermissionService.shared
     @State private var authService = AuthService()
     @State private var userListener: ListenerRegistration?
@@ -69,7 +70,7 @@ struct MainTabView: View {
             StockListView()
                 .tabItem {
                     Image(systemName: "cube.box.fill")
-                    Text("Stock")
+                    Text("stock".localized())
                 }
                 .tag(0)
 
@@ -77,7 +78,7 @@ struct MainTabView: View {
             TrucksListView()
                 .tabItem {
                     Image(systemName: "truck.box.fill")
-                    Text("Camions")
+                    Text("trucks".localized())
                 }
                 .tag(1)
 
@@ -88,7 +89,7 @@ struct MainTabView: View {
             )
                 .tabItem {
                     Image(systemName: "qrcode.viewfinder")
-                    Text("Scanner")
+                    Text("scanner".localized())
                 }
                 .tag(2)
 
@@ -96,7 +97,7 @@ struct MainTabView: View {
             EventsListView()
                 .tabItem {
                     Image(systemName: "calendar.circle.fill")
-                    Text("Événements")
+                    Text("events".localized())
                 }
                 .tag(3)
 
@@ -105,7 +106,7 @@ struct MainTabView: View {
                 AdminDashboardView()
                     .tabItem {
                         Image(systemName: "chart.bar.fill")
-                        Text("Dashboard")
+                        Text("dashboard".localized())
                     }
                     .badge(unreadCount > 0 ? unreadCount : 0)
                     .tag(4)
@@ -113,7 +114,7 @@ struct MainTabView: View {
                 ProfileView()
                     .tabItem {
                         Image(systemName: "person.circle.fill")
-                        Text("Profil")
+                        Text("profile".localized())
                     }
                     .badge(unreadCount > 0 ? unreadCount : 0)
                     .tag(4)

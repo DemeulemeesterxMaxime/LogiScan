@@ -11,6 +11,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var localizationManager: LocalizationManager
     @Query private var stockItems: [StockItem]
     @Query private var movements: [Movement]
     @Query private var assets: [Asset]
@@ -77,7 +78,7 @@ struct DashboardView: View {
             .refreshable {
                 await syncManager.syncFromFirebase(modelContext: modelContext)
             }
-            .navigationTitle("Tableau de bord")
+            .navigationTitle("dashboard".localized())
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -90,7 +91,7 @@ struct DashboardView: View {
             .overlay {
                 if syncManager.isSyncing {
                     VStack {
-                        ProgressView("Synchronisation...")
+                        ProgressView("synchronization".localized())
                             .padding()
                             .background(Color(.systemBackground).opacity(0.9))
                             .cornerRadius(10)
@@ -98,10 +99,10 @@ struct DashboardView: View {
                     }
                 }
             }
-            .alert("Données de test créées", isPresented: $showTestDataSuccess) {
-                Button("OK", role: .cancel) {}
+            .alert("test_data_created".localized(), isPresented: $showTestDataSuccess) {
+                Button("ok".localized(), role: .cancel) {}
             } message: {
-                Text("Les données de test ont été créées et synchronisées avec Firebase.")
+                Text("test_data_message".localized())
             }
             .onAppear {
                 // Rafraîchissement automatique à l'arrivée sur la page
@@ -217,7 +218,7 @@ struct DashboardView: View {
             columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16
         ) {
             MetricCard(
-                title: "Assets actifs",
+                title: "active_assets".localized(),
                 value: "\(assetsOK)",
                 change: nil,
                 icon: "cube.box.fill",
@@ -225,7 +226,7 @@ struct DashboardView: View {
             )
 
             MetricCard(
-                title: "Articles en stock",
+                title: "stock_items".localized(),
                 value: "\(stockItems.count)",
                 change: nil,
                 icon: "cube.box",
@@ -233,7 +234,7 @@ struct DashboardView: View {
             )
 
             MetricCard(
-                title: "Stock total",
+                title: "total_stock".localized(),
                 value: "\(stockItems.map(\.totalQuantity).reduce(0, +))",
                 change: nil,
                 icon: "square.stack.3d.up.fill",
@@ -241,7 +242,7 @@ struct DashboardView: View {
             )
 
             MetricCard(
-                title: "Mouvements aujourd'hui",
+                title: "movements_today".localized(),
                 value: "\(todayMovementsCount)",
                 change: nil,
                 icon: "arrow.left.arrow.right.circle.fill",
@@ -253,9 +254,9 @@ struct DashboardView: View {
     private var chartsSection: some View {
         VStack(spacing: 16) {
             // Graphique simple des catégories
-            ChartCard(title: "Répartition du stock par catégorie") {
+            ChartCard(title: "stock_distribution".localized()) {
                 if stockItems.isEmpty {
-                    Text("Aucune donnée disponible")
+                    Text("empty_state".localized())
                         .foregroundColor(.secondary)
                         .frame(height: 150)
                 } else {
@@ -279,7 +280,7 @@ struct DashboardView: View {
 
     private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Actions rapides")
+            Text("quick_actions".localized())
                 .font(.headline)
                 .fontWeight(.semibold)
 
@@ -289,7 +290,7 @@ struct DashboardView: View {
                 // Bouton de test pour charger les données d'exemple
                 QuickActionButton(
                     icon: "arrow.clockwise.circle.fill",
-                    title: isLoadingTestData ? "Chargement..." : "Charger données test",
+                    title: isLoadingTestData ? "loading_data".localized() : "load_test_data".localized(),
                     color: .gray,
                     action: {
                         loadTestData()
@@ -299,7 +300,7 @@ struct DashboardView: View {
                 // 🔧 Bouton de debug temporaire pour tester les permissions
                 QuickActionButton(
                     icon: "person.badge.key.fill",
-                    title: "Debug Permissions",
+                    title: "debug_permissions".localized(),
                     color: .orange,
                     action: {
                         debugPermissions()
@@ -308,7 +309,7 @@ struct DashboardView: View {
 
                 QuickActionButton(
                     icon: "qrcode.viewfinder",
-                    title: "Scanner",
+                    title: "scanner".localized(),
                     color: .blue,
                     action: {
                         // TODO: Navigation vers scanner
@@ -317,7 +318,7 @@ struct DashboardView: View {
 
                 QuickActionButton(
                     icon: "plus.circle",
-                    title: "Nouvel ordre",
+                    title: "new_order".localized(),
                     color: .green,
                     action: {
                         // TODO: Navigation vers nouvel ordre
@@ -326,7 +327,7 @@ struct DashboardView: View {
 
                 QuickActionButton(
                     icon: "truck",
-                    title: "Camions",
+                    title: "trucks".localized(),
                     color: .orange,
                     action: {
                         // TODO: Navigation vers camions
@@ -335,7 +336,7 @@ struct DashboardView: View {
 
                 QuickActionButton(
                     icon: "cube.box",
-                    title: "Stock",
+                    title: "stock".localized(),
                     color: .purple,
                     action: {
                         // TODO: Navigation vers stock
@@ -344,7 +345,7 @@ struct DashboardView: View {
 
                 QuickActionButton(
                     icon: "calendar",
-                    title: "Événements",
+                    title: "events".localized(),
                     color: .red,
                     action: {
                         // TODO: Navigation vers événements
@@ -353,7 +354,7 @@ struct DashboardView: View {
 
                 QuickActionButton(
                     icon: "chart.bar",
-                    title: "Rapports",
+                    title: "reports".localized(),
                     color: .teal,
                     action: {
                         // TODO: Navigation vers rapports
@@ -366,13 +367,13 @@ struct DashboardView: View {
     private var recentActivitySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Activité récente")
+                Text("recent_activity".localized())
                     .font(.headline)
                     .fontWeight(.semibold)
 
                 Spacer()
 
-                Button("Voir tout") {
+                Button("view_all".localized()) {
                     // TODO: Navigation vers historique complet
                 }
                 .font(.subheadline)
@@ -385,7 +386,7 @@ struct DashboardView: View {
                 }
 
                 if recentMovements.isEmpty {
-                    Text("Aucun mouvement récent")
+                    Text("no_recent_movements".localized())
                         .foregroundColor(.secondary)
                         .padding()
                 }

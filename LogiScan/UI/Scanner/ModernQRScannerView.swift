@@ -205,7 +205,7 @@ struct ModernQRScannerView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "list.bullet.clipboard")
                             .font(.title2)
-                        Text("Liste")
+                        Text("list".localized())
                             .font(.caption)
                     }
                     .foregroundColor(.white)

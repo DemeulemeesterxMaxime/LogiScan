@@ -9,6 +9,7 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var localizationManager: LocalizationManager
     @State private var email = ""
     @State private var password = ""
     @State private var isLoading = false
@@ -41,7 +42,7 @@ struct LoginView: View {
                             .font(.system(size: 48, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
 
-                        Text("Gestion d'inventaire intelligente")
+                        Text("app_tagline".localized())
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.9))
                     }
@@ -56,7 +57,7 @@ struct LoginView: View {
                                 .foregroundColor(.gray)
                                 .frame(width: 24)
 
-                            TextField("Email", text: $email)
+                            TextField("email".localized(), text: $email)
                                 .textFieldStyle(.plain)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.emailAddress)
@@ -73,7 +74,7 @@ struct LoginView: View {
                                 .foregroundColor(.gray)
                                 .frame(width: 24)
 
-                            SecureField("Mot de passe", text: $password)
+                            SecureField("password".localized(), text: $password)
                                 .textFieldStyle(.plain)
                         }
                         .padding()
@@ -87,7 +88,7 @@ struct LoginView: View {
                             Button {
                                 showingResetPassword = true
                             } label: {
-                                Text("Mot de passe oublié ?")
+                                Text("forgot_password".localized())
                                     .font(.footnote)
                                     .foregroundColor(.white)
                             }
@@ -102,7 +103,7 @@ struct LoginView: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    Text("Se connecter")
+                                    Text("sign_in".localized())
                                         .fontWeight(.semibold)
                                 }
                             }
@@ -123,9 +124,9 @@ struct LoginView: View {
                             showingSignUp = true
                         } label: {
                             HStack(spacing: 4) {
-                                Text("Pas encore de compte ?")
+                                Text("no_account_yet".localized())
                                     .foregroundColor(.white.opacity(0.9))
-                                Text("S'inscrire")
+                                Text("sign_up".localized())
                                     .fontWeight(.semibold)
                                     .foregroundColor(.white)
                             }
@@ -145,8 +146,8 @@ struct LoginView: View {
                 ResetPasswordView()
                     .environmentObject(authService)
             }
-            .alert("Erreur", isPresented: .constant(errorMessage != nil)) {
-                Button("OK") {
+            .alert("error".localized(), isPresented: .constant(errorMessage != nil)) {
+                Button("ok".localized()) {
                     errorMessage = nil
                 }
             } message: {

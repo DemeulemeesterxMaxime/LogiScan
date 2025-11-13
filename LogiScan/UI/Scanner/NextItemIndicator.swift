@@ -51,7 +51,7 @@ struct NextItemIndicator: View {
                         
                         // Info article
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Prochain article")
+                            Text("next_item".localized())
                                 .font(.caption)
                                 .foregroundColor(.secondary)  // Adaptatif
                             
@@ -112,7 +112,7 @@ struct NextItemIndicator: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Liste complète")
+                        Text("complete_list".localized())
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)  // Adaptatif

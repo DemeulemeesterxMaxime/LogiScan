@@ -11,6 +11,7 @@ import SwiftData
 struct CreateTruckView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var localizationManager: LocalizationManager
     
     @State private var licensePlate = ""
     @State private var name = "" // Nom optionnel du camion
@@ -26,7 +27,7 @@ struct CreateTruckView: View {
             Form {
                 Section("Identification") {
                     HStack {
-                        Text("Immatriculation")
+                        Text("license_plate".localized())
                         Spacer()
                         TextField("AB-123-CD", text: $licensePlate)
                             .textFieldStyle(.roundedBorder)
@@ -53,7 +54,7 @@ struct CreateTruckView: View {
                 Section("Capacités") {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Volume maximum")
+                            Text("max_volume".localized())
                             Spacer()
                             Text(String(format: "%.0f m³", maxVolume))
                                 .foregroundColor(.secondary)
@@ -65,7 +66,7 @@ struct CreateTruckView: View {
                     
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("Poids maximum")
+                            Text("max_weight".localized())
                             Spacer()
                             Text(String(format: "%.0f kg", maxWeight))
                                 .foregroundColor(.secondary)
@@ -115,7 +116,7 @@ struct CreateTruckView: View {
                         VStack(spacing: 12) {
                             ProgressView()
                                 .scaleEffect(1.2)
-                            Text("Enregistrement...")
+                            Text("saving".localized())
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }

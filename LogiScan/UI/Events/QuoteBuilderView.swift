@@ -1934,7 +1934,7 @@ struct StockItemCard: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "plus.circle.fill")
-                            Text("Ajouter")
+                            Text("add_action".localized())
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                         }

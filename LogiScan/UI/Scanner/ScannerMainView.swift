@@ -545,7 +545,7 @@ struct ScannerMainView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.left.arrow.right")
                                 .font(.caption2)
-                            Text("Changer")
+                            Text("change".localized())
                                 .font(.caption2)
                                 .fontWeight(.medium)
                         }
@@ -611,7 +611,7 @@ struct ScannerMainView: View {
                                 }
                             }
                             
-                            Text("Liste")
+                            Text("list".localized())
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.9))
                         }
@@ -657,7 +657,7 @@ struct ScannerMainView: View {
                                     .foregroundColor(isTorchOn ? .yellow : .white)
                             )
                         
-                        Text("Flash")
+                        Text("flash".localized())
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.9))
                     }
@@ -689,7 +689,7 @@ struct ScannerMainView: View {
             // Progress Bar
             VStack(spacing: 8) {
                 HStack {
-                    Text("Progression")
+                    Text("progression".localized())
                         .font(.subheadline)
                         .fontWeight(.medium)
                     

@@ -185,7 +185,7 @@ struct TaskDetailView: View {
     
     private var detailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Détails")
+            Text("details".localized())
                 .font(.headline)
             
             VStack(spacing: 12) {
@@ -291,7 +291,7 @@ struct TaskDetailView: View {
     
     private var planningSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Planification")
+            Text("planning".localized())
                 .font(.headline)
             
             VStack(spacing: 12) {

@@ -394,7 +394,7 @@ struct AdminView: View {
                     .font(.title2)
                     .foregroundStyle(.green)
                 
-                Text("Membres")
+                Text("members".localized())
                     .font(.title2)
                     .fontWeight(.bold)
                 
@@ -546,14 +546,14 @@ struct AdminView: View {
             Form {
                 Section("Membre") {
                     HStack {
-                        Text("Nom")
+                        Text("name".localized())
                         Spacer()
                         Text(member.displayName)
                             .foregroundStyle(.secondary)
                     }
                     
                     HStack {
-                        Text("Email")
+                        Text("email".localized())
                         Spacer()
                         Text(member.email)
                             .foregroundStyle(.secondary)

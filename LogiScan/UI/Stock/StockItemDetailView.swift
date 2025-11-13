@@ -304,7 +304,7 @@ struct TagsSectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Étiquettes")
+                Text("labels".localized())
                     .font(.headline)
 
                 Spacer()
@@ -317,7 +317,7 @@ struct TagsSectionView: View {
             }
 
             if stockItem.tags.isEmpty {
-                Text("Aucune étiquette")
+                Text("no_labels".localized())
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -357,7 +357,7 @@ struct DetailsSectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Détails techniques")
+            Text("technical_details".localized())
                 .font(.headline)
 
             VStack(spacing: 12) {
@@ -431,7 +431,7 @@ struct DetailsSectionView: View {
                             Image(systemName: "doc.text")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("Description technique")
+                            Text("technical_description".localized())
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.secondary)
@@ -454,7 +454,7 @@ struct DetailsSectionView: View {
                             Image(systemName: "wrench.and.screwdriver")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("Spécifications")
+                            Text("specifications".localized())
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.secondary)
@@ -488,7 +488,7 @@ struct DetailsSectionView: View {
                             Image(systemName: "arrow.left.arrow.right")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("Articles substituables")
+                            Text("substitute_items".localized())
                                 .font(.subheadline)
                                 .fontWeight(.medium)
                                 .foregroundColor(.secondary)
@@ -566,7 +566,7 @@ struct SerializedAssetsSectionView: View {
                     Image(systemName: "cube.box")
                         .font(.headline)
                         .foregroundColor(.blue)
-                    Text("Références individuelles")
+                    Text("individual_references".localized())
                         .font(.headline)
                     
                     Spacer()
@@ -890,7 +890,7 @@ struct MovementHistorySectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Mouvements récents")
+                Text("recent_movements".localized())
                     .font(.headline)
 
                 Spacer()
@@ -980,7 +980,7 @@ struct QuickActionsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Actions rapides")
+            Text("quick_actions".localized())
                 .font(.headline)
 
             HStack(spacing: 12) {
@@ -1180,26 +1180,26 @@ struct QuantityAdjustmentSheet: View {
                         }
                     }
                 } header: {
-                    Text("État actuel")
+                    Text("current_state".localized())
                 }
 
                 Section {
                     if adjustmentType == .total {
                         Picker("Action", selection: $isAdding) {
-                            Text("Ajouter").tag(true)
-                            Text("Retirer").tag(false)
+                            Text("add_action".localized()).tag(true)
+                            Text("remove_action".localized()).tag(false)
                         }
                         .pickerStyle(.segmented)
                     } else {
                         Picker("Action", selection: $isAdding) {
-                            Text("Vers maintenance").tag(true)
-                            Text("Depuis maintenance").tag(false)
+                            Text("to_maintenance".localized()).tag(true)
+                            Text("from_maintenance".localized()).tag(false)
                         }
                         .pickerStyle(.segmented)
                     }
 
                     HStack {
-                        Text("Quantité")
+                        Text("quantity".localized())
                         Spacer()
                         TextField("0", text: $adjustmentQuantity)
                             .keyboardType(.numberPad)
@@ -1210,7 +1210,7 @@ struct QuantityAdjustmentSheet: View {
                     TextField("Raison (optionnel)", text: $reason, axis: .vertical)
                         .lineLimit(3...6)
                 } header: {
-                    Text("Ajustement")
+                    Text("adjustment".localized())
                 }
 
                 if let quantity = Int(adjustmentQuantity), quantity > 0 {
@@ -1252,7 +1252,7 @@ struct QuantityAdjustmentSheet: View {
                             }
                         }
                     } header: {
-                        Text("Aperçu")
+                        Text("preview".localized())
                     }
                 }
             }
@@ -1369,7 +1369,7 @@ struct AddAssetSheet: View {
                             .foregroundColor(.blue)
                     }
                 } header: {
-                    Text("Article")
+                    Text("article".localized())
                 }
 
                 Section {
@@ -1390,14 +1390,14 @@ struct AddAssetSheet: View {
                         .foregroundColor(.secondary)
                     }
                 } header: {
-                    Text("Quantité")
+                    Text("quantity".localized())
                 }
 
                 Section {
                     TextField("Commentaires (optionnel)", text: $comments, axis: .vertical)
                         .lineLimit(3...6)
                 } header: {
-                    Text("Informations complémentaires")
+                    Text("additional_info".localized())
                 }
 
                 Section {
@@ -1420,7 +1420,7 @@ struct AddAssetSheet: View {
                         }
                     }
                 } header: {
-                    Text("Aperçu")
+                    Text("preview".localized())
                 }
             }
             .navigationTitle("Ajouter des références")

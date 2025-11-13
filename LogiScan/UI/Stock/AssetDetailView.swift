@@ -144,7 +144,7 @@ struct AssetDetailView: View {
                         HStack {
                             Image(systemName: "text.bubble.fill")
                                 .foregroundColor(.blue)
-                            Text("Commentaires")
+                            Text("comments".localized())
                                 .font(.headline)
 
                             Spacer()
@@ -168,7 +168,7 @@ struct AssetDetailView: View {
                                 )
                         } else {
                             if asset.comments.isEmpty {
-                                Text("Aucun commentaire")
+                                Text("no_comments".localized())
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                     .italic()
@@ -192,7 +192,7 @@ struct AssetDetailView: View {
                         HStack {
                             Image(systemName: "tag.fill")
                                 .foregroundColor(.orange)
-                            Text("Étiquettes")
+                            Text("labels".localized())
                                 .font(.headline)
 
                             Spacer()
@@ -220,7 +220,7 @@ struct AssetDetailView: View {
                         }
 
                         if asset.tags.isEmpty {
-                            Text("Aucune étiquette")
+                            Text("no_labels".localized())
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .italic()
@@ -262,7 +262,7 @@ struct AssetDetailView: View {
 
                     // Infos de base
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Informations")
+                        Text("info".localized())
                             .font(.headline)
 
                         // Status
@@ -295,7 +295,7 @@ struct AssetDetailView: View {
                                 Text("Localisation:")
                                     .foregroundColor(.secondary)
                                 Spacer()
-                                Text("Non définie")
+                                Text("not_defined".localized())
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
                             }
@@ -336,7 +336,7 @@ struct AssetDetailView: View {
                                 Text(lastMaintenance.formatted(date: .abbreviated, time: .omitted))
                                     .fontWeight(.medium)
                             } else {
-                                Text("Jamais")
+                                Text("never".localized())
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
                             }
@@ -354,7 +354,7 @@ struct AssetDetailView: View {
                                     .fontWeight(.medium)
                                     .foregroundColor(asset.needsMaintenance ? .red : .primary)
                             } else {
-                                Text("Non planifiée")
+                                Text("not_planned".localized())
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
                             }
@@ -742,7 +742,7 @@ struct MaintenanceSchedulerView: View {
                 
                 Toggle("Inclure l'heure", isOn: $includeTime)
             } header: {
-                Text("Planification")
+                Text("planning".localized())
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("La maintenance sera planifiée pour le:")
@@ -758,7 +758,7 @@ struct MaintenanceSchedulerView: View {
                 HStack {
                     Image(systemName: "lightbulb.fill")
                         .foregroundColor(.orange)
-                    Text("Conseil")
+                    Text("advice".localized())
                         .fontWeight(.semibold)
                 }
                 

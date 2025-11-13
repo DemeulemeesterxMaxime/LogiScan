@@ -78,7 +78,7 @@ struct RoleBadge: View {
 
 #Preview {
     VStack(spacing: 20) {
-        Text("Small Size")
+        Text("small_size".localized())
             .font(.headline)
         HStack {
             RoleBadge(role: .admin, size: .small)
@@ -89,7 +89,7 @@ struct RoleBadge: View {
         
         Divider()
         
-        Text("Medium Size")
+        Text("medium_size".localized())
             .font(.headline)
         HStack {
             RoleBadge(role: .admin, size: .medium)
@@ -100,7 +100,7 @@ struct RoleBadge: View {
         
         Divider()
         
-        Text("Large Size")
+        Text("large_size".localized())
             .font(.headline)
         VStack(alignment: .leading, spacing: 12) {
             RoleBadge(role: .admin, size: .large)

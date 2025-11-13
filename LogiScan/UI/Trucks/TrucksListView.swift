@@ -10,6 +10,7 @@ import SwiftUI
 
 struct TrucksListView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var localizationManager: LocalizationManager
     @Query private var trucks: [Truck]
     @Query private var events: [Event]
     @StateObject private var syncManager = SyncManager()
@@ -56,7 +57,7 @@ struct TrucksListView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         FilterChip(
-                            title: "Tous",
+                            title: "all".localized(),
                             isSelected: selectedStatus == nil,
                             action: { selectedStatus = nil }
                         )
@@ -128,7 +129,7 @@ struct TrucksListView: View {
                     }
                 }
             }
-            .navigationTitle("Flotte")
+            .navigationTitle("trucks".localized())
             .refreshable {
                 await syncManager.syncFromFirebase(modelContext: modelContext)
             }
@@ -158,7 +159,7 @@ struct TrucksListView: View {
                         
                         Spacer()
                     }
-                    .navigationTitle("Choisir une date")
+                    .navigationTitle("select_date".localized())
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
@@ -244,7 +245,7 @@ struct TruckRow: View {
 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Capacité")
+                        Text("capacity".localized())
                             .font(.caption2)
                             .foregroundColor(.secondary)
 
@@ -256,7 +257,7 @@ struct TruckRow: View {
                     Spacer()
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Volume")
+                        Text("volume".localized())
                             .font(.caption2)
                             .foregroundColor(.secondary)
 

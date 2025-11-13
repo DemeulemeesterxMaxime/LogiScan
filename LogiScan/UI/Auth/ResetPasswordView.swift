@@ -10,6 +10,7 @@ import SwiftUI
 struct ResetPasswordView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var localizationManager: LocalizationManager
 
     @State private var email = ""
     @State private var isLoading = false
@@ -35,12 +36,12 @@ struct ResetPasswordView: View {
                             .font(.system(size: 60))
                             .foregroundColor(.white)
 
-                        Text("Mot de passe oublié")
+                        Text("forgot_password".localized())
                             .font(.title)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
 
-                        Text("Entrez votre email pour recevoir un lien de réinitialisation")
+                        Text("reset_password_instructions".localized())
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.9))
                             .multilineTextAlignment(.center)
@@ -56,7 +57,7 @@ struct ResetPasswordView: View {
                                 .foregroundColor(.gray)
                                 .frame(width: 24)
 
-                            TextField("Email", text: $email)
+                            TextField("email".localized(), text: $email)
                                 .textFieldStyle(.plain)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.emailAddress)
@@ -75,7 +76,7 @@ struct ResetPasswordView: View {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 } else {
-                                    Text("Envoyer le lien")
+                                    Text("send_reset_link".localized())
                                         .fontWeight(.semibold)
                                 }
                             }

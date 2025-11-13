@@ -10,6 +10,7 @@ import SwiftUI
 
 struct StockListView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject var localizationManager: LocalizationManager
     @Query private var stockItems: [StockItem]
     @Query private var allAssets: [Asset]
     @StateObject private var syncManager = SyncManager()
@@ -103,7 +104,7 @@ struct StockListView: View {
                     stockList
                 }
             }
-            .navigationTitle("Stock")
+            .navigationTitle("stock".localized())
             .navigationBarTitleDisplayMode(.inline)
             .refreshable {
                 await syncManager.syncFromFirebase(modelContext: modelContext)
@@ -218,7 +219,7 @@ struct StockListView: View {
                 
                 if activeFiltersCount > 0 {
                     Button(action: clearAllFilters) {
-                        Text("Tout effacer")
+                        Text("clear_all".localized())
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(.red)
@@ -275,11 +276,11 @@ struct StockListView: View {
                 .foregroundColor(.secondary.opacity(0.5))
             
             VStack(spacing: 8) {
-                Text("Aucun article en stock")
+                Text("no_items_in_stock".localized())
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                Text("Commencez par ajouter votre premier article")
+                Text("add_first_item".localized())
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -288,7 +289,7 @@ struct StockListView: View {
             Button(action: { showingAddItem = true }) {
                 HStack(spacing: 8) {
                     Image(systemName: "plus.circle.fill")
-                    Text("Configurer un nouvel article")
+                    Text("configure_new_item".localized())
                 }
                 .font(.headline)
                 .foregroundColor(.white)
@@ -314,7 +315,7 @@ struct StockListView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.secondary.opacity(0.5))
             
-            Text("Aucun résultat")
+            Text("no_results".localized())
                 .font(.title2)
                 .fontWeight(.semibold)
             
@@ -338,7 +339,7 @@ struct StockListView: View {
     
     private var quickActionsPreview: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Actions rapides")
+            Text("quick_actions".localized())
                 .font(.headline)
                 .foregroundColor(.secondary)
             
@@ -406,7 +407,7 @@ struct StockListView: View {
                             }
                         }
                     } header: {
-                        Text("Type de matériel")
+                        Text("equipment_type".localized())
                     }
                 }
                 
@@ -438,7 +439,7 @@ struct StockListView: View {
                             }
                         }
                     } header: {
-                        Text("Catégories")
+                        Text("categories".localized())
                     }
                 }
                 
@@ -478,13 +479,13 @@ struct StockListView: View {
                             }
                         }
                     } header: {
-                        Text("Étiquettes")
+                        Text("tags".localized())
                     } footer: {
-                        Text("Seules les étiquettes utilisées sont affichées")
+                        Text("only_used_tags_shown".localized())
                     }
                 }
             }
-            .navigationTitle("Filtres")
+            .navigationTitle("filters".localized())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -564,7 +565,7 @@ struct StockListView: View {
                                 .frame(width: 40)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("Synchroniser maintenant")
+                                Text("sync_now".localized())
                                     .font(.body)
                                     .fontWeight(.medium)
                                 
@@ -573,7 +574,7 @@ struct StockListView: View {
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 } else {
-                                    Text("Jamais synchronisé")
+                                    Text("never_synced".localized())
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -587,7 +588,7 @@ struct StockListView: View {
                         }
                     }
                 } header: {
-                    Text("Actions disponibles")
+                    Text("available_actions".localized())
                 }
             }
             .navigationTitle("Actions rapides")
@@ -736,7 +737,7 @@ struct StockItemRow: View {
                     .fontWeight(.bold)
                     .foregroundColor(quantities.available > 0 ? .green : .red)
 
-                Text("disponible")
+                Text("available_state".localized())
                     .font(.caption)
                     .foregroundColor(.secondary)
 
@@ -824,7 +825,7 @@ struct BulkQRCodePrintView: View {
                                 Text(item.name)
                                     .fontWeight(.medium)
                                     .foregroundColor(.primary)
-                                Text("Article principal")
+                                Text("main_item".localized())
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

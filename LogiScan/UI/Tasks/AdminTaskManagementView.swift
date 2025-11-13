@@ -312,7 +312,7 @@ struct AdminTaskManagementView: View {
     
     private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Actions rapides")
+            Text("quick_actions".localized())
                 .font(.headline)
                 .fontWeight(.semibold)
             
