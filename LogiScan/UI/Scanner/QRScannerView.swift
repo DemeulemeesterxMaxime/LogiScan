@@ -92,51 +92,19 @@ class QRScannerViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupCamera()
-        
-        // 🆕 Ajouter un gesture recognizer pour le tap
-        if requiresTapToScan {
-            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
-            view.addGestureRecognizer(tapGesture)
-            view.isUserInteractionEnabled = true
-        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         startScanning()
         
-        // Si pas de tap requis, autoriser le scan immédiatement
-        if !requiresTapToScan {
-            canScan = true
-        }
+        // Autoriser le scan automatiquement
+        canScan = true
     }
     
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         stopScanning()
-    }
-    
-    // 🆕 Handler pour le tap
-    @objc private func handleTap() {
-        if requiresTapToScan && !canScan {
-            canScan = true
-            // Feedback visuel et haptique
-            AudioServicesPlaySystemSound(SystemSoundID(1104)) // Tap sound
-            
-            // Animation visuelle pour indiquer que le scan est activé
-            let flashView = UIView(frame: view.bounds)
-            flashView.backgroundColor = .systemBlue
-            flashView.alpha = 0.3
-            view.addSubview(flashView)
-            
-            UIView.animate(withDuration: 0.2) {
-                flashView.alpha = 0
-            } completion: { _ in
-                flashView.removeFromSuperview()
-            }
-            
-            print("📸 Tap détecté - Scan activé pour le prochain code QR")
-        }
     }
     
     private func setupCamera() {
@@ -182,60 +150,7 @@ class QRScannerViewController: UIViewController {
         previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(previewLayer)
         
-        // Ajouter un overlay pour indiquer la zone de scan
-        setupScanOverlay()
-    }
-    
-    private func setupScanOverlay() {
-        let overlayView = UIView(frame: view.bounds)
-        overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-        
-        let scanRect = CGRect(
-            x: view.bounds.width * 0.1,
-            y: view.bounds.height * 0.3,
-            width: view.bounds.width * 0.8,
-            height: view.bounds.width * 0.8
-        )
-        
-        let scanWindow = UIBezierPath(rect: scanRect)
-        let fullPath = UIBezierPath(rect: view.bounds)
-        fullPath.append(scanWindow)
-        fullPath.usesEvenOddFillRule = true
-        
-        let maskLayer = CAShapeLayer()
-        maskLayer.path = fullPath.cgPath
-        maskLayer.fillRule = .evenOdd
-        overlayView.layer.mask = maskLayer
-        
-        // Ajouter des coins pour indiquer la zone de scan
-        let cornerLength: CGFloat = 30
-        let cornerWidth: CGFloat = 4
-        
-        let corners = [
-            // Top-left
-            CGRect(x: scanRect.minX, y: scanRect.minY, width: cornerLength, height: cornerWidth),
-            CGRect(x: scanRect.minX, y: scanRect.minY, width: cornerWidth, height: cornerLength),
-            // Top-right
-            CGRect(x: scanRect.maxX - cornerLength, y: scanRect.minY, width: cornerLength, height: cornerWidth),
-            CGRect(x: scanRect.maxX - cornerWidth, y: scanRect.minY, width: cornerWidth, height: cornerLength),
-            // Bottom-left
-            CGRect(x: scanRect.minX, y: scanRect.maxY - cornerWidth, width: cornerLength, height: cornerWidth),
-            CGRect(x: scanRect.minX, y: scanRect.maxY - cornerLength, width: cornerWidth, height: cornerLength),
-            // Bottom-right
-            CGRect(x: scanRect.maxX - cornerLength, y: scanRect.maxY - cornerWidth, width: cornerLength, height: cornerWidth),
-            CGRect(x: scanRect.maxX - cornerWidth, y: scanRect.maxY - cornerLength, width: cornerWidth, height: cornerLength)
-        ]
-        
-        for corner in corners {
-            let cornerView = UIView(frame: corner)
-            cornerView.backgroundColor = .systemBlue
-            overlayView.addSubview(cornerView)
-        }
-        
-        view.addSubview(overlayView)
-        
-        // ✅ NE PLUS afficher le message "Appuyez sur l'écran"
-        // Le scan est maintenant automatique par défaut
+        // ✅ NE PLUS ajouter d'overlay ici - géré par SwiftUI ModernQRScannerView
     }
     
     func startScanning() {

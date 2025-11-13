@@ -39,13 +39,13 @@ struct ModernQRScannerView: View {
                 scannedCode: $scannedCode,
                 isScanning: $isScanning,
                 isTorchOn: $isTorchOn,
-                requiresTapToScan: true,  // ✅ Scan manuel via bouton
+                requiresTapToScan: false,  // ✅ Scan automatique - pas besoin de tap
                 onCodeScanned: handleScan
             )
             .ignoresSafeArea()
             
-            // Overlay avec zone de scan et fond grisé
-            scanOverlay
+            // Zone de scan avec coins uniquement (pas de fond sombre)
+            scanFrameOnly
             
             // Contrôles de scan
             VStack {
@@ -55,9 +55,62 @@ struct ModernQRScannerView: View {
                     .padding(.bottom, 40)
             }
         }
+        .contentShape(Rectangle())  // ✅ Permet le tap sur toute la vue
+        .onTapGesture {
+            // Le tap déclenche le scan si arrêté
+            if !isScanning {
+                withAnimation(.spring(response: 0.3)) {
+                    isScanning = true
+                }
+            }
+        }
     }
     
-    // MARK: - Scan Overlay
+    // MARK: - Scan Frame Only (coins uniquement, pas de fond sombre)
+    
+    private var scanFrameOnly: some View {
+        GeometryReader { geometry in
+            let scanSize = geometry.size.width * 0.7
+            let scanRect = CGRect(
+                x: (geometry.size.width - scanSize) / 2,
+                y: (geometry.size.height - scanSize) / 2,
+                width: scanSize,
+                height: scanSize
+            )
+            
+            ZStack {
+                // Coins colorés uniquement
+                ScanCorners(rect: scanRect)
+                
+                // Ligne de scan animée
+                if isScanning {
+                    ScanningLine(rect: scanRect, isAnimating: $showScanAnimation)
+                }
+                
+                // Texte d'instruction au-dessus de la zone
+                Text("Placez le QR code dans le cadre")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.6))
+                            .shadow(radius: 10)
+                    )
+                    .position(
+                        x: scanRect.midX,
+                        y: scanRect.minY - 40
+                    )
+            }
+            .onAppear {
+                showScanAnimation = true
+            }
+        }
+    }
+    
+    // MARK: - Scan Overlay (OLD - Not used anymore)
     
     private var scanOverlay: some View {
         GeometryReader { geometry in
