@@ -63,6 +63,11 @@ struct ScannerMainView: View {
         .sheet(isPresented: $showListManagement) {
             ScanListBrowserView()
         }
+        .sheet(isPresented: $viewModel.showInventoryList) {
+            if let session = viewModel.currentInventorySession {
+                InventoryListView(session: session)
+            }
+        }
         .alert("Erreur", isPresented: $viewModel.showError) {
             Button("OK") { }
         } message: {
@@ -134,43 +139,35 @@ struct ScannerMainView: View {
     
     private var inventoryProgressSection: some View {
         Group {
-            if selectedMode == .inventory, let session = viewModel.currentSession {
-                let scannedCount = session.scannedAssets.count
-                let totalCount: Int? = {
-                    if let list = session.expectedAssets, !list.isEmpty {
-                        return list.count
-                    }
-                    return nil
-                }()
+            if selectedMode == .inventory, let invSession = viewModel.currentInventorySession {
+                let scannedCount = invSession.totalCount
                 
-                VStack(spacing: 8) {
-                    HStack {
-                        Label("Inventaire", systemImage: "list.clipboard")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        if let total = totalCount {
-                            let progress = Double(scannedCount) / Double(total)
-                            Text("\(scannedCount)/\(total)")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.blue)
-                            
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.gray.opacity(0.2))
-                                    
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.blue)
-                                        .frame(width: geo.size.width * progress)
-                                }
-                            }
-                            .frame(height: 8)
-                        } else {
-                            Text("\(scannedCount) scannés")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.blue)
+                HStack {
+                    Label("Inventaire", systemImage: "list.clipboard")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text("\(scannedCount) scannés")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.blue)
+                    
+                    // Bouton pour voir la liste
+                    Button {
+                        viewModel.showInventoryList = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Voir")
+                            Image(systemName: "chevron.right")
                         }
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.1))
+                        .clipShape(Capsule())
                     }
                 }
                 .padding(.horizontal)
