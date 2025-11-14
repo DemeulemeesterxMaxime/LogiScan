@@ -724,36 +724,25 @@ struct ScannerMainView: View {
     }
     
     private var successAnimationView: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 80, height: 80)
-                    .scaleEffect(viewModel.showSuccessAnimation ? 1.2 : 0.8)
-                    .opacity(viewModel.showSuccessAnimation ? 0.3 : 0)
-                
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 60, height: 60)
-                
-                Image(systemName: "checkmark")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundColor(.white)
-            }
-            .animation(
-                .spring(response: 0.3, dampingFraction: 0.6)
-                    .repeatCount(1),
-                value: viewModel.showSuccessAnimation
-            )
+        ZStack {
+            Circle()
+                .fill(Color.green)
+                .frame(width: 80, height: 80)
+                .scaleEffect(viewModel.showSuccessAnimation ? 1.2 : 0.8)
+                .opacity(viewModel.showSuccessAnimation ? 0.3 : 0)
             
-            Text("Asset scanné !")
-                .font(.headline)
+            Circle()
+                .fill(Color.green)
+                .frame(width: 60, height: 60)
+            
+            Image(systemName: "checkmark")
+                .font(.system(size: 30, weight: .bold))
                 .foregroundColor(.white)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
+        .animation(
+            .spring(response: 0.3, dampingFraction: 0.6)
+                .repeatCount(1),
+            value: viewModel.showSuccessAnimation
         )
     }
     

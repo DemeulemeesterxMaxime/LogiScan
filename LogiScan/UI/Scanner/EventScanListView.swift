@@ -104,9 +104,16 @@ struct EventScanListView: View {
                 .padding()
             }
             
-            // Bouton scanner flottant
+            // Boutons d'action
             if !scanList.isComplete {
-                scanButton
+                VStack(spacing: 12) {
+                    scanButton
+                    
+                    // ✅ Bouton de validation pour forcer la sauvegarde
+                    if scanList.scannedItems > 0 {
+                        validateButton
+                    }
+                }
             }
         }
         .navigationTitle("Liste de préparation")
@@ -330,7 +337,45 @@ struct EventScanListView: View {
             .cornerRadius(12)
             .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         }
-        .padding()
+        .padding(.horizontal)
+    }
+    
+    /// ✅ Bouton pour valider et sauvegarder la progression du scan
+    private var validateButton: some View {
+        Button(action: {
+            // Forcer la sauvegarde
+            do {
+                try modelContext.save()
+                print("✅ [EventScanList] Sauvegarde manuelle réussie")
+                print("   - Liste: \(scanList.displayName)")
+                print("   - Scannés: \(scanList.scannedItems)/\(scanList.totalItems)")
+                print("   - Complète: \(scanList.isComplete)")
+                
+                // Afficher une alerte de confirmation
+                alertTitle = "✅ Sauvegarde réussie"
+                alertMessage = "\(scanList.scannedItems) article(s) scanné(s) ont été sauvegardés."
+                showAlert = true
+            } catch {
+                print("❌ [EventScanList] Erreur sauvegarde: \(error)")
+                alertTitle = "❌ Erreur"
+                alertMessage = "Impossible de sauvegarder: \(error.localizedDescription)"
+                showAlert = true
+            }
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle")
+                    .font(.title2)
+                Text("Valider le scan (\(scanList.scannedItems))")
+                    .font(.headline)
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.green)
+            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        }
+        .padding(.horizontal)
     }
     
     // MARK: - Empty State
