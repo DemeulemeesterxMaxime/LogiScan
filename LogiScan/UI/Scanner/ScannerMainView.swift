@@ -53,12 +53,20 @@ struct ScannerMainView: View {
             selectedMode = .free
             selectedEvent = nil
             selectedScanList = nil
+            
+            // 🆕 Passer le ModelContext au ViewModel
+            viewModel.setModelContext(modelContext)
         }
         .sheet(isPresented: $viewModel.showResult) {
             scanResultSheet
         }
         .sheet(isPresented: $showListManagement) {
             ScanListBrowserView()
+        }
+        .sheet(isPresented: $viewModel.showInventoryList) {
+            if let session = viewModel.currentInventorySession {
+                InventoryListView(session: session)
+            }
         }
         .alert("Erreur", isPresented: $viewModel.showError) {
             Button("OK") { }
@@ -131,43 +139,35 @@ struct ScannerMainView: View {
     
     private var inventoryProgressSection: some View {
         Group {
-            if selectedMode == .inventory, let session = viewModel.currentSession {
-                let scannedCount = session.scannedAssets.count
-                let totalCount: Int? = {
-                    if let list = session.expectedAssets, !list.isEmpty {
-                        return list.count
-                    }
-                    return nil
-                }()
+            if selectedMode == .inventory, let invSession = viewModel.currentInventorySession {
+                let scannedCount = invSession.totalCount
                 
-                VStack(spacing: 8) {
-                    HStack {
-                        Label("Inventaire", systemImage: "list.clipboard")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        if let total = totalCount {
-                            let progress = Double(scannedCount) / Double(total)
-                            Text("\(scannedCount)/\(total)")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.blue)
-                            
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.gray.opacity(0.2))
-                                    
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.blue)
-                                        .frame(width: geo.size.width * progress)
-                                }
-                            }
-                            .frame(height: 8)
-                        } else {
-                            Text("\(scannedCount) scannés")
-                                .font(.subheadline.bold())
-                                .foregroundColor(.blue)
+                HStack {
+                    Label("Inventaire", systemImage: "list.clipboard")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text("\(scannedCount) scannés")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.blue)
+                    
+                    // Bouton pour voir la liste
+                    Button {
+                        viewModel.showInventoryList = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Voir")
+                            Image(systemName: "chevron.right")
                         }
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.1))
+                        .clipShape(Capsule())
                     }
                 }
                 .padding(.horizontal)
@@ -427,8 +427,10 @@ struct ScannerMainView: View {
     
     private func handleModeChange() {
         // Réinitialiser le scanner
-        // ✅ SUPPRIMÉ - Plus besoin de gérer les variables tap
         viewModel.stopScanning()
+        
+        // ✅ Réinitialiser le ViewModel pour éviter les états mixtes
+        viewModel.currentActiveScanList = nil
         
         // Adapter le ViewModel selon le mode
         switch selectedMode {
@@ -442,17 +444,13 @@ struct ScannerMainView: View {
             
         case .event:
             // Mode événement : utiliser la liste sélectionnée
-            if let event = selectedEvent, let _ = selectedScanList {
+            if let event = selectedEvent, let scanList = selectedScanList {
                 // Utiliser un mode approprié selon le LogisticsStatus de l'événement
                 let scanMode = determineScanMode(for: event)
-                // Note: on ne passe pas expectedAssets car la logique de scan utilise maintenant selectedScanList
+                // Définir la liste active dans le ViewModel
+                viewModel.currentActiveScanList = scanList
                 viewModel.selectMode(scanMode, truck: nil, event: event, expectedAssets: nil)
             }
-        }
-        
-        // Redémarrer le scan
-        if cameraPermission == .authorized {
-            viewModel.startScanning()
         }
     }
     
@@ -726,36 +724,25 @@ struct ScannerMainView: View {
     }
     
     private var successAnimationView: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 80, height: 80)
-                    .scaleEffect(viewModel.showSuccessAnimation ? 1.2 : 0.8)
-                    .opacity(viewModel.showSuccessAnimation ? 0.3 : 0)
-                
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 60, height: 60)
-                
-                Image(systemName: "checkmark")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundColor(.white)
-            }
-            .animation(
-                .spring(response: 0.3, dampingFraction: 0.6)
-                    .repeatCount(1),
-                value: viewModel.showSuccessAnimation
-            )
+        ZStack {
+            Circle()
+                .fill(Color.green)
+                .frame(width: 80, height: 80)
+                .scaleEffect(viewModel.showSuccessAnimation ? 1.2 : 0.8)
+                .opacity(viewModel.showSuccessAnimation ? 0.3 : 0)
             
-            Text("Asset scanné !")
-                .font(.headline)
+            Circle()
+                .fill(Color.green)
+                .frame(width: 60, height: 60)
+            
+            Image(systemName: "checkmark")
+                .font(.system(size: 30, weight: .bold))
                 .foregroundColor(.white)
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
+        .animation(
+            .spring(response: 0.3, dampingFraction: 0.6)
+                .repeatCount(1),
+            value: viewModel.showSuccessAnimation
         )
     }
     

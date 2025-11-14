@@ -24,8 +24,7 @@ struct EventScanListView: View {
     @State private var alertMessage = ""
     @State private var selectedFilter: ScanItemStatus? = nil
     @State private var searchText = ""
-    @State private var navigateToNextList = false  // 🆕 Navigation vers liste suivante
-    @State private var nextScanList: ScanList?  // 🆕 Liste suivante
+    @State private var nextScanList: ScanList?  // 🆕 Liste suivante pour navigation
     
     // Throttling pour éviter les scans trop rapides
     @State private var lastScanTime: Date?
@@ -105,9 +104,16 @@ struct EventScanListView: View {
                 .padding()
             }
             
-            // Bouton scanner flottant
+            // Boutons d'action
             if !scanList.isComplete {
-                scanButton
+                VStack(spacing: 12) {
+                    scanButton
+                    
+                    // ✅ Bouton de validation pour forcer la sauvegarde
+                    if scanList.scannedItems > 0 {
+                        validateButton
+                    }
+                }
             }
         }
         .navigationTitle("Liste de préparation")
@@ -142,6 +148,9 @@ struct EventScanListView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(alertMessage)
+        }
+        .navigationDestination(item: $nextScanList) { scanList in
+            EventScanListView(scanList: scanList)
         }
         .onAppear {
             print("🔍 [EventScanListView] onAppear - État initial:")
@@ -328,7 +337,45 @@ struct EventScanListView: View {
             .cornerRadius(12)
             .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         }
-        .padding()
+        .padding(.horizontal)
+    }
+    
+    /// ✅ Bouton pour valider et sauvegarder la progression du scan
+    private var validateButton: some View {
+        Button(action: {
+            // Forcer la sauvegarde
+            do {
+                try modelContext.save()
+                print("✅ [EventScanList] Sauvegarde manuelle réussie")
+                print("   - Liste: \(scanList.displayName)")
+                print("   - Scannés: \(scanList.scannedItems)/\(scanList.totalItems)")
+                print("   - Complète: \(scanList.isComplete)")
+                
+                // Afficher une alerte de confirmation
+                alertTitle = "✅ Sauvegarde réussie"
+                alertMessage = "\(scanList.scannedItems) article(s) scanné(s) ont été sauvegardés."
+                showAlert = true
+            } catch {
+                print("❌ [EventScanList] Erreur sauvegarde: \(error)")
+                alertTitle = "❌ Erreur"
+                alertMessage = "Impossible de sauvegarder: \(error.localizedDescription)"
+                showAlert = true
+            }
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle")
+                    .font(.title2)
+                Text("Valider le scan (\(scanList.scannedItems))")
+                    .font(.headline)
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.green)
+            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        }
+        .padding(.horizontal)
     }
     
     // MARK: - Empty State
@@ -503,6 +550,58 @@ struct EventScanListView: View {
         }
     }
     
+    /// ✅ Marque la liste comme complétée et met à jour le statut de l'événement
+    private func markListAsCompleted() {
+        scanList.status = .completed
+        scanList.completedAt = Date()
+        
+        // Sauvegarder
+        do {
+            try modelContext.save()
+            print("✅ [EventScanList] Liste marquée comme complétée: \(scanList.displayName)")
+            
+            // ✅ Mettre à jour le statut de l'événement
+            updateEventStatus()
+        } catch {
+            print("❌ [EventScanList] Erreur sauvegarde: \(error)")
+        }
+    }
+    
+    /// ✅ Met à jour le statut de l'événement selon la liste complétée
+    private func updateEventStatus() {
+        // Récupérer l'événement
+        let eventId = scanList.eventId
+        let fetchDescriptor = FetchDescriptor<Event>(
+            predicate: #Predicate { $0.eventId == eventId }
+        )
+        
+        guard let event = try? modelContext.fetch(fetchDescriptor).first else {
+            print("❌ [EventScanList] Événement non trouvé")
+            return
+        }
+        
+        // Mettre à jour le statut selon la direction de scan
+        switch scanList.scanDirection {
+        case .stockToTruck:
+            event.logisticsStatus = .inTransitToEvent
+        case .truckToEvent:
+            event.logisticsStatus = .onSite
+        case .eventToTruck:
+            event.logisticsStatus = .inTransitToStock
+        case .truckToStock:
+            event.logisticsStatus = .returned
+        }
+        
+        event.updatedAt = Date()
+        
+        do {
+            try modelContext.save()
+            print("✅ [EventScanList] Statut événement mis à jour: \(event.logisticsStatus)")
+        } catch {
+            print("❌ [EventScanList] Erreur mise à jour événement: \(error)")
+        }
+    }
+    
     // MARK: - Completion Action Button
     
     private var completionActionButton: some View {
@@ -532,7 +631,12 @@ struct EventScanListView: View {
             // Bouton d'action
             if let next = nextList {
                 // Il y a une liste suivante
-                NavigationLink(destination: EventScanListView(scanList: next)) {
+                Button {
+                    // ✅ Marquer la liste actuelle comme complétée
+                    markListAsCompleted()
+                    // Naviguer vers la prochaine liste
+                    nextScanList = next
+                } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.right.circle.fill")
                             .font(.title3)
@@ -567,6 +671,8 @@ struct EventScanListView: View {
             } else {
                 // Pas de liste suivante, proposer de changer d'événement
                 Button(action: {
+                    // ✅ Marquer la liste comme complétée avant de fermer
+                    markListAsCompleted()
                     dismiss() // Retour à la liste des événements
                 }) {
                     HStack(spacing: 12) {

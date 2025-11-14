@@ -10,7 +10,7 @@ import SwiftData
 import SwiftUI
 
 @Model
-final class TodoTask: @unchecked Sendable {
+final class TodoTask {
     @Attribute(.unique) var taskId: String
     var title: String?  // Optionnel : utilise le nom du type si nil
     var taskDescription: String?
