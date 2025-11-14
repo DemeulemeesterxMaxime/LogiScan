@@ -447,8 +447,7 @@ class ScannerViewModel: ObservableObject {
                     rawPayload: scannedCode ?? ""
                 )
                 
-                // Animation de succès
-                showSuccessAnimation = true
+                // ✅ PAS d'animation de succès en mode libre - uniquement les infos
                 playSuccessSound()
                 
                 // Afficher le résultat

@@ -458,14 +458,8 @@ struct AssetDetailView: View {
             .navigationTitle("Détail référence")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuler") {
-                        // Annuler les modifications en rechargeant depuis le contexte
-                        modelContext.rollback()
-                        dismiss()
-                    }
-                }
-
+                // ✅ Pas de bouton Annuler - le bouton retour natif suffit
+                
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Sauvegarder") {
                         // Appliquer le statut sélectionné

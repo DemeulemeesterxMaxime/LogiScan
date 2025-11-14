@@ -45,8 +45,13 @@ class InventorySessionService: ObservableObject {
         try modelContext.save()
         print("✅ [InventorySession] Asset ajouté: \(assetId) (\(session.totalCount) total)")
         
-        // Sauvegarder dans Firebase (asynchrone)
-        try await syncSessionToFirebase(session)
+        // Sauvegarder dans Firebase (asynchrone) - ne pas faire échouer si Firebase indisponible
+        do {
+            try await syncSessionToFirebase(session)
+        } catch {
+            print("⚠️ [InventorySession] Erreur Firebase (non bloquant): \(error.localizedDescription)")
+            // Ne pas propager l'erreur - l'asset est sauvegardé localement
+        }
     }
     
     /// Complète une session et la sauvegarde
