@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftUI
+import SwiftData
 import AVFoundation
 
 @MainActor
@@ -29,12 +30,19 @@ class ScannerViewModel: ObservableObject {
     @Published var scanList: [ScanListItem] = []
     @Published var showScanList = false
     
+    // MARK: - Inventory Session
+    @Published var currentInventorySession: InventorySession?
+    @Published var showInventoryList = false
+    
     // MARK: - Context
     @Published var selectedTruck: Truck?
     @Published var selectedEvent: Event?
     
     // MARK: - Statistics
     @Published var sessionStats: SessionStats = SessionStats()
+    
+    // MARK: - Services
+    private let inventoryService = InventorySessionService()
     
     // MARK: - Animation & Feedback
     @Published var showSuccessAnimation = false
@@ -47,13 +55,21 @@ class ScannerViewModel: ObservableObject {
     
     private let assetRepository: AssetRepositoryProtocol
     private let movementRepository: MovementRepositoryProtocol
+    private var modelContext: ModelContext?  // Context pour les opérations SwiftData
     
     init(
         assetRepository: AssetRepositoryProtocol,
-        movementRepository: MovementRepositoryProtocol
+        movementRepository: MovementRepositoryProtocol,
+        modelContext: ModelContext? = nil
     ) {
         self.assetRepository = assetRepository
         self.movementRepository = movementRepository
+        self.modelContext = modelContext
+    }
+    
+    /// Définit le ModelContext pour les opérations SwiftData
+    func setModelContext(_ context: ModelContext) {
+        self.modelContext = context
     }
     
     // MARK: - Scan Control
@@ -102,8 +118,30 @@ class ScannerViewModel: ObservableObject {
         selectedTruck = truck
         selectedEvent = event
         
-        // Créer une nouvelle session si mode avec workflow
-        if mode != .free {
+        // ✅ Mode inventaire : créer ou récupérer session
+        if mode == .inventory, let context = modelContext {
+            do {
+                // Essayer de récupérer une session active
+                if let activeSession = try inventoryService.fetchActiveSession(modelContext: context) {
+                    currentInventorySession = activeSession
+                    print("✅ [Scanner] Session inventaire récupérée: \(activeSession.totalCount) items")
+                } else {
+                    // Créer nouvelle session
+                    let userId = "CURRENT_USER_ID" // TODO: Récupérer du AuthService
+                    currentInventorySession = inventoryService.createSession(
+                        createdBy: userId,
+                        notes: "Session du \(Date().formatted())",
+                        modelContext: context
+                    )
+                    print("✅ [Scanner] Nouvelle session inventaire créée")
+                }
+            } catch {
+                print("❌ [Scanner] Erreur session inventaire: \(error)")
+            }
+        }
+        
+        // Créer une session classique si mode avec workflow (non-inventory)
+        if mode != .free && mode != .inventory {
             let userId = "CURRENT_USER_ID" // TODO: Récupérer du AuthService
             currentSession = ScanSession(
                 mode: mode,
@@ -118,9 +156,6 @@ class ScannerViewModel: ObservableObject {
                 scanList = expected.map { ScanListItem(asset: $0) }
             }
         }
-        
-        // Démarrer le scan automatiquement
-        startScanning()
     }
     
     func resetMode() {
@@ -351,6 +386,116 @@ class ScannerViewModel: ObservableObject {
                 return
             }
             
+            // 🆕 MODE ÉVÉNEMENTIEL : Utiliser la logique de liste de scan
+            if let scanList = currentActiveScanList, let context = modelContext {
+                do {
+                    try await processScanForList(
+                        asset: foundAsset,
+                        scanList: scanList,
+                        modelContext: context
+                    )
+                    
+                    // Animation de succès
+                    showSuccessAnimation = true
+                    playSuccessSound()
+                    
+                    // Attendre puis arrêter l'animation
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                    showSuccessAnimation = false
+                    
+                    // Vérifier si la liste est complète
+                    if scanList.isComplete {
+                        endCurrentSession()
+                        showSessionComplete()
+                    }
+                    
+                    // ✅ Ne pas redémarrer automatiquement - attendre le prochain hold
+                    return
+                    
+                } catch let scanListError as ScanListError {
+                    await showErrorMessage(scanListError.localizedDescription)
+                    playErrorSound()
+                    
+                    // Attendre puis réinitialiser
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    // ✅ Ne pas redémarrer automatiquement - attendre le prochain hold
+                    return
+                    
+                } catch {
+                    await showErrorMessage("Erreur scan liste: \(error.localizedDescription)")
+                    playErrorSound()
+                    
+                    // Attendre puis réinitialiser
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    // ✅ Ne pas redémarrer automatiquement - attendre le prochain hold
+                    return
+                }
+            }
+            
+            // MODE CLASSIQUE : Logique existante
+            
+            // ✅ En mode LIBRE, toujours afficher les infos de l'asset (pas de gestion de duplicata)
+            if currentMode == .free {
+                // Créer le résultat de scan avec toutes les infos
+                scanResult = ScanResult(
+                    type: .asset,
+                    asset: foundAsset,
+                    title: foundAsset.name,
+                    subtitle: "SKU: \(foundAsset.sku)",
+                    status: foundAsset.status.displayName,
+                    statusColor: foundAsset.status.color,
+                    rawPayload: scannedCode ?? ""
+                )
+                
+                // ✅ PAS d'animation de succès en mode libre - uniquement les infos
+                playSuccessSound()
+                
+                // Afficher le résultat
+                showResult = true
+                stopScanning()
+                return
+            }
+            
+            // ✅ MODE INVENTAIRE : sauvegarder dans la session et Firebase
+            if currentMode == .inventory {
+                if let invSession = currentInventorySession, let context = modelContext {
+                    // Vérifier si déjà scanné
+                    if invSession.scannedAssetIds.contains(foundAsset.assetId) {
+                        showDuplicateWarning = true
+                        playWarningSound()
+                        
+                        // Attendre puis réinitialiser
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                        showDuplicateWarning = false
+                        return
+                    }
+                    
+                    // Ajouter à la session et sauvegarder
+                    try await inventoryService.addAssetToSession(
+                        session: invSession,
+                        assetId: foundAsset.assetId,
+                        modelContext: context
+                    )
+                    
+                    sessionStats.totalScanned = invSession.totalCount
+                    
+                    // Animation de succès
+                    showSuccessAnimation = true
+                    playSuccessSound()
+                    
+                    // Attendre puis arrêter l'animation
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                    showSuccessAnimation = false
+                    
+                    return
+                } else {
+                    await showErrorMessage("Session inventaire non initialisée")
+                    playErrorSound()
+                    return
+                }
+            }
+            
+            // Pour autres modes workflow : vérifier duplicata
             // Vérifier si déjà scanné dans cette session
             if let session = currentSession, session.scannedAssets.contains(foundAsset.assetId) {
                 showDuplicateWarning = true
@@ -359,8 +504,7 @@ class ScannerViewModel: ObservableObject {
                 // Attendre 1 seconde puis reprendre le scan
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 showDuplicateWarning = false
-                startScanning()
-                return
+                return  // ✅ Ne pas restart automatiquement, attendre le hold
             }
             
             // Ajouter à la session
@@ -418,24 +562,11 @@ class ScannerViewModel: ObservableObject {
             showSuccessAnimation = true
             playSuccessSound()
             
-            // Selon le mode, afficher le résultat ou reprendre le scan
-            if currentMode == .free {
-                // Mode libre: afficher le résultat
-                showResult = true
-                stopScanning()
-            } else {
-                // Modes workflow: reprendre le scan après 0.5s
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                showSuccessAnimation = false
-                
-                // Vérifier si la session est complète
-                if let session = currentSession, session.isComplete {
-                    endCurrentSession()
-                    showSessionComplete()
-                } else {
-                    startScanning()
-                }
-            }
+            // Mode inventaire et workflow: feedback visuel puis attendre le prochain hold
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            showSuccessAnimation = false
+            
+            // ✅ Ne pas redémarrer automatiquement - attendre le prochain hold
             
         } catch {
             await showErrorMessage("Erreur lors de la recherche de l'asset: \(error.localizedDescription)")

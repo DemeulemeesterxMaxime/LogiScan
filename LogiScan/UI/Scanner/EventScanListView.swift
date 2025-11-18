@@ -24,8 +24,7 @@ struct EventScanListView: View {
     @State private var alertMessage = ""
     @State private var selectedFilter: ScanItemStatus? = nil
     @State private var searchText = ""
-    @State private var navigateToNextList = false  // 🆕 Navigation vers liste suivante
-    @State private var nextScanList: ScanList?  // 🆕 Liste suivante
+    @State private var nextScanList: ScanList?  // 🆕 Liste suivante pour navigation
     
     // Throttling pour éviter les scans trop rapides
     @State private var lastScanTime: Date?
@@ -94,6 +93,12 @@ struct EventScanListView: View {
                             },
                             onUndo: { assetId in
                                 undoScan(assetId: assetId, item: item)
+                            },
+                            onManualIncrement: {
+                                manualIncrement(item: item)
+                            },
+                            onManualDecrement: {
+                                manualDecrement(item: item)
                             }
                         )
                     }
@@ -105,9 +110,16 @@ struct EventScanListView: View {
                 .padding()
             }
             
-            // Bouton scanner flottant
+            // Boutons d'action
             if !scanList.isComplete {
-                scanButton
+                VStack(spacing: 12) {
+                    scanButton
+                    
+                    // ✅ Bouton de validation pour forcer la sauvegarde
+                    if scanList.scannedItems > 0 {
+                        validateButton
+                    }
+                }
             }
         }
         .navigationTitle("Liste de préparation")
@@ -142,6 +154,9 @@ struct EventScanListView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(alertMessage)
+        }
+        .navigationDestination(item: $nextScanList) { scanList in
+            EventScanListView(scanList: scanList)
         }
         .onAppear {
             print("🔍 [EventScanListView] onAppear - État initial:")
@@ -328,7 +343,45 @@ struct EventScanListView: View {
             .cornerRadius(12)
             .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
         }
-        .padding()
+        .padding(.horizontal)
+    }
+    
+    /// ✅ Bouton pour valider et sauvegarder la progression du scan
+    private var validateButton: some View {
+        Button(action: {
+            // Forcer la sauvegarde
+            do {
+                try modelContext.save()
+                print("✅ [EventScanList] Sauvegarde manuelle réussie")
+                print("   - Liste: \(scanList.displayName)")
+                print("   - Scannés: \(scanList.scannedItems)/\(scanList.totalItems)")
+                print("   - Complète: \(scanList.isComplete)")
+                
+                // Afficher une alerte de confirmation
+                alertTitle = "✅ Sauvegarde réussie"
+                alertMessage = "\(scanList.scannedItems) article(s) scanné(s) ont été sauvegardés."
+                showAlert = true
+            } catch {
+                print("❌ [EventScanList] Erreur sauvegarde: \(error)")
+                alertTitle = "❌ Erreur"
+                alertMessage = "Impossible de sauvegarder: \(error.localizedDescription)"
+                showAlert = true
+            }
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle")
+                    .font(.title2)
+                Text("Valider le scan (\(scanList.scannedItems))")
+                    .font(.headline)
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.green)
+            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+        }
+        .padding(.horizontal)
     }
     
     // MARK: - Empty State
@@ -465,6 +518,62 @@ struct EventScanListView: View {
         }
     }
     
+    // ✅ Validation manuelle : incrémenter la quantité sans scanner
+    private func manualIncrement(item: PreparationListItem) {
+        print("➕ [EventScanListView] manualIncrement - Item: \(item.name)")
+        
+        guard item.quantityScanned < item.quantityRequired else {
+            print("⚠️ Quantité maximale atteinte")
+            return
+        }
+        
+        Task { @MainActor in
+            do {
+                try scanListService.manualIncrement(
+                    sku: item.sku,
+                    scanList: scanList,
+                    modelContext: modelContext
+                )
+                
+                print("✅ [EventScanListView] Quantité incrémentée: \(item.quantityScanned)/\(item.quantityRequired)")
+                
+            } catch {
+                print("❌ [EventScanListView] Erreur incrémentation: \(error.localizedDescription)")
+                alertTitle = "❌ Erreur"
+                alertMessage = "Impossible d'incrémenter: \(error.localizedDescription)"
+                showAlert = true
+            }
+        }
+    }
+    
+    // ✅ Validation manuelle : décrémenter la quantité
+    private func manualDecrement(item: PreparationListItem) {
+        print("➖ [EventScanListView] manualDecrement - Item: \(item.name)")
+        
+        guard item.quantityScanned > 0 else {
+            print("⚠️ Quantité minimale atteinte")
+            return
+        }
+        
+        Task { @MainActor in
+            do {
+                try scanListService.manualDecrement(
+                    sku: item.sku,
+                    scanList: scanList,
+                    modelContext: modelContext
+                )
+                
+                print("✅ [EventScanListView] Quantité décrémentée: \(item.quantityScanned)/\(item.quantityRequired)")
+                
+            } catch {
+                print("❌ [EventScanListView] Erreur décrémentation: \(error.localizedDescription)")
+                alertTitle = "❌ Erreur"
+                alertMessage = "Impossible de décrémenter: \(error.localizedDescription)"
+                showAlert = true
+            }
+        }
+    }
+    
     private func resetScanList() {
         Task { @MainActor in
             do {
@@ -503,6 +612,58 @@ struct EventScanListView: View {
         }
     }
     
+    /// ✅ Marque la liste comme complétée et met à jour le statut de l'événement
+    private func markListAsCompleted() {
+        scanList.status = .completed
+        scanList.completedAt = Date()
+        
+        // Sauvegarder
+        do {
+            try modelContext.save()
+            print("✅ [EventScanList] Liste marquée comme complétée: \(scanList.displayName)")
+            
+            // ✅ Mettre à jour le statut de l'événement
+            updateEventStatus()
+        } catch {
+            print("❌ [EventScanList] Erreur sauvegarde: \(error)")
+        }
+    }
+    
+    /// ✅ Met à jour le statut de l'événement selon la liste complétée
+    private func updateEventStatus() {
+        // Récupérer l'événement
+        let eventId = scanList.eventId
+        let fetchDescriptor = FetchDescriptor<Event>(
+            predicate: #Predicate { $0.eventId == eventId }
+        )
+        
+        guard let event = try? modelContext.fetch(fetchDescriptor).first else {
+            print("❌ [EventScanList] Événement non trouvé")
+            return
+        }
+        
+        // Mettre à jour le statut selon la direction de scan
+        switch scanList.scanDirection {
+        case .stockToTruck:
+            event.logisticsStatus = .inTransitToEvent
+        case .truckToEvent:
+            event.logisticsStatus = .onSite
+        case .eventToTruck:
+            event.logisticsStatus = .inTransitToStock
+        case .truckToStock:
+            event.logisticsStatus = .returned
+        }
+        
+        event.updatedAt = Date()
+        
+        do {
+            try modelContext.save()
+            print("✅ [EventScanList] Statut événement mis à jour: \(event.logisticsStatus)")
+        } catch {
+            print("❌ [EventScanList] Erreur mise à jour événement: \(error)")
+        }
+    }
+    
     // MARK: - Completion Action Button
     
     private var completionActionButton: some View {
@@ -532,7 +693,12 @@ struct EventScanListView: View {
             // Bouton d'action
             if let next = nextList {
                 // Il y a une liste suivante
-                NavigationLink(destination: EventScanListView(scanList: next)) {
+                Button {
+                    // ✅ Marquer la liste actuelle comme complétée
+                    markListAsCompleted()
+                    // Naviguer vers la prochaine liste
+                    nextScanList = next
+                } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "arrow.right.circle.fill")
                             .font(.title3)
@@ -565,15 +731,18 @@ struct EventScanListView: View {
                     .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
                 }
             } else {
-                // Pas de liste suivante, proposer de changer d'événement
+                // ✅ Pas de liste suivante, proposer de voir les autres listes
+                // Cliquable uniquement quand la liste est complétée ET sauvegardée
                 Button(action: {
+                    // ✅ Marquer la liste comme complétée avant de fermer
+                    markListAsCompleted()
                     dismiss() // Retour à la liste des événements
                 }) {
                     HStack(spacing: 12) {
-                        Image(systemName: "calendar.badge.checkmark")
+                        Image(systemName: "list.bullet.clipboard")
                             .font(.title3)
                         
-                        Text("Toutes les listes terminées")
+                        Text("Voir les autres listes")
                             .font(.headline)
                         
                         Spacer()
@@ -607,6 +776,8 @@ struct PreparationItemRow: View {
     let item: PreparationListItem
     let onTapScan: () -> Void
     let onUndo: (String) -> Void
+    let onManualIncrement: () -> Void  // ✅ Callback pour incrémenter manuellement
+    let onManualDecrement: () -> Void  // ✅ Callback pour décrémenter manuellement
     
     @State private var showingDetails = false
     
@@ -632,15 +803,35 @@ struct PreparationItemRow: View {
                 
                 Spacer()
                 
-                // Progression
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("\(item.quantityScanned)/\(item.quantityRequired)")
-                        .font(.headline)
-                        .foregroundColor(item.isComplete ? .green : .primary)
+                // ✅ Boutons de validation manuelle +/-
+                HStack(spacing: 8) {
+                    Button(action: onManualDecrement) {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(item.quantityScanned > 0 ? .orange : .gray.opacity(0.3))
+                    }
+                    .disabled(item.quantityScanned == 0)
+                    .buttonStyle(.plain)
                     
-                    Text("\(item.progressPercentage)%")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    // Progression
+                    VStack(alignment: .center, spacing: 4) {
+                        Text("\(item.quantityScanned)/\(item.quantityRequired)")
+                            .font(.headline)
+                            .foregroundColor(item.isComplete ? .green : .primary)
+                        
+                        Text("\(item.progressPercentage)%")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(minWidth: 60)
+                    
+                    Button(action: onManualIncrement) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(item.quantityScanned < item.quantityRequired ? .green : .gray.opacity(0.3))
+                    }
+                    .disabled(item.quantityScanned >= item.quantityRequired)
+                    .buttonStyle(.plain)
                 }
                 
                 // Bouton expand

@@ -9,12 +9,14 @@ import FirebaseCore
 import FirebaseFirestore
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 @main
 struct LogiScanApp: App {
     let sharedModelContainer: ModelContainer
     @StateObject private var authService = AuthService()
     @StateObject private var userSessionService = UserSessionService()
+    @StateObject private var notificationManager = NotificationManager.shared
 
     init() {
         // 🔥 INITIALISATION FIREBASE
@@ -112,6 +114,10 @@ struct LogiScanApp: App {
                     "Impossible d'initialiser l'application: \(fallbackError.localizedDescription)")
             }
         }
+        
+        // Configuration des notifications
+        print("📬 Configuration du système de notifications...")
+        notificationManager.setupNotificationCategories()
     }
 
     var body: some Scene {
@@ -125,10 +131,16 @@ struct LogiScanApp: App {
                     MainTabView()
                         .environmentObject(authService)
                         .environmentObject(userSessionService)
+                        .environmentObject(notificationManager)
                         .onAppear {
                             // Charger les données d'exemple au premier lancement
                             let context = sharedModelContainer.mainContext
                             SampleData.createSampleData(modelContext: context)
+                            
+                            // Demander les permissions de notification
+                            Task {
+                                await notificationManager.requestAuthorization()
+                            }
                         }
                 } else if let error = userSessionService.error {
                     // Erreur de chargement du profil

@@ -282,7 +282,7 @@ class ScanListService: ObservableObject {
         
         // Vérifier que l'asset n'est pas déjà scanné
         if scanListItem.scannedAssets.contains(assetId) {
-            throw ScanListError.assetAlreadyScanned
+            throw ScanListError.assetAlreadyScanned(assetName: asset.name)
         }
         
         // Vérifier qu'on ne dépasse pas la quantité requise
@@ -423,8 +423,6 @@ class ScanListService: ObservableObject {
         scanList.updatedAt = Date()
         
         // 🔧 Mettre à jour le statut de la liste
-        let oldStatus = scanList.status
-        
         if scanList.scannedItems == 0 {
             scanList.status = .pending
             scanList.completedAt = nil
@@ -444,6 +442,130 @@ class ScanListService: ObservableObject {
         
         print("✅ [ScanListService] Scan annulé avec succès")
         print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    }
+    
+    // MARK: - Validation manuelle (sans scan)
+    
+    /// ✅ Incrémente manuellement la quantité d'un item (validation manuelle sans scan)
+    func manualIncrement(
+        sku: String,
+        scanList: ScanList,
+        modelContext: ModelContext
+    ) throws {
+        print("➕ [ScanListService] Incrémentation manuelle pour SKU: \(sku)")
+        
+        // Trouver le ScanListItem correspondant
+        guard let scanListItem = scanList.items.first(where: { $0.sku == sku }) else {
+            throw ScanListError.itemNotInList
+        }
+        
+        print("   - Item: \(scanListItem.name)")
+        print("   - Quantité avant: \(scanListItem.quantityScanned)/\(scanListItem.quantityRequired)")
+        
+        // Vérifier qu'on ne dépasse pas la quantité requise
+        guard scanListItem.quantityScanned < scanListItem.quantityRequired else {
+            throw ScanListError.quantityExceeded
+        }
+        
+        // Incrémenter la quantité (en ajoutant un ID fictif pour représenter la validation manuelle)
+        let manualId = "MANUAL-\(UUID().uuidString.prefix(8))"
+        scanListItem.addScannedAsset(manualId)
+        
+        print("   - Quantité après: \(scanListItem.quantityScanned)/\(scanListItem.quantityRequired)")
+        print("   - Statut item: \(scanListItem.status.displayName)")
+        
+        // Recalculer le total de la liste
+        let oldScannedItems = scanList.scannedItems
+        scanList.scannedItems = scanList.items.reduce(0) { $0 + $1.quantityScanned }
+        scanList.updatedAt = Date()
+        
+        print("   - Progression liste: \(scanList.scannedItems)/\(scanList.totalItems) (+\(scanList.scannedItems - oldScannedItems))")
+        
+        // Mettre à jour le statut de la liste
+        if scanList.isComplete {
+            scanList.status = .completed
+            scanList.completedAt = Date()
+            print("🎉 Liste complétée!")
+        } else if scanList.status == .pending && scanList.scannedItems > 0 {
+            scanList.status = .inProgress
+            print("▶️ Liste en cours")
+        }
+        
+        // Sauvegarder
+        try modelContext.save()
+        
+        // Synchroniser avec Firebase
+        Task {
+            do {
+                try await syncScanListToFirebase(scanList)
+            } catch {
+                print("⚠️ [ScanListService] Erreur sync Firebase: \(error.localizedDescription)")
+            }
+        }
+        
+        print("✅ [ScanListService] Incrémentation manuelle réussie")
+    }
+    
+    /// ✅ Décrémente manuellement la quantité d'un item
+    func manualDecrement(
+        sku: String,
+        scanList: ScanList,
+        modelContext: ModelContext
+    ) throws {
+        print("➖ [ScanListService] Décrémentation manuelle pour SKU: \(sku)")
+        
+        // Trouver le ScanListItem correspondant
+        guard let scanListItem = scanList.items.first(where: { $0.sku == sku }) else {
+            throw ScanListError.itemNotInList
+        }
+        
+        print("   - Item: \(scanListItem.name)")
+        print("   - Quantité avant: \(scanListItem.quantityScanned)/\(scanListItem.quantityRequired)")
+        
+        // Vérifier qu'il y a quelque chose à décrémenter
+        guard scanListItem.quantityScanned > 0 else {
+            print("⚠️ Aucune quantité à décrémenter")
+            return
+        }
+        
+        // Retirer le dernier asset scanné (priorité aux validations manuelles)
+        if let lastAsset = scanListItem.scannedAssets.last {
+            scanListItem.removeScannedAsset(lastAsset)
+        }
+        
+        print("   - Quantité après: \(scanListItem.quantityScanned)/\(scanListItem.quantityRequired)")
+        print("   - Statut item: \(scanListItem.status.displayName)")
+        
+        // Recalculer le total de la liste
+        scanList.scannedItems = scanList.items.reduce(0) { $0 + $1.quantityScanned }
+        scanList.updatedAt = Date()
+        
+        // Mettre à jour le statut de la liste
+        if scanList.scannedItems == 0 {
+            scanList.status = .pending
+            scanList.completedAt = nil
+            print("⏸️ Liste remise en attente")
+        } else if scanList.status == .completed {
+            scanList.status = .inProgress
+            scanList.completedAt = nil
+            print("▶️ Liste remise en cours")
+        }
+        
+        print("   - Progression liste: \(scanList.scannedItems)/\(scanList.totalItems)")
+        
+        // Sauvegarder
+        try modelContext.save()
+        
+        // Synchroniser avec Firebase
+        Task {
+            do {
+                try await syncScanListToFirebase(scanList)
+            } catch {
+                print("⚠️ [ScanListService] Erreur sync Firebase: \(error.localizedDescription)")
+            }
+        }
+        
+        print("✅ [ScanListService] Décrémentation manuelle réussie")
     }
     
     /// Recalcule et met à jour le statut d'une ScanList en fonction de ses items
@@ -569,51 +691,6 @@ class ScanListService: ObservableObject {
     }
 }
 
-enum ScanListError: LocalizedError {
-    case eventNotFinalized
-    case noItemsInQuote
-    case assetNotFound
-    case skuMismatch(expected: String, found: String)
-    case itemNotInList
-    case assetAlreadyScanned
-    case assetNotScanned
-    case quantityExceeded
-    
-    var errorDescription: String? {
-        switch self {
-        case .eventNotFinalized:
-            return "L'événement n'est pas finalisé. Veuillez d'abord finaliser le devis."
-        case .noItemsInQuote:
-            return "Le devis ne contient aucun article."
-        case .assetNotFound:
-            return "❌ Asset introuvable\n\nVeuillez vérifier le QR code scanné."
-        case .skuMismatch(let expected, let found):
-            return """
-⚠️ Mauvais article scanné
-
-Attendu : \(expected)
-Scanné : \(found)
-
-💡 Scannez le bon article
-"""
-        case .itemNotInList:
-            return """
-❌ Article hors liste
-
-Cet article n'est pas dans la liste de préparation actuelle.
-
-💡 Vérifiez la liste active
-"""
-        case .assetAlreadyScanned:
-            return "✅ Cet asset a déjà été scanné"
-        case .assetNotScanned:
-            return "❌ Cet asset n'a pas été scanné"
-        case .quantityExceeded:
-            return "✅ Quantité déjà atteinte pour cet article"
-        }
-    }
-}
-
 // MARK: - Firebase Synchronization
 
 extension ScanListService {
@@ -661,10 +738,18 @@ extension ScanListService {
         var localScanLists: [ScanList] = []
         for firestoreScanList in firestoreScanLists {
             if let scanList = firestoreScanList.toScanList() {
+                // ✅ SAUVEGARDER les valeurs depuis Firebase AVANT de régénérer les items
+                let firebaseScannedItems = scanList.scannedItems
+                let firebaseStatus = scanList.status
+                let firebaseCompletedAt = scanList.completedAt
+                
+                print("🔄 [ScanListService] Restauration depuis Firebase: \(scanList.displayName)")
+                print("   - Statut Firebase: \(firebaseStatus.displayName)")
+                print("   - Progression Firebase: \(firebaseScannedItems)/\(scanList.totalItems)")
+                
                 modelContext.insert(scanList)
                 
-                // � FIX MAJEUR: Régénérer les PreparationListItems depuis les QuoteItems
-                print("🔄 [ScanListService] Régénération des items pour \(scanList.displayName)...")
+                // 🔥 Régénérer les PreparationListItems depuis les QuoteItems (structure seulement)
                 for quoteItem in quoteItems {
                     let scanListItem = PreparationListItem(
                         scanListId: scanList.scanListId,
@@ -672,7 +757,7 @@ extension ScanListService {
                         name: quoteItem.name,
                         category: quoteItem.category,
                         quantityRequired: quoteItem.quantity,
-                        quantityScanned: 0,  // Reset à 0, sera recalculé par refreshStatus
+                        quantityScanned: 0,  // Sera restauré depuis Firebase
                         scannedAssets: [],
                         status: .pending
                     )
@@ -681,10 +766,14 @@ extension ScanListService {
                     modelContext.insert(scanListItem)
                 }
                 
-                print("✅ [ScanListService] \(scanList.items.count) items régénérés depuis QuoteItems")
+                // ✅ RESTAURER les valeurs depuis Firebase au lieu de tout réinitialiser
+                scanList.scannedItems = firebaseScannedItems
+                scanList.status = firebaseStatus
+                scanList.completedAt = firebaseCompletedAt
                 
-                // Recalculer le statut basé sur les items fraîchement créés
-                try refreshScanListStatus(scanList, modelContext: modelContext)
+                print("✅ [ScanListService] \(scanList.items.count) items créés avec statut restauré")
+                print("   - Statut final: \(scanList.status.displayName)")
+                print("   - Progression finale: \(scanList.scannedItems)/\(scanList.totalItems)")
                 
                 localScanLists.append(scanList)
             }

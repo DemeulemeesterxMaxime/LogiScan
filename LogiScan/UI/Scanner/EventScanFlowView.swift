@@ -16,11 +16,15 @@ struct EventScanFlowView: View {
     
     @Query private var events: [Event]
     @Query private var scanLists: [ScanList]
+    @Query private var quoteItems: [QuoteItem]  // ✅ Pour la synchronisation Firebase
+    
+    @StateObject private var scanListService = ScanListService()  // ✅ Service pour sync Firebase
     
     @State private var currentStep: ScanStep = .selectEvent
     @State private var selectedEvent: Event?
     @State private var selectedScanList: ScanList?
     @State private var showScanner = false
+    @State private var isLoadingLists = false  // ✅ Indicateur de chargement
     
     enum ScanStep {
         case selectEvent
@@ -109,12 +113,7 @@ struct EventScanFlowView: View {
                             event: event,
                             isSelected: selectedEvent?.eventId == event.eventId,
                             onSelect: {
-                                withAnimation(.spring()) {
-                                    selectedEvent = event
-                                    // Pré-sélectionner la première liste
-                                    selectedScanList = availableLists(for: event).first
-                                    currentStep = .selectList
-                                }
+                                selectEvent(event)
                             }
                         )
                     }
@@ -148,21 +147,35 @@ struct EventScanFlowView: View {
                 // Listes disponibles
                 ScrollView {
                     VStack(spacing: 12) {
-                        let lists = availableLists(for: event)
-                        
-                        if lists.isEmpty {
-                            noListsView
+                        // ✅ Indicateur de chargement pendant la sync Firebase
+                        if isLoadingLists {
+                            VStack(spacing: 16) {
+                                ProgressView()
+                                    .scaleEffect(1.5)
+                                
+                                Text("Chargement des listes...")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(40)
                         } else {
-                            ForEach(lists) { list in
-                                ScanListSelectionCard(
-                                    scanList: list,
-                                    isSelected: selectedScanList?.scanListId == list.scanListId,
-                                    onSelect: {
-                                        withAnimation(.spring()) {
-                                            selectedScanList = list
+                            let lists = availableLists(for: event)
+                            
+                            if lists.isEmpty {
+                                noListsView
+                            } else {
+                                ForEach(lists) { list in
+                                    ScanListSelectionCard(
+                                        scanList: list,
+                                        isSelected: selectedScanList?.scanListId == list.scanListId,
+                                        onSelect: {
+                                            withAnimation(.spring()) {
+                                                selectedScanList = list
+                                            }
                                         }
-                                    }
-                                )
+                                    )
+                                }
                             }
                         }
                     }
@@ -273,6 +286,54 @@ struct EventScanFlowView: View {
     private func startScanning() {
         withAnimation(.spring()) {
             currentStep = .scanning
+        }
+    }
+    
+    // ✅ Sélectionner un événement et synchroniser ses listes depuis Firebase
+    private func selectEvent(_ event: Event) {
+        withAnimation(.spring()) {
+            selectedEvent = event
+            currentStep = .selectList
+        }
+        
+        // ✅ Synchroniser les listes de scan depuis Firebase
+        Task {
+            await syncScanLists(for: event)
+        }
+    }
+    
+    // ✅ Synchroniser les listes de scan depuis Firebase
+    private func syncScanLists(for event: Event) async {
+        isLoadingLists = true
+        
+        print("🔄 [EventScanFlowView] Synchronisation des listes depuis Firebase pour événement: \(event.name)")
+        
+        // Récupérer les quoteItems de cet événement
+        let eventQuoteItems = quoteItems.filter { $0.eventId == event.eventId }
+        
+        do {
+            let syncedLists = try await scanListService.fetchScanListsFromFirebase(
+                forEvent: event,
+                quoteItems: eventQuoteItems,
+                modelContext: modelContext
+            )
+            
+            print("✅ [EventScanFlowView] \(syncedLists.count) listes synchronisées depuis Firebase")
+            
+            // Pré-sélectionner la première liste après sync
+            await MainActor.run {
+                selectedScanList = availableLists(for: event).first
+                isLoadingLists = false
+            }
+            
+        } catch {
+            print("⚠️ [EventScanFlowView] Erreur sync Firebase: \(error.localizedDescription)")
+            
+            // En cas d'erreur, utiliser les données locales
+            await MainActor.run {
+                selectedScanList = availableLists(for: event).first
+                isLoadingLists = false
+            }
         }
     }
 }

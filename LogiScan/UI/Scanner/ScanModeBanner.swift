@@ -43,17 +43,24 @@ struct ScanModeBanner: View {
     private func modeButton(_ mode: ScannerMode) -> some View {
         Button {
             print("🔄 [ScanModeBanner] Mode sélectionné: \(mode.displayName)")
-            selectedMode = mode
             
-            if mode != .event {
+            if mode == .event {
+                // ✅ Si déjà en mode event et qu'on re-clique, réinitialiser
+                if selectedMode == .event {
+                    selectedEvent = nil
+                    selectedScanList = nil
+                    print("   → Réinitialisation mode événement")
+                }
+                // Ouvrir le flux en étapes pour sélectionner événement puis liste
+                print("   → Ouverture du flux de sélection événement/liste")
+                showEventScanFlow = true
+            } else {
+                // Basculer vers un autre mode
+                selectedMode = mode
                 // Si on quitte le mode événement, réinitialiser
                 selectedEvent = nil
                 selectedScanList = nil
                 print("   → Événement et liste réinitialisés")
-            } else {
-                // ✅ Ouvrir le flux en étapes pour sélectionner événement puis liste
-                print("   → Ouverture du flux de sélection événement/liste")
-                showEventScanFlow = true
             }
             onModeChange()
         } label: {
