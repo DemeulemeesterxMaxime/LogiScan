@@ -93,6 +93,12 @@ struct EventScanListView: View {
                             },
                             onUndo: { assetId in
                                 undoScan(assetId: assetId, item: item)
+                            },
+                            onManualIncrement: {
+                                manualIncrement(item: item)
+                            },
+                            onManualDecrement: {
+                                manualDecrement(item: item)
                             }
                         )
                     }
@@ -512,6 +518,62 @@ struct EventScanListView: View {
         }
     }
     
+    // ✅ Validation manuelle : incrémenter la quantité sans scanner
+    private func manualIncrement(item: PreparationListItem) {
+        print("➕ [EventScanListView] manualIncrement - Item: \(item.name)")
+        
+        guard item.quantityScanned < item.quantityRequired else {
+            print("⚠️ Quantité maximale atteinte")
+            return
+        }
+        
+        Task { @MainActor in
+            do {
+                try scanListService.manualIncrement(
+                    sku: item.sku,
+                    scanList: scanList,
+                    modelContext: modelContext
+                )
+                
+                print("✅ [EventScanListView] Quantité incrémentée: \(item.quantityScanned)/\(item.quantityRequired)")
+                
+            } catch {
+                print("❌ [EventScanListView] Erreur incrémentation: \(error.localizedDescription)")
+                alertTitle = "❌ Erreur"
+                alertMessage = "Impossible d'incrémenter: \(error.localizedDescription)"
+                showAlert = true
+            }
+        }
+    }
+    
+    // ✅ Validation manuelle : décrémenter la quantité
+    private func manualDecrement(item: PreparationListItem) {
+        print("➖ [EventScanListView] manualDecrement - Item: \(item.name)")
+        
+        guard item.quantityScanned > 0 else {
+            print("⚠️ Quantité minimale atteinte")
+            return
+        }
+        
+        Task { @MainActor in
+            do {
+                try scanListService.manualDecrement(
+                    sku: item.sku,
+                    scanList: scanList,
+                    modelContext: modelContext
+                )
+                
+                print("✅ [EventScanListView] Quantité décrémentée: \(item.quantityScanned)/\(item.quantityRequired)")
+                
+            } catch {
+                print("❌ [EventScanListView] Erreur décrémentation: \(error.localizedDescription)")
+                alertTitle = "❌ Erreur"
+                alertMessage = "Impossible de décrémenter: \(error.localizedDescription)"
+                showAlert = true
+            }
+        }
+    }
+    
     private func resetScanList() {
         Task { @MainActor in
             do {
@@ -669,17 +731,18 @@ struct EventScanListView: View {
                     .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
                 }
             } else {
-                // Pas de liste suivante, proposer de changer d'événement
+                // ✅ Pas de liste suivante, proposer de voir les autres listes
+                // Cliquable uniquement quand la liste est complétée ET sauvegardée
                 Button(action: {
                     // ✅ Marquer la liste comme complétée avant de fermer
                     markListAsCompleted()
                     dismiss() // Retour à la liste des événements
                 }) {
                     HStack(spacing: 12) {
-                        Image(systemName: "calendar.badge.checkmark")
+                        Image(systemName: "list.bullet.clipboard")
                             .font(.title3)
                         
-                        Text("Toutes les listes terminées")
+                        Text("Voir les autres listes")
                             .font(.headline)
                         
                         Spacer()
@@ -713,6 +776,8 @@ struct PreparationItemRow: View {
     let item: PreparationListItem
     let onTapScan: () -> Void
     let onUndo: (String) -> Void
+    let onManualIncrement: () -> Void  // ✅ Callback pour incrémenter manuellement
+    let onManualDecrement: () -> Void  // ✅ Callback pour décrémenter manuellement
     
     @State private var showingDetails = false
     
@@ -738,15 +803,35 @@ struct PreparationItemRow: View {
                 
                 Spacer()
                 
-                // Progression
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("\(item.quantityScanned)/\(item.quantityRequired)")
-                        .font(.headline)
-                        .foregroundColor(item.isComplete ? .green : .primary)
+                // ✅ Boutons de validation manuelle +/-
+                HStack(spacing: 8) {
+                    Button(action: onManualDecrement) {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(item.quantityScanned > 0 ? .orange : .gray.opacity(0.3))
+                    }
+                    .disabled(item.quantityScanned == 0)
+                    .buttonStyle(.plain)
                     
-                    Text("\(item.progressPercentage)%")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    // Progression
+                    VStack(alignment: .center, spacing: 4) {
+                        Text("\(item.quantityScanned)/\(item.quantityRequired)")
+                            .font(.headline)
+                            .foregroundColor(item.isComplete ? .green : .primary)
+                        
+                        Text("\(item.progressPercentage)%")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(minWidth: 60)
+                    
+                    Button(action: onManualIncrement) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(item.quantityScanned < item.quantityRequired ? .green : .gray.opacity(0.3))
+                    }
+                    .disabled(item.quantityScanned >= item.quantityRequired)
+                    .buttonStyle(.plain)
                 }
                 
                 // Bouton expand
